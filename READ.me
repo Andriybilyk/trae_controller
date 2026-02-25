@@ -1,0 +1,169 @@
+You are an expert in embedded systems programming (C++ for ESP32), IoT device development, full-stack web applications (Node.js/TypeScript backend with Express/WebSockets, React/TypeScript frontend with Vite), PID control algorithms, thermocouple interfacing, and kiln/furnace automation systems. Your goal is to analyze, refactor, and enhance the open-source kiln controller codebase from the GitHub repository https://github.com/Andriybilyk/kiln. This repository includes:
+
+Firmware: Embedded C++ code (e.g., src/firmware/enhanced_main.cpp) built with PlatformIO for ESP32 microcontrollers. It handles core kiln operations like temperature reading via MAX31855/MAX31856 thermocouple amplifiers, PID-based heating control using relays/SSRs, WiFi connectivity (AP/STA modes), OTA updates, and basic API endpoints for status and control.
+Backend: Node.js/TypeScript server (e.g., src/backend/server.ts, enhanced_api.ts) running on the ESP32 or a separate host, providing RESTful APIs for kiln status, logging, and control, with WebSocket support for real-time updates.
+Frontend: React/TypeScript web app (e.g., src/frontend/App.tsx, EnhancedDashboard.tsx) for monitoring temperature graphs, status, and basic controls. Note: The original schedule editor was removed; it needs to be reimplemented and enhanced.
+Other Components: Configuration files (platformio.ini, package.json), dependencies (e.g., Arduino libraries for ESP32, Chart.js for graphs, Axios for API calls), and minimal hardware integration (e.g., no native display support yet).
+
+The project is an affordable DIY kiln controller for muffle furnaces, targeting pottery/artists/hobbyists. Base all enhancements on the commercial TAP II kiln controller from SDS Industries as the primary inspiration. Key TAP II features to emulate:
+
+Intuitive, user-friendly interface: Large, readable touchscreen with swipe gestures, minimal menus (e.g., home screen for quick start, schedule library, firing monitor).
+Unlimited custom firing schedules: Multi-step profiles with ramp-up rates (°C/min), target temperatures, hold times, cooling phases, alarms, and options to skip/abort steps.
+Real-time monitoring: Graphical temperature curves (actual vs. setpoint), status indicators (heating, holding, cooling), error alerts (e.g., thermocouple failure, overheat).
+Safety features: Over-temperature protection, door interlock detection, power failure recovery, audible/visual alarms.
+Connectivity: WiFi for remote access, potential for mobile app integration.
+Professional polish: Clean design, error logging, auto-calibration, energy usage tracking.
+
+Prioritize making the controller maximally convenient (plug-and-play for non-programmers), professional (robust, reliable, with documentation), and cost-effective (total hardware < $50 USD, using commodity parts like ESP32-S3 ~$5-7, cheap SSRs ~$5, thermocouples ~$5). Avoid expensive or proprietary hardware; use open-source libraries (e.g., TFT_eSPI for displays, LVGL for GUI, PID_v1 for control).
+Specific Requirements for Refactoring:
+
+Hardware Support and Cost Optimization:
+Core MCU: ESP32-S3 (for better performance, native USB, potential BLE).
+Thermocouple: MAX31855/MAX31856 for K-type probes (accurate to ±2°C).
+Heating Control: SSR or relay module for AC heaters.
+Power: 5V USB or DC input with regulators.
+Sensors: Optional NTC for ambient temp, door switch (GPIO input for safety).
+Storage: SD card or SPIFFS/LittleFS for logs and schedules.
+Target BOM cost: < $50 (list at end).
+
+Display Integration (4.3-inch Option):
+Add support for affordable 4.3" TFT touchscreen (e.g., ILI9341/ILI9488 driver, modules like CrowPanel or ESP32-2432S028 ~$10-15).
+Use libraries: TFT_eSPI for graphics, XPT2046_Touchscreen or LVGL for touch GUI.
+Local UI design like TAP II:
+Home screen: Large buttons for "Start Firing", "Schedules", "Settings".
+Schedule editor: Touch-friendly input with on-screen numeric keypad, drag-and-drop steps (ramp/hold/cool).
+Firing monitor: Real-time graph (line chart of temp vs. time), progress bar, pause/resume/abort buttons.
+Gestures: Swipe to navigate screens, long-press for options.
+Standalone mode: Works without WiFi/web; syncs with web when connected.
+
+Fallback: Support headless mode (no display) for cheaper builds.
+
+Web Interface Enhancements:
+Build on existing React frontend: Make it responsive (mobile/desktop), professional UI/UX like TAP II (clean, dark/light themes, large fonts).
+Key pages: Dashboard (real-time graphs via Chart.js/Recharts, WebSocket updates every 1-5s), Schedule Library (CRUD for unlimited profiles, drag-and-drop editor with validation), Logs (firing history, errors), Settings (WiFi config, calibration).
+Authentication: Simple JWT or basic auth for security.
+OTA: Web-based firmware uploads.
+Hosting: Run on ESP32's built-in server (AsyncWebServer) for local access; optional MQTT for cloud/remote (e.g., via AWS IoT or free brokers).
+
+Future Mobile App Readiness:
+Expose robust API: REST endpoints (GET/POST for status, schedules, control) in enhanced_api.ts; WebSockets for live data.
+Hooks for app: BLE support (ESP32 native) for direct connection; push notifications (integrate Firebase or OneSignal).
+Architecture: Modular (separate concerns: firmware core, API layer, UI), easy to port to React Native/Flutter app (share API logic).
+
+Core Functionality Improvements:
+Firmware (C++):
+Refine PID (autotune option, multi-zone if adding zones cheaply).
+Safety: Max temp limit, thermocouple error detection, watchdog timer.
+Logging: CSV to SD/SPIFFS, energy monitoring (via current sensor if added cheaply).
+Efficiency: Low-power modes, auto-sleep after firing.
+
+Backend: Error handling, schedule persistence (JSON files), integration with display if present.
+Reimplement Schedule Editor: Restore and enhance the removed editor – add TAP II-like features: Step types (ramp to temp at rate, hold for time, cool to temp), alarms per step, cost estimation (based on energy use).
+Modularity: Use defines/macros for optional features (e.g., #ifdef HAS_DISPLAY).
+Testing: Add unit tests (e.g., for PID in PlatformIO), simulate hardware.
+
+Convenience, Professionalism, and Documentation:
+User-friendly: Auto-detect hardware, web-based setup wizard, voice prompts (optional via TTS lib like ESP8266Audio).
+Clean Code: Follow best practices (SOLID principles, comments, ESLint/Prettier for JS/TS, clang-format for C++).
+Internationalization: Support multiple languages (e.g., en/ua).
+README: Update with build instructions, wiring diagrams, TAP II comparison, troubleshooting.
+No complex manuals: In-app help tooltips.
+
+
+Output Format:
+
+Summary of Changes: Step-by-step explanation of modifications, how they emulate TAP II, and benefits (convenience, professionalism, cost).
+Updated Directory Structure: List all files/directories, highlighting new/changed ones.
+Full Code for Key Files: Provide complete, refactored code for:
+Firmware: enhanced_main.cpp (include display handling, PID, API).
+Backend: server.ts, enhanced_api.ts.
+Frontend: App.tsx, EnhancedDashboard.tsx, new ScheduleEditor.tsx.
+New Files: e.g., display_gui.cpp (for TFT), schedule_model.ts (data models).
+
+Bill of Materials (BOM): Table with parts, sources (AliExpress/Amazon), approx. prices, total < $50.
+Testing Instructions: How to build/deploy/test.
+
+Ensure code is modern (ES2023+ for JS, C++11+), secure (input validation), and runnable on low-end hardware. Write clean, commented code – no placeholders.  Функції контролера TAP II Pro від SDS Industries
+TAP II Pro — це вдосконалена версія програмованого цифрового контролера для муфельних печей (кілнів), випущена у 2025 році компанією SDS Industries. Вона призначена для точного керування температурою в багатозонних печах (до 3 зон), духовках або промислових нагрівачах. На відміну від стандартного TAP II, який орієнтований на однозонні печі, TAP II Pro додає незалежне керування зонами, підтримку додаткових типів термопар (R та S), ексклюзивний режим Cone Fire Mode для кераміки, покращений сенсорний екран з кращими кутами огляду, інтегрований WiFi та розширені функції мобільного додатка. Контролер підтримує складні промислові або художні проекти з високою точністю, з акцентом на зручність для новачків. Нижче детальний опис ключових функцій на основі офіційної документації.
+Інтерфейс користувача (User Interface)
+
+Сенсорний екран: Покращений capacitive touchscreen з швидшим відгуком, кращими кутами огляду та більшою чутливістю. Дизайн подібний до смартфона: великий екран для зручного перегляду, індикатори стану, прості графіки розкладів та поточного обпалу.
+Навігація: Інтуїтивна, з прокручуванням списків пальцем, кнопками "Назад", редагування (олівець) та додавання до "Вибраного" (зірочки). Оновлений UI для новачків: спрощені меню, підказки (coach marks) та повнотекстові описи.
+Налаштування дисплея: Регулювання яскравості, вибір одиниць (°F/°C), форматів дати (MM/DD/YY, DD-MMM-YY, DD/MM/YY) та часу (12/24-годинний).
+Калібрування екрану: Доступне через спеціальну послідовність перезавантаження для точного сенсорного відгуку.
+Додаткові елементи: Прості графіки для візуалізації розкладів, індикатори стану зон (до 3) та реального часу обпалу.
+
+Програмування розкладів обпалу (Programming Firing Schedules)
+
+Необмежена кількість розкладів: Створення, редагування, іменування та збереження необмеженої кількості розкладів та кроків. Підтримка багатозонних налаштувань: незалежне програмування для кожної з 3 зон.
+Параметри кроків: Швидкість наростання (Ramp Rate, °C/хв), цільова температура (Setpoint), час утримання (Hold Time), сповіщення (Alerts). Додатково: незалежне керування зонами для складних процесів.
+Ексклюзивний Cone Fire Mode: Спеціальний режим для кераміки — швидке створення розкладів на основі конусів (cone numbers), що забезпечує більшу послідовність та простоту для новачків.
+Редагування: Додавання/видалення кроків (подвійне натискання + підтвердження), редагування через таблиці. Можливість редагування під час обпалу (поточні та майбутні кроки).
+Список "Вибране": Швидкий доступ до улюблених розкладів.
+Розширені можливості: Автоматичні оновлення ПЗ, розрахунок витрат електроенергії для оцінки вартості робіт.
+
+Моніторинг у реальному часі (Real-Time Monitoring)
+
+Екран виконання: Показує поточний крок, температуру в кожній зоні, швидкість наростання, Setpoint, час утримання, пройдений час та графіки (прості лінії для актуальної vs. запланованої температури).
+Графічний моніторинг: Через мобільний додаток — детальні графіки температури хвилину за хвилиною, з підтримкою багатозонного відображення.
+Керування процесом: Пауза/відновлення, пропуск кроку (Skip Step), аварійне зупинення (Abort) з підтвердженням. Реальні часові коригування через додаток.
+Відстеження: Моніторинг витрат електроенергії, стану обладнання (термін служби реле, термопар, елементів).
+Рекомендації: Фізичний нагляд за піччю обов'язковий; контролер не є повним пристроєм безпеки.
+
+Функції безпеки (Safety Features)
+
+Автоматичне відключення: При перевищенні максимальної температури, несправностях або кінці терміну служби компонентів.
+Запобіжні сповіщення: Алерт про наближення кінця терміну служби (реле, термопари, нагрівальні елементи) для запобігання поломкам.
+Екран безпеки: Нагадування про ризики при запуску.
+Відновлення після збою: Продовження з останнього стану після перебоїв живлення (якщо можливо).
+Не є пристроєм безпеки: Виробник наголошує на необхідності фізичного нагляду; не залишати піч без уваги.
+Гарантія: Розширена 3-річна гарантія.
+
+Сповіщення та аларми (Alerts and Alarms)
+
+Сповіщення (Alerts): Звукові/візуальні для подій розкладу (досягнення Setpoint, кінець Hold Time). Вмикаються на крок або глобально; пуш-сповіщення через додаток.
+Аларми (Alarms): Для помилок (перевищення температури, відсутність нагріву, перевищення швидкості, відсутність термопари). Можна вимкнути, але логуються.
+Пуш-сповіщення: Через додаток для просування кроків, завершення, помилок та стану обладнання.
+Запобіжні алерти: Про наближення кінця терміну служби компонентів.
+
+Підключення (Connectivity: WiFi, App)
+
+WiFi: Інтегрований модуль для підключення до мереж; автоматичні оновлення ПЗ. Налаштування: перегляд статусу, IP, UID для додатка.
+Мобільний додаток TAP Kiln Control Mobile (iOS/Android):
+Віддалений моніторинг, керування (зміна розкладів, реальні часові коригування), графіки, журнали.
+Пуш-сповіщення для подій, помилок, стану.
+Преміум-функції: Детальна аналітика, графіки обпалів, віддалений старт (окремий план, без Remote Start у базовій преміум).
+Відстеження витрат електроенергії та сповіщення про обладнання.
+
+Автоматичні оновлення: Через WiFi, без переривання обпалу; вимагають перезавантаження.
+
+Налаштування (Settings)
+
+Дата та час: Встановлення часового поясу, дати/часу з резервною батареєю (CR1220, замінна).
+Сповіщення: Вмикання/вимикання сповіщень, алармів та пуш-нотифікацій.
+Офсет термопари: Корекція на знос датчика (± градуси) для кожної зони.
+Розширені налаштування: Конфігурація для конкретної печі (зони, допоміжний вихід для вентилятора/витяжки), калібрування (точність ±0.1% ±1°C при 77°F).
+Доступність: Не доступні під час обпалу.
+
+Обробка помилок (Error Handling)
+
+Журнал помилок: Детальний список з причинами та рішеннями (наприклад, перевищення температури — перевірка реле; відсутність нагріву — з'єднання; відсутність термопари — заміна). Очищення доступне.
+Логування даних: Локальне (CSV-файли, 220MB внутрішньої пам'яті), передача через email.
+Автоматичні дії: Безпекове відключення при критичних помилках.
+
+Розширені опції (Advanced Options)
+
+Журнал обпалів: Перегляд історії з очищенням; деталі в додатку (графіки для преміум).
+Сумісність: Для багатозонних печей з електронними реле; термопари K/R/S. Діапазон температур: залежить від печі (до 3214°F для R/S). Підтримка 24VAC, до 3 зон, допоміжний вихід (вентилятор/витяжка).
+Апаратні деталі: Входи: до 3 термопар; Виходи: 12VDC, 3 для елементів, 1 допоміжний, 1 безпековий. Точність: ±0.1% ±1°C. Сумісний з більшістю реле-печей; заміна старих контролерів (можлива модифікація коробки).
+Cone Fire Mode: Ексклюзивний для кераміки — швидке програмування на основі конусів для послідовності.
+
+Відмінності від TAP II
+
+Багатозонне керування (3 зони vs. 1).
+Підтримка термопар R/S (крім K).
+Покращений capacitive екран з кращими кутами.
+Cone Fire Mode для новачків.
+Інтегрований WiFi, розширені app-функції (реальні коригування, витрати енергії).
+Допоміжний вихід, логування CSV з email, 3-річна гарантія.
+Ціна: Близько $549 (TAP II) vs. вища для Pro (точна залежить від конфігурації).

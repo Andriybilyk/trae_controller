@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "author": "Trae Assistant",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 100,
+      "left": 300,
+      "attrs": { "flashSize": "16" }
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "lcd1",
+      "top": 50,
+      "left": 600,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-max31855",
+      "id": "max1",
+      "top": 100,
+      "left": 50,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 250,
+      "left": 80,
+      "attrs": { "color": "green", "label": "Door Switch" }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay1",
+      "top": 300,
+      "left": 600,
+      "attrs": { "label": "Zone 1" }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay2",
+      "top": 400,
+      "left": 600,
+      "attrs": { "label": "Zone 2" }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "relay3",
+      "top": 500,
+      "left": 600,
+      "attrs": { "label": "Zone 3" }
+    },
+    {
+      "type": "wokwi-fan",
+      "id": "fan1",
+      "top": 450,
+      "left": 350,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-nfet",
+      "id": "q1",
+      "top": 380,
+      "left": 320,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 360,
+      "left": 220,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 400,
+      "left": 220,
+      "attrs": { "value": "10000" }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "safeRelay",
+      "top": 600,
+      "left": 600,
+      "attrs": { "label": "SAFETY RELAY (Cutoff)" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzz1",
+      "top": 550,
+      "left": 350,
+      "attrs": { "volume": "0.1" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt1",
+      "top": 430,
+      "left": 360,
+      "attrs": { "text": "Cooling Fan" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_inputs",
+      "top": 60,
+      "left": 50,
+      "attrs": { "text": "INPUTS (Sensors)" }
+    },
+    {
+      "type": "wokwi-text",
+      "id": "txt_outputs",
+      "top": 20,
+      "left": 600,
+      "attrs": { "text": "OUTPUTS (Display & Relays)" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    
+    [ "lcd1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "lcd1:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "lcd1:CS", "esp:5", "green", [ "v0" ] ],
+    [ "lcd1:RESET", "esp:4", "purple", [ "v0" ] ],
+    [ "lcd1:DC", "esp:2", "blue", [ "v0" ] ],
+    [ "lcd1:MOSI", "esp:23", "orange", [ "v0" ] ],
+    [ "lcd1:SCK", "esp:18", "yellow", [ "v0" ] ],
+    [ "lcd1:MISO", "esp:19", "white", [ "v0" ] ],
+    [ "lcd1:LED", "esp:3V3", "red", [ "v0" ] ],
+
+    [ "max1:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "max1:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "max1:CLK", "esp:11", "yellow", [ "v0" ] ],
+    [ "max1:CS", "esp:10", "green", [ "v0" ] ],
+    [ "max1:DO", "esp:12", "white", [ "v0" ] ],
+
+    [ "relay1:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "relay1:GND", "esp:GND.3", "black", [ "v0" ] ],
+    [ "relay1:IN", "esp:15", "blue", [ "v0" ] ],
+
+    [ "relay2:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "relay2:GND", "esp:GND.4", "black", [ "v0" ] ],
+    [ "relay2:IN", "esp:16", "blue", [ "v0" ] ],
+
+    [ "relay3:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "relay3:GND", "esp:GND.5", "black", [ "v0" ] ],
+    [ "relay3:IN", "esp:17", "blue", [ "v0" ] ],
+
+    [ "btn1:2.r", "esp:GND.6", "black", [ "v0" ] ],
+    [ "btn1:1.l", "esp:14", "green", [ "v0" ] ],
+
+    [ "fan1:VCC", "esp:5V", "red", [ "v0" ] ], 
+    [ "fan1:GND", "q1:D", "black", [ "v0" ] ],
+    [ "q1:S", "esp:GND.7", "black", [ "v0" ] ],
+    [ "q1:G", "r1:2", "green", [ "v0" ] ],
+    [ "r1:1", "esp:13", "green", [ "v0" ] ],
+    [ "r2:1", "q1:G", "green", [ "v0" ] ],
+    [ "r2:2", "esp:GND.8", "black", [ "v0" ] ],
+
+    [ "safeRelay:VCC", "esp:5V", "red", [ "v0" ] ],
+    [ "safeRelay:GND", "esp:GND.9", "black", [ "v0" ] ],
+    [ "safeRelay:IN", "esp:6", "purple", [ "v0" ] ],
+
+    [ "buzz1:2", "esp:GND.10", "black", [ "v0" ] ],
+    [ "buzz1:1", "esp:7", "red", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

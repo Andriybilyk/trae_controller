@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" style="background-color:white; font-family: Arial, sans-serif;">
+  <!-- Title -->
+  <text x="500" y="30" text-anchor="middle" font-size="20" font-weight="bold">Trae Controller Wiring (Based on tdfguy2002/KilnController)</text>
+
+  <!-- === 220V AC MAINS SECTION (LEFT) === -->
+  <g transform="translate(50, 100)">
+    <!-- Mains Plug -->
+    <rect x="0" y="0" width="40" height="60" fill="#bdc3c7" stroke="black"/>
+    <text x="20" y="35" text-anchor="middle" font-size="10">220V</text>
+    <text x="20" y="50" text-anchor="middle" font-size="10">AC</text>
+    
+    <!-- L & N Wires -->
+    <path d="M40 10 L400 10" stroke="#c0392b" stroke-width="4" /> <!-- Live -->
+    <path d="M40 50 L100 50" stroke="#2980b9" stroke-width="4" /> <!-- Neutral -->
+    <text x="80" y="25" fill="#c0392b" font-weight="bold">L (Phase)</text>
+    <text x="60" y="70" fill="#2980b9" font-weight="bold">N (Neutral)</text>
+
+    <!-- Safety Relay (Mechanical) -->
+    <g transform="translate(150, -20)">
+        <rect width="80" height="100" fill="none" stroke="black" stroke-dasharray="5,5"/>
+        <text x="40" y="-10" text-anchor="middle" font-size="12">Safety Relay</text>
+        <rect x="10" y="10" width="60" height="80" fill="#e67e22" stroke="black"/>
+        <text x="40" y="55" text-anchor="middle" fill="white" font-weight="bold">RELAY</text>
+        <!-- Coil connections -->
+        <circle cx="20" cy="80" r="3" fill="#2c3e50"/>
+        <circle cx="60" cy="80" r="3" fill="#2c3e50"/>
+        <text x="40" y="95" text-anchor="middle" font-size="8">Coil (5V)</text>
+    </g>
+    
+    <!-- 12V PSU -->
+    <g transform="translate(100, 200)">
+        <rect width="80" height="100" fill="#95a5a6" stroke="black"/>
+        <text x="40" y="50" text-anchor="middle" font-weight="bold" fill="white">PSU</text>
+        <text x="40" y="70" text-anchor="middle" fill="white" font-size="10">12V DC</text>
+        <!-- AC Input -->
+        <text x="-10" y="20" font-size="10">L</text>
+        <text x="-10" y="80" font-size="10">N</text>
+    </g>
+  </g>
+
+  <!-- === LOW VOLTAGE CONTROL SECTION (RIGHT) === -->
+  
+  <!-- ESP32 -->
+  <g transform="translate(500, 200)">
+    <rect width="140" height="300" fill="#2c3e50" stroke="black" rx="5"/>
+    <text x="70" y="30" text-anchor="middle" fill="white" font-weight="bold">ESP32-S3</text>
+    
+    <!-- Pins Left -->
+    <g font-size="10" fill="white" text-anchor="end">
+        <text x="10" y="60">5V/VIN</text>
+        <text x="10" y="90">GND</text>
+        <text x="10" y="120">IO13 (Fan)</text>
+        <text x="10" y="150">IO6 (Safe)</text>
+        <text x="10" y="180">IO7 (Buzz)</text>
+        <text x="10" y="210">IO15 (Z1)</text>
+        <text x="10" y="240">IO16 (Z2)</text>
+        <text x="10" y="270">IO17 (Z3)</text>
+    </g>
+    
+    <!-- Pins Right -->
+    <g font-size="10" fill="white" text-anchor="start">
+        <text x="130" y="60">3V3</text>
+        <text x="130" y="90">GND</text>
+        <text x="130" y="120">IO10 (CS_T)</text>
+        <text x="130" y="150">IO11 (CLK_T)</text>
+        <text x="130" y="180">IO12 (DO_T)</text>
+        <text x="130" y="210">IO5 (CS_D)</text>
+        <text x="130" y="240">SPI Bus</text>
+    </g>
+  </g>
+
+  <!-- Buck Converter -->
+  <g transform="translate(350, 250)">
+    <rect width="60" height="40" fill="#27ae60" stroke="black"/>
+    <text x="30" y="25" text-anchor="middle" fill="white" font-size="10">Buck</text>
+    <text x="30" y="35" text-anchor="middle" fill="white" font-size="8">12V->5V</text>
+  </g>
+
+  <!-- Transistor for Safety Relay -->
+  <g transform="translate(350, 350)">
+     <circle cx="20" cy="20" r="15" fill="none" stroke="black"/>
+     <text x="20" y="25" text-anchor="middle" font-size="10">Q1</text>
+     <text x="20" y="45" text-anchor="middle" font-size="8">NPN</text>
+  </g>
+
+  <!-- Transistor for Fan -->
+  <g transform="translate(350, 450)">
+     <rect width="30" height="30" fill="#34495e"/>
+     <text x="15" y="20" text-anchor="middle" fill="white" font-size="10">MOS</text>
+  </g>
+
+  <!-- Fan -->
+  <g transform="translate(250, 450)">
+    <circle cx="25" cy="25" r="25" fill="#95a5a6" stroke="black"/>
+    <path d="M25 0 L25 50 M0 25 L50 25" stroke="black"/>
+    <text x="25" y="65" text-anchor="middle" font-size="10">Fan 12V</text>
+  </g>
+  
+  <!-- Thermocouple -->
+  <g transform="translate(800, 300)">
+    <rect width="60" height="80" fill="#8e44ad"/>
+    <text x="30" y="20" text-anchor="middle" fill="white" font-size="10">MAX31855</text>
+    <text x="30" y="40" text-anchor="middle" fill="white" font-size="8">Thermocouple</text>
+    <path d="M60 40 L100 40" stroke="#f1c40f" stroke-width="2"/>
+    <text x="80" y="35" font-size="8">Probe</text>
+  </g>
+
+  <!-- SSRs -->
+  <g transform="translate(700, 450)">
+    <rect width="60" height="80" fill="#ecf0f1" stroke="black"/>
+    <text x="30" y="20" text-anchor="middle" font-size="10">SSR 1</text>
+    <text x="30" y="40" text-anchor="middle" font-size="8">Zone 1</text>
+    <rect x="70" y="0" width="60" height="80" fill="#ecf0f1" stroke="black"/>
+    <text x="100" y="20" text-anchor="middle" font-size="10">SSR 2</text>
+    <rect x="140" y="0" width="60" height="80" fill="#ecf0f1" stroke="black"/>
+    <text x="170" y="20" text-anchor="middle" font-size="10">SSR 3</text>
+  </g>
+
+  <!-- Display -->
+  <g transform="translate(750, 100)">
+    <rect width="120" height="100" fill="#3498db" stroke="black"/>
+    <rect x="10" y="10" width="100" height="60" fill="black"/>
+    <text x="60" y="90" text-anchor="middle" fill="white" font-size="10">ILI9341 SPI</text>
+  </g>
+
+  <!-- === WIRING PATHS === -->
+  
+  <!-- Mains to PSU -->
+  <path d="M100 10 L100 220" stroke="#c0392b" stroke-width="2" fill="none"/> <!-- L to PSU -->
+  <path d="M100 50 L90 50 L90 280" stroke="#2980b9" stroke-width="2" fill="none"/> <!-- N to PSU -->
+
+  <!-- Mains to Safety Relay -->
+  <path d="M230 10 L250 10" stroke="#c0392b" stroke-width="4"/> <!-- L Out of Relay -->
+  <path d="M250 10 L400 10" stroke="#c0392b" stroke-width="4"/> <!-- Bus to SSRs -->
+
+  <!-- 12V DC -->
+  <path d="M180 220 L350 270" stroke="#e67e22" stroke-width="2" fill="none"/> <!-- 12V to Buck -->
+  <path d="M180 220 L275 450" stroke="#e67e22" stroke-width="2" fill="none"/> <!-- 12V to Fan -->
+
+  <!-- 5V Logic Power -->
+  <path d="M410 270 L500 260" stroke="#e74c3c" stroke-width="2" fill="none"/> <!-- Buck to ESP -->
+  <path d="M410 270 L230 70" stroke="#e74c3c" stroke-width="2" fill="none"/> <!-- 5V to Safety Relay Coil -->
+
+  <!-- Safety Relay Control -->
+  <path d="M500 350 L390 370" stroke="#9b59b6" stroke-width="1" fill="none"/> <!-- ESP IO6 to Transistor Base -->
+  <path d="M370 350 L190 100" stroke="black" stroke-width="1" fill="none"/> <!-- Transistor Collector to Relay Coil GND -->
+
+  <!-- Fan Control -->
+  <path d="M500 320 L380 460" stroke="#9b59b6" stroke-width="1" fill="none"/> <!-- ESP IO13 to MOS Gate -->
+  <path d="M350 480 L275 500" stroke="black" stroke-width="2" fill="none"/> <!-- MOS Drain to Fan GND -->
+
+  <!-- SSR Control Signals -->
+  <path d="M500 410 L700 470" stroke="#3498db" stroke-width="1" fill="none"/> <!-- Z1 -->
+  <path d="M500 440 L770 470" stroke="#3498db" stroke-width="1" fill="none"/> <!-- Z2 -->
+  <path d="M500 470 L840 470" stroke="#3498db" stroke-width="1" fill="none"/> <!-- Z3 -->
+
+  <!-- Thermocouple SPI -->
+  <path d="M640 320 L800 340" stroke="#f1c40f" stroke-width="1" fill="none"/>
+  
+  <!-- Display SPI -->
+  <path d="M640 410 L750 180" stroke="#f1c40f" stroke-width="1" fill="none"/>
+
+  <!-- Legend -->
+  <rect x="50" y="600" width="200" height="80" fill="white" stroke="black"/>
+  <text x="60" y="620" font-weight="bold">Legend:</text>
+  <line x1="60" y1="635" x2="90" y2="635" stroke="#c0392b" stroke-width="2"/><text x="100" y="640" font-size="10">220V Live</text>
+  <line x1="60" y1="650" x2="90" y2="650" stroke="#2980b9" stroke-width="2"/><text x="100" y="655" font-size="10">220V Neutral</text>
+  <line x1="60" y1="665" x2="90" y2="665" stroke="#e67e22" stroke-width="2"/><text x="100" y="670" font-size="10">12V DC</text>
+  <line x1="60" y1="680" x2="90" y2="680" stroke="#e74c3c" stroke-width="2"/><text x="100" y="685" font-size="10">5V DC</text>
+
+</svg>
