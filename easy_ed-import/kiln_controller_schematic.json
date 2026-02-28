@@ -1,0 +1,23 @@
+{
+  "docType": "schematic",
+  "title": "Trae Kiln Controller",
+  "version": "1.1",
+  "uuid": "generated-uuid-12345",
+  "shapes": [
+    {
+        "type": "HDR",
+        "x": 300,
+        "y": 100,
+        "sch": {
+            "name": "ESP32-S3-WROOM-1"
+        }
+    },
+    {
+        "type": "TEXT",
+        "text": "... other components ...",
+        "x": 300,
+        "y": 150
+    }
+  ],
+  "nets": []
+}

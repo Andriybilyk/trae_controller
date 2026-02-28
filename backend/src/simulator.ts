@@ -13,6 +13,8 @@ interface KilnState {
     holdStartTime: number;
     estimatedDuration: number; // Total estimated minutes
     elapsedTime: number; // Minutes elapsed in firing
+    timeRemaining: number; // Minutes remaining
+    history: {x: number, y: number}[]; // x: elapsed hours, y: temp
 }
 
 export const kilnState: KilnState = {
@@ -27,8 +29,14 @@ export const kilnState: KilnState = {
     startTime: 0,
     holdStartTime: 0,
     estimatedDuration: 0,
-    elapsedTime: 0
+    elapsedTime: 0,
+    timeRemaining: 0,
+    history: []
 };
+
+// SIMULATION PARAMETERS
+const SIM_SPEED = 60; // 1 real second = 60 simulated seconds (1 minute)
+const TICK_RATE = 1000; // ms
 
 // Helper to calculate total duration
 const calculateDuration = (schedule: any[]) => {
@@ -91,27 +99,12 @@ setInterval(() => {
         kilnState.t3 = kilnState.temp + 1;
 
     } else if (kilnState.status !== 'IDLE' && kilnState.status !== 'COMPLETE' && kilnState.status !== 'ERROR') {
-        // Update Elapsed Time
-        if (kilnState.startTime > 0) {
-            kilnState.elapsedTime = (Date.now() - kilnState.startTime) / 60000; // Minutes
-        }
+        // Update Elapsed Time (Simulated)
+        // We add SIM_SPEED seconds to elapsed time every tick
+        kilnState.elapsedTime += (TICK_RATE / 1000 * SIM_SPEED) / 60; // in minutes
+        kilnState.timeRemaining = Math.max(0, kilnState.estimatedDuration - kilnState.elapsedTime);
 
-        // Simulate Heating
-        const rampRate = 100; // degrees per tick (fast simulation)
-        
-        // Move temp towards target
-        if (kilnState.temp < kilnState.target) {
-            kilnState.temp += (Math.random() * 2) + 0.5; // Random heat
-            kilnState.energy += 0.01; // Simulate energy usage
-        } else if (kilnState.temp > kilnState.target) {
-            kilnState.temp -= 0.5; // Cool down
-        }
-
-        // Zone variance simulation
-        kilnState.t2 = kilnState.temp - 2 + (Math.random());
-        kilnState.t3 = kilnState.temp + 1.5 - (Math.random());
-
-        // Step Management (Simplified)
+        // Step Management
         if (kilnState.schedule.length > 0) {
             const currentStep = kilnState.schedule[kilnState.stepIndex];
             
@@ -120,30 +113,74 @@ setInterval(() => {
                 if (currentStep.type === 'ramp') {
                     kilnState.status = 'RAMP';
                     kilnState.target = currentStep.target;
-                    // If reached target, move to next or hold
-                    if (Math.abs(kilnState.temp - kilnState.target) < 5) {
+                    
+                    // Calculate required change per tick based on rate
+                    // Rate is deg/hr.
+                    // Sim speed: 1 sec = 1 min.
+                    // Rate per min = rate / 60.
+                    // Change per tick = (rate / 60) * (SIM_SPEED / 60) * (TICK_RATE/1000) ???
+                    // Simplification: We advanced SIM_SPEED seconds.
+                    // Hours advanced = SIM_SPEED / 3600.
+                    const hoursAdvanced = SIM_SPEED / 3600;
+                    const rate = currentStep.rate || 100;
+                    const maxChange = rate * hoursAdvanced;
+
+                    if (kilnState.temp < kilnState.target) {
+                        kilnState.temp += maxChange;
+                        if (kilnState.temp > kilnState.target) kilnState.temp = kilnState.target;
+                    } else if (kilnState.temp > kilnState.target) {
+                        kilnState.temp -= maxChange;
+                        if (kilnState.temp < kilnState.target) kilnState.temp = kilnState.target;
+                    }
+
+                    // Check completion
+                    if (Math.abs(kilnState.temp - kilnState.target) < 0.5) {
                         kilnState.stepIndex++;
+                        kilnState.holdStartTime = kilnState.elapsedTime; // Mark start of hold in sim time
                     }
                 } 
                 // HOLD
                 else if (currentStep.type === 'hold') {
                     kilnState.status = 'HOLD';
                     kilnState.target = currentStep.target;
-                    // In real sim, track time. Here just wait a bit randomly or assume hold logic handled elsewhere
-                    // For demo, we just drift through holds slowly
-                    if (Math.random() > 0.95) kilnState.stepIndex++; 
+                    
+                    // Maintain temp (add noise)
+                    kilnState.temp = kilnState.target + (Math.random() - 0.5);
+
+                    // Check duration
+                    const duration = currentStep.holdTime || 0;
+                    if ((kilnState.elapsedTime - kilnState.holdStartTime) >= duration) {
+                        kilnState.stepIndex++;
+                    }
                 }
             } else {
                 kilnState.status = 'COMPLETE';
             }
         }
+
+        // Record History (every 5 ticks to save space? or every tick)
+        // x: elapsed hours
+        kilnState.history.push({
+            x: kilnState.elapsedTime / 60,
+            y: kilnState.temp
+        });
+
+        // Limit history size (e.g. last 1000 points)
+        // if (kilnState.history.length > 1000) kilnState.history.shift();
+
+        // Zone variance
+        kilnState.t2 = kilnState.temp - 2 + (Math.random());
+        kilnState.t3 = kilnState.temp + 1.5 - (Math.random());
+
     } else {
         // Cool to room temp
         if (kilnState.temp > 25) {
-            kilnState.temp -= 0.2;
+            kilnState.temp -= 0.5; // Cool faster when off
+            if (kilnState.temp < 25) kilnState.temp = 25;
             kilnState.t2 = kilnState.temp;
             kilnState.t3 = kilnState.temp;
         }
+        // Clear history if IDLE for a while? No, keep it until new start.
     }
 
     // 2. Broadcast
@@ -154,7 +191,7 @@ setInterval(() => {
         }
     });
 
-}, 1000);
+}, TICK_RATE);
 
 export const startSimulation = (schedule: any) => {
     kilnState.schedule = schedule.steps || [];
@@ -163,6 +200,8 @@ export const startSimulation = (schedule: any) => {
     kilnState.energy = 0;
     kilnState.startTime = Date.now();
     kilnState.elapsedTime = 0;
+    kilnState.history = [{x: 0, y: 25}];
+    kilnState.temp = 25;
     kilnState.estimatedDuration = calculateDuration(kilnState.schedule);
 };
 
@@ -179,16 +218,67 @@ export const stopSimulation = () => {
 };
 
 export const skipStep = () => {
-    if (kilnState.schedule[kilnState.stepIndex + 1]) {
+    if (kilnState.status === 'IDLE' || kilnState.status === 'COMPLETE') return;
+    console.log("Skipping Step");
+    if (kilnState.stepIndex < kilnState.schedule.length - 1) {
         kilnState.stepIndex++;
     } else {
         kilnState.status = 'COMPLETE';
     }
 };
 
-export const addHold = (minutes: number) => {
-    // In a real hold, extend the duration.
-    // For simulation, we can't easily "extend" without tracking time properly.
-    // We'll just log it for now as "action received"
-    console.log("Simulating Hold Extension");
+export const addHoldTime = (minutes: number, targetStepIndex?: number) => {
+    if (kilnState.status === 'IDLE' || kilnState.status === 'COMPLETE') return;
+
+    if (targetStepIndex !== undefined) {
+        // Modify specific step
+        const step = kilnState.schedule[targetStepIndex];
+        if (step && step.type === 'hold') {
+             step.holdTime = (step.holdTime || 0) + minutes;
+             console.log(`Extended step ${targetStepIndex + 1} by ${minutes} min`);
+        }
+        return;
+    }
+
+    const currentStep = kilnState.schedule[kilnState.stepIndex];
+    
+    if (currentStep && currentStep.type === 'hold') {
+        currentStep.holdTime = (currentStep.holdTime || 0) + minutes;
+        console.log(`Extended current hold by ${minutes} min. New total: ${currentStep.holdTime}`);
+    } else {
+        // Try to find next hold step to extend
+        let found = false;
+        for (let i = kilnState.stepIndex + 1; i < kilnState.schedule.length; i++) {
+            if (kilnState.schedule[i].type === 'hold') {
+                kilnState.schedule[i].holdTime = (kilnState.schedule[i].holdTime || 0) + minutes;
+                console.log(`Extended next hold (step ${i+1}) by ${minutes} min`);
+                found = true;
+                break;
+            }
+        }
+        if (!found) console.log("No hold step found to extend");
+    }
+};
+
+export const addTemperature = (degrees: number, targetStepIndex?: number) => {
+    if (kilnState.status === 'IDLE' || kilnState.status === 'COMPLETE') return;
+    
+    if (targetStepIndex !== undefined) {
+        const step = kilnState.schedule[targetStepIndex];
+        if (step) {
+            step.target += degrees;
+            // If modifying current step, update global target too
+            if (targetStepIndex === kilnState.stepIndex) {
+                kilnState.target += degrees;
+            }
+            console.log(`Increased target of step ${targetStepIndex + 1} by ${degrees}C. New target: ${step.target}`);
+        }
+        return;
+    }
+
+    if (kilnState.schedule[kilnState.stepIndex]) {
+        kilnState.schedule[kilnState.stepIndex].target += degrees;
+        kilnState.target += degrees;
+        console.log(`Increased target by ${degrees}C. New target: ${kilnState.target}`);
+    }
 };

@@ -4,18 +4,40 @@
 #include <ESPAsyncWebServer.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_MAX31855.h>
+#include <Adafruit_MAX6675.h>
 #include <PID_v1.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
+#include <ESPmDNS.h>
 
 #include "config.h"
 #include "glass_schedules.h"
 #include "SafetyMonitor.h" // Professional Safety Class
 #include "RecoveryManager.h" // Power Loss Recovery
+#include <esp_task_wdt.h>
+#include <Preferences.h>
+#include <time.h> // NTP Support
+
+#include <WiFiManager.h> // WiFi Manager
+
+// Watchdog Timeout (Seconds)
+#define WDT_TIMEOUT 10
+
+// NTP Server Settings
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 7200; // GMT+2 (Ukraine Standard)
+const int   daylightOffset_sec = 3600; // Summer Time (+1h)
+
+// Preferences (NVS Storage)
+Preferences preferences;
+
+// WiFi Fail-Safe
+unsigned long lastWiFiCheck = 0;
+const unsigned long WIFI_CHECK_INTERVAL = 30000; // 30 sec
+bool wifiConnected = false;
 
 // --- Global Objects ---
-Adafruit_MAX31855 thermocouple(MAXCLK, MAXCS, MAXDO);
+Adafruit_MAX6675 thermocouple(MAXCLK, MAXCS, MAXDO);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 SafetyMonitor safetyMonitor(1300.0); // 1300C limit
@@ -24,8 +46,18 @@ RecoveryManager recoveryManager;
 // --- PID Variables ---
 // Using 3 independent PIDs for multi-zone support
 double Setpoint[3], Input[3], Output[3];
-// Tuning parameters - should be loaded from config
+
+// Structure to hold PID tunings for different temperature ranges
+struct PIDTuning {
+    float temp; // The upper temperature for this tuning
+    double kp, ki, kd;
+};
+
+std::vector<PIDTuning> pidTunings;
+
+// Default tuning if none are loaded
 double Kp = PID_KP, Ki = PID_KI, Kd = PID_KD;
+
 PID pid0(&Input[0], &Output[0], &Setpoint[0], Kp, Ki, Kd, DIRECT);
 PID pid1(&Input[1], &Output[1], &Setpoint[1], Kp, Ki, Kd, DIRECT);
 PID pid2(&Input[2], &Output[2], &Setpoint[2], Kp, Ki, Kd, DIRECT);
@@ -88,6 +120,48 @@ void startFiring(const std::vector<KilnStep>& schedule, String name);
 void stopFiring();
 void handleMQTT();
 
+void saveTunings() {
+    preferences.begin("pid-tunings", false);
+    preferences.clear(); // Clear old tunings
+    preferences.putUInt("count", pidTunings.size());
+    for (int i = 0; i < pidTunings.size(); i++) {
+        String prefix = "t" + String(i) + "_";
+        preferences.putFloat((prefix + "temp").c_str(), pidTunings[i].temp);
+        preferences.putDouble((prefix + "kp").c_str(), pidTunings[i].kp);
+        preferences.putDouble((prefix + "ki").c_str(), pidTunings[i].ki);
+        preferences.putDouble((prefix + "kd").c_str(), pidTunings[i].kd);
+    }
+    preferences.end();
+    Serial.println("Saved PID tunings to NVS.");
+}
+
+void loadTunings() {
+    preferences.begin("pid-tunings", true); // Read-only
+    unsigned int count = preferences.getUInt("count", 0);
+    pidTunings.clear();
+    if (count > 0) {
+        Serial.printf("Loading %u PID tuning sets...\n", count);
+        for (int i = 0; i < count; i++) {
+            String prefix = "t" + String(i) + "_";
+            PIDTuning tuning;
+            tuning.temp = preferences.getFloat((prefix + "temp").c_str(), 0);
+            tuning.kp = preferences.getDouble((prefix + "kp").c_str(), PID_KP);
+            tuning.ki = preferences.getDouble((prefix + "ki").c_str(), PID_KI);
+            tuning.kd = preferences.getDouble((prefix + "kd").c_str(), PID_KD);
+            pidTunings.push_back(tuning);
+        }
+        // Sort by temperature
+        std::sort(pidTunings.begin(), pidTunings.end(), [](const PIDTuning& a, const PIDTuning& b) {
+            return a.temp < b.temp;
+        });
+    } else {
+        Serial.println("No PID tunings found, using defaults.");
+        // Add a default tuning if none exist
+        pidTunings.push_back({1300, Kp, Ki, Kd});
+    }
+    preferences.end();
+}
+
 // --- Setup ---
 void setup() {
     Serial.begin(115200);
@@ -98,6 +172,9 @@ void setup() {
         return;
     }
     loadConfig();
+
+    // Load PID Tunings from NVS
+    loadTunings();
 
     // Init Hardware
     pinMode(SSR_ZONE1_PIN, OUTPUT);
@@ -116,9 +193,22 @@ void setup() {
     if (!thermocouple.begin()) {
         state.errorMsg = "Thermocouple Init Failed!";
         state.status = ERROR;
-        Serial.println("ERROR: MAX31855 not found.");
+        Serial.println("ERROR: MAX6675 not found.");
         sensorError = true;
     }
+
+    // Load Preferences
+    preferences.begin("kiln-config", false);
+    double savedKp = preferences.getDouble("kp", 2.0);
+    double savedKi = preferences.getDouble("ki", 5.0);
+    double savedKd = preferences.getDouble("kd", 1.0);
+    int savedOffset = preferences.getInt("offset", 0);
+    preferences.end();
+    
+    // Apply saved config
+    Kp = savedKp; Ki = savedKi; Kd = savedKd;
+    pid0.SetTunings(Kp, Ki, Kd);
+    // TODO: Apply thermocouple offset if supported by library wrapper
 
     // Init PID
     pid0.SetMode(AUTOMATIC);
@@ -130,8 +220,38 @@ void setup() {
     pid2.SetMode(AUTOMATIC);
     pid2.SetOutputLimits(0, PID_WINDOW_SIZE);
 
-    // Init WiFi & API
-    setupWiFi();
+    // Init Watchdog (Hardware WDT)
+    esp_task_wdt_init(WDT_TIMEOUT, true); // Panic on timeout (reset)
+    esp_task_wdt_add(NULL); // Watch current task (loop)
+
+    // WiFi Setup (WiFiManager)
+    WiFiManager wm;
+    // Set timeout to avoid blocking startup forever (e.g., 3 mins)
+    wm.setConfigPortalTimeout(180); 
+    
+    bool res = wm.autoConnect("Trae Kiln Setup"); // AP Name
+    
+    if(!res) {
+        Serial.println("Failed to connect or hit timeout");
+        // ESP.restart(); // Optional: restart or continue offline
+    } else {
+        Serial.println("WiFi Connected!");
+        Serial.println(WiFi.localIP());
+        // --- Start mDNS Service ---
+        if (MDNS.begin("kiln")) {
+            Serial.println("mDNS responder started. Hostname: kiln.local");
+            MDNS.addService("http", "tcp", 80);
+            MDNS.addService("ws", "tcp", 80);
+        } else {
+            Serial.println("Error starting mDNS");
+        }
+    }
+
+    // Init NTP
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    // We don't wait for WiFi here to ensure critical safety loops start immediately
+    
+    // Web Server Routes
     setupAPI();
 
     // --- Power Recovery Check ---
@@ -169,7 +289,27 @@ void setup() {
 
 // --- Main Loop ---
 void loop() {
+    // 0. WATCHDOG RESET
+    esp_task_wdt_reset(); // Feed the dog!
+
     unsigned long now = millis();
+
+    // WiFi Connectivity Check (Non-blocking)
+    if (now - lastWiFiCheck >= WIFI_CHECK_INTERVAL) {
+        lastWiFiCheck = now;
+        if (WiFi.status() == WL_CONNECTED) {
+            if (!wifiConnected) {
+                Serial.println("WiFi Connected!");
+                Serial.println(WiFi.localIP());
+                wifiConnected = true;
+            }
+        } else {
+            Serial.println("WiFi Lost... Reconnecting (Async)");
+            WiFi.disconnect();
+            WiFi.reconnect();
+            wifiConnected = false;
+        }
+    }
 
     // 1. Read Sensors (every 500ms)
     if (now - lastSensorRead > 500) {
@@ -182,8 +322,8 @@ void loop() {
                 state.status = ERROR;
             }
         } else {
-            state.currentTemp = c;
-            Input[0] = state.currentTemp;
+            state.currentTemp[0] = c;
+            Input[0] = c;
         }
         lastSensorRead = now;
     }
@@ -214,7 +354,7 @@ void loop() {
         static unsigned long lastSave = 0;
         if (now - lastSave > 60000 && state.isFiring) {
             unsigned long timeInStep = now - state.stepStartTime;
-            recoveryManager.saveState(true, state.currentStepIndex, timeInStep, state.targetTemp, state.currentTemp, activeScheduleName, activeSchedule);
+            recoveryManager.saveState(true, state.currentStepIndex, timeInStep, state.targetTemp, state.currentTemp[0], activeScheduleName, activeSchedule);
             lastSave = now;
         }
     }
@@ -222,9 +362,11 @@ void loop() {
     ws.cleanupClients();
     handleMQTT();
     
-    // Safety Watchdog (Professional)
+    // 1. SAFETY FIRST
+    // Check sensors and safety logic every loop (critical)
     float currentOutput = (Output[0] / PID_WINDOW_SIZE) * 100.0; // 0-100%
-    SafetyMonitor::SafetyStatus safetyStatus = safetyMonitor.update(state.currentTemp, state.targetTemp, currentOutput);
+    double internalTemp = 25.0; // Dummy value, MAX6675 has no internal sensor
+    SafetyMonitor::SafetyStatus safetyStatus = safetyMonitor.check(state.currentTemp[0], internalTemp, currentOutput);
     
     if (safetyStatus != SafetyMonitor::SAFE) {
         stopFiring();
@@ -232,14 +374,21 @@ void loop() {
         
         switch (safetyStatus) {
             case SafetyMonitor::ERROR_SENSOR_FAIL:
-                state.errorMsg = "Critical: Sensor Failure!";
+                state.errorMsg = "Critical: Sensor Failure (NAN)!";
                 break;
+            case SafetyMonitor::ERROR_THERMOCOUPLE_OPEN:
+                state.errorMsg = "Critical: Thermocouple Open/Broken!";
+                break;
+                        /* case SafetyMonitor::ERROR_COLD_JUNCTION_OVERHEAT:
+                state.errorMsg = "Critical: Electronics Overheat! Fan ON";
+                digitalWrite(FAN_PIN, HIGH); // Emergency Cooling
+                break; // NOTE: MAX6675 does not have a cold junction sensor */
             case SafetyMonitor::ERROR_HEATER_STUCK_ON:
                 state.errorMsg = "Critical: Relay Stuck ON!";
                 // TODO: Trigger external alarm or mechanical relay
                 break;
             case SafetyMonitor::ERROR_HEATER_FAIL:
-                state.errorMsg = "Error: Heater Fail / Too Slow";
+                state.errorMsg = "Error: Heater Stalled (No Temp Rise)";
                 break;
             case SafetyMonitor::ERROR_OVERTEMP:
                 state.errorMsg = "Critical: Over Temperature!";
@@ -256,6 +405,28 @@ void loop() {
             digitalWrite(BUZZER_PIN, LOW);
             delay(200);
         }
+    }
+}
+
+void applyGainScheduling() {
+    if (pidTunings.empty()) return;
+
+    // Find the best tuning for the current setpoint
+    PIDTuning bestTuning = pidTunings[0]; // Default to the first one
+    for (const auto& tuning : pidTunings) {
+        if (Setpoint[0] <= tuning.temp) {
+            bestTuning = tuning;
+            break;
+        }
+        bestTuning = tuning; // Use the last one if setpoint is higher than all table values
+    }
+
+    // Check if the tuning has changed
+    if (abs(pid0.GetKp() - bestTuning.kp) > 0.01 || abs(pid0.GetKi() - bestTuning.ki) > 0.01 || abs(pid0.GetKd() - bestTuning.kd) > 0.01) {
+        pid0.SetTunings(bestTuning.kp, bestTuning.ki, bestTuning.kd);
+        pid1.SetTunings(bestTuning.kp, bestTuning.ki, bestTuning.kd);
+        pid2.SetTunings(bestTuning.kp, bestTuning.ki, bestTuning.kd);
+        Serial.printf("PID Gain Scheduling: Applied tunings for %.0fC (Kp:%.2f Ki:%.2f Kd:%.2f)\n", bestTuning.temp, bestTuning.kp, bestTuning.ki, bestTuning.kd);
     }
 }
 
@@ -296,28 +467,35 @@ void runControlLoop() {
                 float period = (millis() - state.tuneStartTime) / 1000.0; // Seconds
                 
                 // Ziegler-Nichols (Relay)
-                // Ku = 4 * d / (pi * a) where d is relay amplitude (100%) and a is temp amplitude
-                // Let's simplify for slow kilns:
-                
-                // Kp = 0.6 * Ku
-                // Ki = 2 * Kp / Pu
-                // Kd = Kp * Pu / 8
-                
-                // For kilns, conservative tuning is better (no overshoot)
-                // Kp = 100 / amplitude (rough heuristic)
-                
                 Kp = 50.0 / amplitude; 
                 Ki = Kp / (period / 2.0);
                 Kd = Kp * (period / 8.0);
                 
-                // Apply new PID
-                pid0.SetTunings(Kp, Ki, Kd);
+                // --- Update Tuning Table ---
+                // Remove any existing tuning for a similar temperature range
+                pidTunings.erase(
+                    std::remove_if(pidTunings.begin(), pidTunings.end(),
+                        [&](const PIDTuning& t) {
+                            return abs(t.temp - state.tuneTarget) < 50; // Remove if within 50C
+                        }),
+                    pidTunings.end()
+                );
+
+                // Add the new tuning
+                pidTunings.push_back({state.tuneTarget, Kp, Ki, Kd});
+
+                // Sort the vector by temperature
+                std::sort(pidTunings.begin(), pidTunings.end(), [](const PIDTuning& a, const PIDTuning& b) {
+                    return a.temp < b.temp;
+                });
+
+                // Save to NVS
+                saveTunings();
                 
-                Serial.printf("AutoTune Complete: Kp=%.2f Ki=%.2f Kd=%.2f\n", Kp, Ki, Kd);
+                Serial.printf("AutoTune Complete: Kp=%.2f Ki=%.2f Kd=%.2f for %.0fC\n", Kp, Ki, Kd, state.tuneTarget);
                 state.isTuning = false;
                 state.status = COMPLETE;
                 stopFiring();
-                // TODO: Save to config
             }
         }
         return; // Skip normal PID
@@ -406,6 +584,9 @@ void runControlLoop() {
     Setpoint[1] = Setpoint[0]; // All zones follow same schedule
     Setpoint[2] = Setpoint[0];
 
+    // Apply Gain Scheduling
+    applyGainScheduling();
+
     // PID Compute
     pid0.Compute();
     pid1.Compute();
@@ -477,7 +658,7 @@ void stopFiring() {
 
 void broadcastStatus() {
     DynamicJsonDocument doc(512);
-    doc["temp"] = state.currentTemp;
+    doc["temp"] = state.currentTemp[0];
     doc["target"] = state.targetTemp;
     doc["status"] = statusStr[state.status];
     doc["step"] = state.currentStepIndex;
@@ -690,16 +871,56 @@ void setupAPI() {
         request->send(200, "application/json", "{\"status\":\"started\", \"target\":" + String(state.tuneTarget) + "}");
     });
      
-     // Get Status
+    // Get Status
     server.on("/api/status", HTTP_GET, [](AsyncWebServerRequest *request){
-        DynamicJsonDocument doc(512);
-        doc["temp"] = state.currentTemp;
+        DynamicJsonDocument doc(1024);
+        doc["temp"] = state.currentTemp[0];
         doc["target"] = state.targetTemp;
         doc["status"] = statusStr[state.status];
+        doc["output"] = Output[0];
+        doc["step"] = state.currentStepIndex + 1;
+        doc["totalSteps"] = activeSchedule.size();
         
-        String json;
-        serializeJson(doc, json);
-        request->send(200, "application/json", json);
+        // Time Info
+        struct tm timeinfo;
+        if(getLocalTime(&timeinfo)){
+            char timeString[64];
+            strftime(timeString, sizeof(timeString), "%Y-%m-%d %H:%M:%S", &timeinfo);
+            doc["time"] = String(timeString);
+        } else {
+            doc["time"] = "NTP Syncing...";
+        }
+
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    });
+
+    // Save Settings API
+    server.on("/api/settings", HTTP_POST, [](AsyncWebServerRequest *request){}, NULL, [](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total){
+        DynamicJsonDocument doc(512);
+        deserializeJson(doc, (const char*)data);
+        
+        // Update Variables
+        if (doc.containsKey("kp")) Kp = doc["kp"];
+        if (doc.containsKey("ki")) Ki = doc["ki"];
+        if (doc.containsKey("kd")) Kd = doc["kd"];
+        
+        // Save to NVS
+        preferences.begin("kiln-config", false);
+        if (doc.containsKey("kp")) preferences.putDouble("kp", Kp);
+        if (doc.containsKey("ki")) preferences.putDouble("ki", Ki);
+        if (doc.containsKey("kd")) preferences.putDouble("kd", Kd);
+        if (doc.containsKey("offset")) {
+            int offset = doc["offset"];
+            preferences.putInt("offset", offset);
+        }
+        preferences.end();
+        
+        // Update PID
+        pid0.SetTunings(Kp, Ki, Kd);
+        
+        request->send(200, "application/json", "{\"status\":\"saved\"}");
     });
 
     ws.onEvent([](AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len){

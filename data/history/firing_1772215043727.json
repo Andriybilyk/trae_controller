@@ -1,0 +1,12 @@
+{
+  "summary": {
+    "id": "firing_1772215043727",
+    "scheduleName": "Glass 90 polish",
+    "startTime": 1772215043727,
+    "endTime": 1772215048022,
+    "duration": 4,
+    "status": "STOPPED",
+    "peakTemp": null
+  },
+  "data": []
+}

@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
 import fs from 'fs';
+import fsPromises from 'fs/promises';
 import path from 'path';
 import { Schedule, Step } from './schedule_model';
 
@@ -141,7 +142,7 @@ router.get('/settings', (req, res) => {
     res.json(appSettings);
 });
 
-import { startSimulation, stopSimulation, skipStep, addHold, startAutotune, kilnState } from './simulator';
+import { startSimulation, stopSimulation, skipStep, addHoldTime, addTemperature, startAutotune, kilnState } from './simulator';
 
 // ... (existing imports)
 
@@ -149,7 +150,33 @@ import { startSimulation, stopSimulation, skipStep, addHold, startAutotune, kiln
 
 // Get Current Status
 router.get('/status', (req, res) => {
-    res.json(kilnState);
+    // Calculate remaining time dynamically
+    let remaining = 0;
+    if (kilnState.status !== 'IDLE' && kilnState.status !== 'COMPLETE') {
+        // Future steps
+        for (let i = kilnState.stepIndex + 1; i < kilnState.schedule.length; i++) {
+            const step = kilnState.schedule[i];
+            if (step.type === 'hold') remaining += (step.holdTime || 0);
+            else if (step.type === 'ramp') {
+                const prev = kilnState.schedule[i-1]?.target || 25;
+                const diff = Math.abs(step.target - prev);
+                remaining += (diff / (step.rate || 100)) * 60;
+            }
+        }
+        // Current step (add full duration for simplicity since we don't track elapsed in step precisely in sim)
+        const current = kilnState.schedule[kilnState.stepIndex];
+        if (current) {
+            if (current.type === 'hold') remaining += (current.holdTime || 0);
+            else remaining += 15; // Approx for ramp
+        }
+    }
+
+    res.json({
+        ...kilnState,
+        step: kilnState.stepIndex + 1,
+        totalSteps: kilnState.schedule.length,
+        timeRemaining: Math.floor(remaining)
+    });
 });
 
 // Start Firing (Updated to use simulator)
@@ -173,30 +200,85 @@ router.post('/stop', (req, res) => {
     res.json({ status: 'stopped' });
 });
 
-// Mock control endpoints (Updated)
-router.post('/control/start', (req, res) => {
-    const { name } = req.body;
-    // Just a quick manual start for demo
-    startSimulation({ steps: [{type:'ramp', target: 500}, {type:'hold', target: 500}] });
-    res.json({ success: true });
-});
-
-router.post('/control/stop', (req, res) => {
-    stopSimulation();
-    res.json({ success: true });
-});
-
-router.post('/control/skip', (req, res) => {
-    console.log("Skipping Step");
+// Live Control Routes
+router.post('/skip', (req, res) => {
     skipStep();
     res.json({ success: true });
 });
 
-router.post('/control/hold', (req, res) => {
-    const { minutes } = req.body;
-    console.log(`Adding ${minutes} min hold`);
-    addHold(minutes);
+router.post('/addTime', (req, res) => {
+    const { minutes, stepIndex } = req.body;
+    addHoldTime(Number(minutes) || 5, stepIndex !== undefined ? Number(stepIndex) : undefined);
     res.json({ success: true });
+});
+
+router.post('/addTemp', (req, res) => {
+    const { degrees, stepIndex } = req.body;
+    addTemperature(Number(degrees) || 5, stepIndex !== undefined ? Number(stepIndex) : undefined);
+    res.json({ success: true });
+});
+
+router.get('/diagnostics', (req, res) => {
+    // Mock Diagnostics
+    res.json({
+        relays: { zone1: true, safety: true },
+        elements: { resistance: 12.5, health: 98 },
+        thermocouple: { temp: kilnState.temp, status: 'OK' },
+        ground: 'OK'
+    });
+});
+
+// --- History API ---
+const HISTORY_DIR = path.join(__dirname, '../../data/history');
+
+// GET /api/history - List all firing sessions
+router.get('/history', async (req, res) => {
+    try {
+        await fsPromises.mkdir(HISTORY_DIR, { recursive: true });
+        const files = await fsPromises.readdir(HISTORY_DIR);
+        const summaries = await Promise.all(
+            files
+                .filter(f => f.endsWith('.json'))
+                .map(async (file) => {
+                    const content = await fsPromises.readFile(path.join(HISTORY_DIR, file), 'utf-8');
+                    const log = JSON.parse(content);
+                    return log.summary; // Return only the summary part
+                })
+        );
+        // Sort by start time, newest first
+        summaries.sort((a, b) => (new Date(b.startTime).getTime()) - (new Date(a.startTime).getTime()));
+        res.json(summaries);
+    } catch (error) {
+        // If directory doesn't exist (e.g. permissions issue), return empty array gracefully.
+        if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'ENOENT') {
+            return res.json([]);
+        }
+        console.error('Error reading history directory:', error);
+        res.status(500).json({ error: 'Failed to fetch history' });
+    }
+});
+
+// GET /api/history/:id - Get details for a specific session
+router.get('/history/:id', async (req, res) => {
+    const { id } = req.params;
+    // Basic sanitization to prevent directory traversal
+    if (!id.match(/^[a-zA-Z0-9_\-]+$/)) {
+        return res.status(400).json({ error: 'Invalid history ID format' });
+    }
+
+    const filepath = path.join(HISTORY_DIR, `${id}.json`);
+
+    try {
+        const content = await fsPromises.readFile(filepath, 'utf-8');
+        const log = JSON.parse(content);
+        res.json(log);
+    } catch (error) {
+        if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'ENOENT') {
+            return res.status(404).json({ error: 'History log not found' });
+        }
+        console.error(`Error reading history file ${id}.json:`, error);
+        res.status(500).json({ error: 'Failed to fetch history detail' });
+    }
 });
 
 export const apiRouter = router;

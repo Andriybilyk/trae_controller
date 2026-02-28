@@ -11,35 +11,38 @@
       },
       {
         "type": "hold",
-        "holdTime": 30
+        "holdTime": 30,
+        "target": 677
       },
       {
         "type": "ramp",
         "rate": 333,
-        "target": 804
+        "target": 677
       },
       {
         "type": "hold",
-        "holdTime": 10
+        "holdTime": 10,
+        "target": 677
       },
       {
         "type": "ramp",
         "rate": 9999,
-        "target": 482
+        "target": 677
       },
       {
         "type": "hold",
-        "holdTime": 60
+        "holdTime": 60,
+        "target": 677
       },
       {
         "type": "ramp",
         "rate": 83,
-        "target": 371
+        "target": 677
       },
       {
         "type": "ramp",
         "rate": 9999,
-        "target": 25
+        "target": 677
       }
     ],
     "created": "2026-02-24T18:22:39.950Z",
@@ -298,5 +301,34 @@
       "type": "slump",
       "thickness": 4
     }
+  },
+  {
+    "id": "1772045300036",
+    "name": "Нова програма",
+    "type": "Custom",
+    "steps": [
+      {
+        "id": 1,
+        "type": "ramp",
+        "rate": 100,
+        "target": 500,
+        "fan": false
+      },
+      {
+        "id": 2,
+        "type": "hold",
+        "holdTime": 10,
+        "target": 500,
+        "fan": false
+      },
+      {
+        "id": 3,
+        "type": "ramp",
+        "rate": 200,
+        "target": 25,
+        "fan": false
+      }
+    ],
+    "created": "2026-02-25T18:48:20.036Z"
   }
 ]

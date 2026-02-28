@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Monitor } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import toast from 'react-hot-toast';
+import { API_BASE_URL } from '../config';
 
 const Settings = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [settings, setSettings] = useState({
     wattage: 3.0, // kW
     costPerKwh: 0.15, // $
@@ -13,6 +17,7 @@ const Settings = () => {
   
   const [offset, setOffset] = useState(0);
   const [ssrCycles, setSsrCycles] = useState(15420);
+  const [autotuneTemp, setAutotuneTemp] = useState(600);
 
   useEffect(() => {
     // Load from local storage or API
@@ -22,28 +27,28 @@ const Settings = () => {
 
   const handleSave = () => {
     localStorage.setItem('kiln_settings', JSON.stringify(settings));
-    // Also send to backend if needed
-    fetch('http://localhost:3000/api/settings', {
+    fetch(`${API_BASE_URL}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...settings, offset, ssrCycles })
+    }).then(() => {
+        toast.success(t.settings.saved);
     });
-    // alert(t.settings.saved); // Removed alert as requested
   };
 
   const handleAutoTune = async () => {
-      if(confirm(t.settings.confirmAutotune)) {
+      if(confirm(`${t.settings.confirmAutotune} at ${autotuneTemp}°C?`)) {
           try {
-              const res = await fetch('http://localhost:3001/api/autotune', {
+              const res = await fetch(`${API_BASE_URL}/autotune`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ temp: 150 })
+                  body: JSON.stringify({ temp: autotuneTemp })
               });
               const data = await res.json();
-              if(res.ok) alert("Автотюн запущено! Слідкуйте за графіком на Дашборді.");
-              else alert("Помилка: " + (data.error || "Невідома помилка"));
+              if(res.ok) toast.success(`Autotune started at ${autotuneTemp}°C! Monitor the dashboard.`);
+              else toast.error("Error: " + (data.error || "Unknown error"));
           } catch (e) {
-              alert("Помилка з'єднання з контролером.");
+              toast.error("Connection error to controller.");
           }
       }
   };
@@ -136,21 +141,21 @@ const Settings = () => {
         
         <div className="space-y-8">
             {/* Thermocouple Offset */}
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
                 <div className="p-3 h-12 w-12 rounded-xl bg-zinc-800/50 flex items-center justify-center shrink-0">
                     <Thermometer className="text-yellow-500" size={24} />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 w-full overflow-hidden">
                     <h3 className="text-white font-bold mb-1">{t.settings.thermocoupleOffset}</h3>
                     <p className="text-zinc-500 text-sm mb-3">{t.settings.offsetDesc}</p>
-                    <div className="flex gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full">
                         <input 
                             type="number" 
                             value={offset}
                             onChange={(e) => setOffset(Number(e.target.value))}
-                            className="bg-black border border-zinc-800 rounded-lg px-4 py-2 text-white w-24 text-center focus:border-purple-500 focus:outline-none"
+                            className="bg-black border border-zinc-800 rounded-lg px-3 py-3 text-white w-full sm:w-24 text-center focus:border-purple-500 focus:outline-none font-bold"
                         />
-                        <button className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors">
+                        <button className="w-full sm:w-auto px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors text-sm whitespace-nowrap">
                             {t.settings.save}
                         </button>
                     </div>
@@ -158,24 +163,24 @@ const Settings = () => {
             </div>
 
             {/* SSR Relay Cycles */}
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
                 <div className="p-3 h-12 w-12 rounded-xl bg-zinc-800/50 flex items-center justify-center shrink-0">
                     <Activity className="text-blue-400" size={24} />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 w-full overflow-hidden">
                     <h3 className="text-white font-bold mb-1">{t.settings.ssrCycles}</h3>
                     <p className="text-zinc-500 text-sm mb-3">{t.settings.ssrDesc}</p>
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1 bg-black border border-zinc-800 rounded-lg w-fit overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+                        <div className="flex items-center bg-black border border-zinc-800 rounded-lg w-full sm:w-fit overflow-hidden relative">
                             <input 
                                 type="number"
-                                className="px-3 py-2 bg-transparent text-white font-mono font-bold text-lg w-28 focus:outline-none text-right"
+                                className="px-3 py-3 bg-transparent text-white font-mono font-bold text-lg w-full sm:w-28 focus:outline-none text-left pl-3 pr-16"
                                 value={ssrCycles}
                                 onChange={(e) => setSsrCycles(parseInt(e.target.value) || 0)}
                             />
-                            <div className="px-3 py-2 text-zinc-500 text-sm border-l border-zinc-800 bg-zinc-900">{t.settings.cycles}</div>
+                            <div className="absolute right-0 top-0 bottom-0 flex items-center px-3 text-zinc-500 text-sm border-l border-zinc-800 bg-zinc-900/50 pointer-events-none">{t.settings.cycles}</div>
                         </div>
-                        <button className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors" onClick={handleSave}>
+                        <button className="w-full sm:w-auto px-6 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors text-sm whitespace-nowrap" onClick={handleSave}>
                             {t.settings.save}
                         </button>
                     </div>
@@ -207,18 +212,30 @@ const Settings = () => {
             <Activity size={24} className="text-purple-400" />
             {t.settings.serviceAutotune}
         </h2>
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-6">
             <div className="p-3 h-12 w-12 rounded-xl bg-purple-500/10 flex items-center justify-center shrink-0 border border-purple-500/20">
                 <Activity className="text-purple-400" size={24} />
             </div>
             <div className="flex-1">
                 <p className="text-zinc-400 text-sm mb-4">{t.settings.warningText}</p>
-                <button 
-                    className="w-full md:w-auto px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition-colors shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2"
-                    onClick={handleAutoTune}
-                >
-                    <Activity size={18} /> {t.settings.initiateCalib}
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative w-full sm:w-48">
+                        <input 
+                            type="number"
+                            value={autotuneTemp}
+                            onChange={(e) => setAutotuneTemp(Number(e.target.value))}
+                            placeholder="e.g., 600"
+                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-purple-500 focus:outline-none transition-colors pr-12"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">°C</span>
+                    </div>
+                    <button 
+                        className="w-full sm:w-auto px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold transition-colors shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2"
+                        onClick={handleAutoTune}
+                    >
+                        <Activity size={18} /> {t.settings.initiateCalib}
+                    </button>
+                </div>
             </div>
         </div>
       </div>
@@ -250,6 +267,30 @@ const Settings = () => {
             </div>
         </div>
       </div>
+      {/* Developer Section */}
+      <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg mb-8">
+         <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-3 border-b border-zinc-800 pb-4">
+            <Monitor size={24} className="text-emerald-400" />
+            Developer Tools
+        </h2>
+        
+        <div className="flex gap-4 items-center">
+            <div className="p-3 h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
+                <Monitor className="text-emerald-400" size={24} />
+            </div>
+            <div className="flex-1">
+                <h3 className="text-white font-bold mb-1">Controller Screen Simulator</h3>
+                <p className="text-zinc-500 text-sm mb-3">Preview the native interface for Waveshare 4.3" ESP32-S3 (800x480)</p>
+                <button 
+                    onClick={() => navigate('/controller-sim')}
+                    className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors border border-zinc-700"
+                >
+                    Launch Simulator
+                </button>
+            </div>
+        </div>
+      </div>
+
     </div>
   );
 };

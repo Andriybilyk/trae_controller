@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer } from 'lucide-react';
+import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { API_BASE_URL } from '../config';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -56,58 +57,119 @@ const chartOptions = {
   }
 };
 
-const StatCard = ({ title, value, unit, colorClass, valueClass }: any) => (
-  <div className="bg-kiln-card border border-kiln-border rounded-xl p-5 flex flex-col justify-center shadow-lg shadow-black/20 min-w-0 h-28">
+const StatCard = ({ title, value, unit, colorClass, valueClass, subValue, subValueClass, className }: any) => (
+  <div className={`bg-kiln-card border border-kiln-border rounded-xl p-5 flex flex-col justify-center shadow-lg shadow-black/20 min-w-0 h-28 relative overflow-hidden ${className || ''}`}>
     <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 truncate">{title}</div>
     <div className={`text-xl lg:text-2xl font-bold tracking-tight truncate ${valueClass || 'text-white'}`}>
       {value} <span className="text-sm text-zinc-600 font-normal ml-0.5 align-baseline">{unit}</span>
     </div>
+    {subValue && (
+        <div className={`text-xs font-medium mt-1 ${subValueClass || 'text-zinc-500'}`}>
+            {subValue}
+        </div>
+    )}
   </div>
 );
 
+interface StatusData {
+    temp: number;
+    target: number;
+    output: number;
+    status: string;
+    step: number;
+    totalSteps: number;
+    time?: string;
+    pcbTemp?: number;
+    error?: string;
+    history?: {x: number, y: number}[];
+}
+
 const Dashboard = () => {
   const { t } = useLanguage();
-  const [status, setStatus] = useState<any>({ temp: 22.5, status: 'IDLE', energy: 0 });
-  const [history, setHistory] = useState<{ time: string, temp: number, target: number }[]>([]);
+  const [status, setStatus] = useState<StatusData>({ 
+      temp: 25, 
+      target: 0, 
+      output: 0, 
+      status: 'IDLE', 
+      step: 0, 
+      totalSteps: 0,
+      pcbTemp: 35.5,
+      history: []
+  });
+  
+  // Chart History State (Now derived from backend)
+  const [history, setHistory] = useState<{x: number, y: number}[]>([]);
+
+  // Helper to calculate target profile points
+  const getTargetProfile = (schedule: Schedule | undefined) => {
+      if (!schedule) return [];
+      const points = [{x: 0, y: 25}];
+      let currentTime = 0;
+      let currentTemp = 25;
+
+      schedule.steps.forEach(step => {
+          if (step.type === 'ramp') {
+              const diff = Math.abs(step.target - currentTemp);
+              const rate = step.rate || 100;
+              const duration = diff / rate;
+              currentTime += duration;
+              currentTemp = Number(step.target);
+              points.push({x: currentTime, y: currentTemp});
+          } else {
+              const duration = (step.holdTime || 0) / 60;
+              currentTime += duration;
+              points.push({x: currentTime, y: currentTemp});
+          }
+      });
+      return points;
+  };
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
+  const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
+
+  // Fetch Schedules
+  const fetchSchedules = async () => {
+      try {
+          const res = await fetch(`${API_BASE_URL}/schedules`);
+          if (res.ok) {
+              const data = await res.json();
+              setSchedules(data);
+              if (data.length > 0 && !selectedScheduleId) {
+                  setSelectedScheduleId(data[0].id);
+              }
+          }
+      } catch (e) {
+          console.error("Failed to fetch schedules");
+      }
+  };
 
   useEffect(() => {
     // Fetch Status from Backend
     const fetchStatus = async () => {
         try {
-            const res = await fetch('http://localhost:3001/api/status');
+            const res = await fetch(`${API_BASE_URL}/status`);
             if (res.ok) {
-                const data = await res.json();
-                setStatus(data);
+                const d = await res.json();
+                setStatus(d);
                 
-                // Update History
-                setHistory(prev => {
-                    const newTime = new Date().toLocaleTimeString('en-US', { hour12: false });
-                    const newEntry = { time: newTime, temp: data.temp, target: data.target };
-                    const newHistory = [...prev, newEntry];
-                    if (newHistory.length > 60) newHistory.shift(); // Keep last 60 points
-                    return newHistory;
-                });
-            }
-        } catch (e) {
-            console.error("Connection error");
-        }
-    };
+                // Show Error Toast
+                if (d.error) {
+                    // TODO: Implement proper toast here. For now alert on new error.
+                    // if (d.error !== lastError) toast.error(d.error);
+                }
 
-    // Fetch Schedules
-    const fetchSchedules = async () => {
-        try {
-            const res = await fetch('http://localhost:3000/api/schedules');
-            if (res.ok) {
-                const data = await res.json();
-                setSchedules(data);
-                if (data.length > 0 && !selectedScheduleId) {
-                    setSelectedScheduleId(data[0].id);
+                // Update History for Chart
+                if (d.history && Array.isArray(d.history)) {
+                    setHistory(d.history);
+                } else {
+                    // Fallback for old API/Sim
+                    if (d.status === 'IDLE') {
+                        setHistory([]);
+                    }
                 }
             }
         } catch (e) {
-            console.error("Failed to fetch schedules");
+            console.error("Connection error");
         }
     };
 
@@ -124,7 +186,7 @@ const Dashboard = () => {
       }
 
       try {
-          await fetch('http://localhost:3000/api/start', {
+          await fetch(`${API_BASE_URL}/start`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(schedule)
@@ -135,6 +197,8 @@ const Dashboard = () => {
   };
 
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showAddTimeModal, setShowAddTimeModal] = useState(false);
+  const [showAddTempModal, setShowAddTempModal] = useState(false);
 
   // ... (existing useEffects)
 
@@ -143,32 +207,141 @@ const Dashboard = () => {
       setShowStopConfirm(true);
   };
 
+  const handleSkip = async () => {
+      try {
+          await fetch(`${API_BASE_URL}/skip`, { method: 'POST' });
+          // toast.success(t.dashboard.skip + " OK");
+      } catch (e) {
+          // toast.error("Error skipping step");
+      }
+  };
+
+  const submitAddTime = async (minutes: number, stepIndex: number) => {
+      try {
+          await fetch(`${API_BASE_URL}/addTime`, { 
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ minutes, stepIndex })
+          });
+          // toast.success(`Added ${minutes} min to step ${stepIndex + 1}`);
+      } catch (e) {
+          // toast.error("Error adding time");
+      }
+  };
+
+  const handleAddTimeClick = () => {
+      setShowAddTimeModal(true);
+  };
+
+  const submitAddTemp = async (degrees: number, stepIndex: number) => {
+      try {
+          await fetch(`${API_BASE_URL}/addTemp`, { 
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({ degrees, stepIndex })
+          });
+          // toast.success(`Added ${degrees}°C to step ${stepIndex + 1}`);
+      } catch (e) {
+          // toast.error("Error adding temp");
+      }
+  };
+
+  const handleAddTempClick = () => {
+      setShowAddTempModal(true);
+  };
+
   const confirmStop = async () => {
       try {
-          await fetch('http://localhost:3000/api/stop', { method: 'POST' });
+          await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
           setShowStopConfirm(false);
       } catch (e) {
           alert("Error stopping firing");
       }
   };
 
-  const formatTimeRemaining = (status: any) => {
-      if (status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR') return "-- : --";
-      if (!status.estimatedDuration) return "-- : --";
+  const getSegmentInfo = () => {
+      // If firing, show progress
+      if (status.status !== 'IDLE' && status.status !== 'COMPLETE' && status.status !== 'ERROR') {
+          return `${status.step || 1} / ${status.totalSteps || activeSchedule?.steps.length || '?'}`;
+      }
+
+      // If just selected, show total segments
+      if (activeSchedule) {
+          return `${t.dashboard.total}: ${activeSchedule.steps.length}`;
+      }
       
-      const remainingMinutes = Math.max(0, status.estimatedDuration - status.elapsedTime);
-      const hours = Math.floor(remainingMinutes / 60);
-      const minutes = Math.floor(remainingMinutes % 60);
-      
-      return `${hours.toString().padStart(2, '0')} : ${minutes.toString().padStart(2, '0')}`;
+      return "-- / --";
   };
 
+  const formatTimeRemaining = (status: any) => {
+      if (status.status === 'IDLE') return "--:--";
+      if (status.status === 'COMPLETE') return t.dashboard.done;
+      
+      // Use server provided estimate
+      if (status.timeRemaining !== undefined) {
+          const hours = Math.floor(status.timeRemaining / 60);
+          const mins = Math.floor(status.timeRemaining % 60);
+          return `${hours}${t.dashboard.hourSuffix} ${mins}${t.dashboard.minSuffix}`;
+      }
+
+      return "--:--";
+  };
+
+  const activeSchedule = schedules.find(s => s.id === selectedScheduleId);
+
   return (
-    <div className="flex flex-col gap-6 p-8 h-full overflow-y-auto bg-kiln-bg relative">
+    <div className="flex h-full gap-6 p-4 md:p-6 max-w-[1600px] mx-auto overflow-hidden flex-col md:flex-row">
+      
+      {/* LEFT SIDEBAR: SCHEDULE LIBRARY (Desktop Only) */}
+      <div className="hidden md:flex w-80 flex-col gap-4 shrink-0 bg-kiln-card border border-kiln-border rounded-xl p-4 shadow-lg overflow-hidden">
+          <h2 className="text-lg font-bold text-white mb-2 px-2 flex items-center gap-2">
+              <Sliders size={20} className="text-kiln-accent" />
+              {t.schedules.library}
+          </h2>
+          
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {schedules.map(s => (
+                  <div 
+                      key={s.id}
+                      onClick={() => setSelectedScheduleId(s.id)}
+                      className={`p-4 rounded-xl cursor-pointer border transition-all relative group ${selectedScheduleId === s.id 
+                          ? 'bg-zinc-800 border-kiln-accent shadow-[0_0_0_1px_rgba(16,185,129,1)]' 
+                          : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}
+                  >
+                      <div className="font-bold text-sm text-white mb-1 pr-6 truncate">{s.name}</div>
+                      <div className="text-xs text-zinc-500">{s.steps.length} segments • {s.type || 'Custom'}</div>
+                      {selectedScheduleId === s.id && (
+                          <div className="absolute top-4 right-4 text-kiln-accent">
+                              <Check size={16} />
+                          </div>
+                      )}
+                  </div>
+              ))}
+          </div>
+      </div>
+
+      {/* RIGHT CONTENT: DASHBOARD & CONTROLS */}
+      <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-20 md:pb-0 relative no-scrollbar md:scrollbar-default">
+      
+      {/* Mobile Schedule Selector (Sticky Top) */}
+      <div className="md:hidden sticky top-0 z-30 bg-kiln-bg/95 backdrop-blur-sm pb-2 pt-1">
+          <button 
+              onClick={() => { setIsScheduleMenuOpen(true); fetchSchedules(); }}
+              className="w-full bg-zinc-800 border border-zinc-700 p-4 rounded-xl flex justify-between items-center text-white font-bold shadow-lg active:scale-98 transition-transform"
+          >
+              <span className="flex items-center gap-2">
+                  <Sliders size={18} className="text-kiln-accent" />
+                  {activeSchedule?.name || t.dashboard.selectSchedule}
+              </span>
+              <ChevronDown size={20} className="text-zinc-500" />
+          </button>
+      </div>
+
+
       
       {/* Custom Stop Confirmation Modal */}
       {showStopConfirm && (
-          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-kiln-card border border-red-500/50 rounded-2xl p-8 max-w-md w-full shadow-[0_0_50px_rgba(239,68,68,0.2)] text-center animate-in fade-in zoom-in duration-200">
                   <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                       <Square size={40} className="text-red-500" fill="currentColor" />
@@ -197,35 +370,186 @@ const Dashboard = () => {
           </div>
       )}
 
+      {/* MOBILE CONTROL BAR (Fixed Bottom) */}
+      <div className="md:hidden fixed bottom-16 left-0 right-0 bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800 p-3 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+          {status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' ? (
+              <button 
+                  onClick={handleStartFiring}
+                  className="w-full py-3 bg-kiln-accent text-black rounded-xl hover:bg-emerald-400 transition-all text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center justify-center gap-2"
+              >
+                  <Play size={20} fill="black" /> {t.dashboard.startFiring}
+              </button>
+          ) : (
+              <div className="flex flex-col gap-2">
+                  <div className="grid grid-cols-3 gap-2">
+                      <button onClick={handleAddTimeClick} className="py-2.5 bg-zinc-800 rounded-lg text-[10px] font-bold text-zinc-300 flex flex-col items-center justify-center gap-1 border border-zinc-700 active:bg-zinc-700">
+                          <Clock size={16} /> {t.dashboard.addTime}
+                      </button>
+                      <button onClick={handleAddTempClick} className="py-2.5 bg-zinc-800 rounded-lg text-[10px] font-bold text-zinc-300 flex flex-col items-center justify-center gap-1 border border-zinc-700 active:bg-zinc-700">
+                          <Thermometer size={16} /> {t.dashboard.addTemp}
+                      </button>
+                      <button onClick={handleSkip} className="py-2.5 bg-zinc-800 rounded-lg text-[10px] font-bold text-zinc-300 flex flex-col items-center justify-center gap-1 border border-zinc-700 active:bg-zinc-700">
+                          <Play size={16} className="fill-current" /> {t.dashboard.skip}
+                      </button>
+                  </div>
+                  <button 
+                      onClick={handleStopFiring}
+                      className="w-full py-3 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-all text-lg font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)] flex items-center justify-center gap-2 active:scale-[0.98]"
+                  >
+                      <Square size={20} fill="white" /> {t.dashboard.stopFiring}
+                  </button>
+              </div>
+          )}
+      </div>
+
+      {/* Add Time Modal */}
+      {showAddTimeModal && (
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-kiln-card border border-zinc-700 rounded-2xl p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in duration-200">
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-bold text-white">{t.dashboard.extendHoldTitle}</h3>
+                      <button onClick={() => setShowAddTimeModal(false)} className="text-zinc-400 hover:text-white">
+                          <Check size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-2 no-scrollbar md:scrollbar-default">
+                      {activeSchedule?.steps.map((step, index) => {
+                          if (step.type !== 'hold' || index < (status.step - 1)) return null;
+                          return (
+                              <div key={index} className="flex justify-between items-center p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
+                                  <div>
+                                      <div className="text-sm font-bold text-zinc-300">{t.dashboard.stepHold} {index + 1} {t.dashboard.holdSuffix}</div>
+                                      <div className="text-xs text-zinc-500">{t.dashboard.currentDuration}: {step.holdTime}{t.dashboard.minSuffix}</div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                      <button 
+                                          onClick={() => submitAddTime(1, index)}
+                                          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors"
+                                      >
+                                          +1{t.dashboard.minSuffix}
+                                      </button>
+                                      <button 
+                                          onClick={() => submitAddTime(5, index)}
+                                          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors"
+                                      >
+                                          +5{t.dashboard.minSuffix}
+                                      </button>
+                                      <button 
+                                          onClick={() => submitAddTime(10, index)}
+                                          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors"
+                                      >
+                                          +10{t.dashboard.minSuffix}
+                                      </button>
+                                  </div>
+                              </div>
+                          );
+                      })}
+                      {activeSchedule?.steps.every((s, i) => s.type !== 'hold' || i < (status.step - 1)) && (
+                          <div className="text-center text-zinc-500 py-4">
+                              {t.dashboard.noHoldsAvailable}
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Add Temp Modal */}
+      {showAddTempModal && (
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-kiln-card border border-zinc-700 rounded-2xl p-6 max-w-xl w-full shadow-2xl animate-in fade-in zoom-in duration-200 max-h-[80vh] flex flex-col">
+                  <div className="flex justify-between items-center mb-4 shrink-0">
+                      <h3 className="text-xl font-bold text-white">{t.dashboard.extendTempTitle}</h3>
+                      <button onClick={() => setShowAddTempModal(false)} className="text-zinc-400 hover:text-white">
+                          <Check size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="space-y-2 overflow-y-auto pr-2 flex-1 no-scrollbar md:scrollbar-default">
+                      {activeSchedule?.steps.map((step, index) => {
+                          if (index < (status.step - 1)) return null;
+                          return (
+                              <div key={index} className="flex flex-col gap-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
+                                  <div className="flex justify-between items-center">
+                                      <div className="text-sm font-bold text-zinc-300">{t.dashboard.stepHold} {index + 1} {step.type === 'hold' ? t.dashboard.holdSuffix : t.dashboard.tempSuffix}</div>
+                                      <div className="text-xs text-zinc-500">{t.dashboard.currentTemp}: {step.target}°C</div>
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-2">
+                                      <button 
+                                          onClick={() => submitAddTemp(1, index)}
+                                          className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
+                                      >
+                                          +1°C
+                                      </button>
+                                      <button 
+                                          onClick={() => submitAddTemp(5, index)}
+                                          className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
+                                      >
+                                          +5°C
+                                      </button>
+                                      <button 
+                                          onClick={() => submitAddTemp(10, index)}
+                                          className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
+                                      >
+                                          +10°C
+                                      </button>
+                                      <button 
+                                          onClick={() => submitAddTemp(50, index)}
+                                          className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
+                                      >
+                                          +50°C
+                                      </button>
+                                  </div>
+                              </div>
+                          );
+                      })}
+                      {activeSchedule?.steps.every((s, i) => i < (status.step - 1)) && (
+                          <div className="text-center text-zinc-500 py-4">
+                              {t.dashboard.noStepsAvailable}
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Stat Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard 
-            title={t.dashboard.currentTemp} 
-            value={status.temp.toFixed(1)} 
-            unit="°C" 
-        />
-        <StatCard 
-            title={t.dashboard.status} 
-            value={t.status[status.status] || status.status} 
-            unit="" 
-            valueClass={status.status === 'IDLE' ? 'text-zinc-400' : 'text-kiln-accent'}
-        />
+        {/* MEGA CARD: Temp & Status */}
+        <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg shadow-black/20 relative overflow-hidden lg:col-span-3 flex flex-col md:flex-row items-center justify-between group min-h-32 gap-4 md:gap-0">
+            <div className="relative z-10 text-center md:text-left">
+                <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">{t.dashboard.currentTemp}</div>
+                <div className="text-5xl lg:text-6xl font-bold text-white tracking-tighter tabular-nums leading-none">
+                    {(status.temp || 0).toFixed(1)}
+                    <span className="text-2xl lg:text-3xl text-zinc-600 font-normal ml-1 align-top">°C</span>
+                </div>
+            </div>
+            
+            <div className="relative z-10 flex flex-col items-center md:items-end gap-2 text-center md:text-right">
+                <div className={`text-2xl lg:text-3xl font-bold tracking-tight ${status.status === 'IDLE' ? 'text-zinc-500' : 'text-kiln-accent'}`}>
+                    {t.status[status.status] || status.status}
+                </div>
+                <div className="text-xs font-medium text-zinc-400 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-zinc-800 inline-flex items-center gap-2">
+                    <span className="text-indigo-400 uppercase tracking-wider">{t.dashboard.setpoint}</span>
+                    <span className="text-white font-mono text-lg leading-none">{(status.target || 0).toFixed(0)}°C</span>
+                </div>
+            </div>
+            
+            {/* Background Glow */}
+            <div className={`absolute -right-10 -top-10 w-64 h-64 bg-kiln-accent/5 rounded-full blur-3xl pointer-events-none transition-opacity duration-700 ${status.status !== 'IDLE' ? 'opacity-100' : 'opacity-0'}`} />
+        </div>
+
         <StatCard 
             title={t.dashboard.timeRemaining} 
             value={formatTimeRemaining(status)} 
             unit="" 
         />
         <StatCard 
-            title={t.dashboard.currentCost} 
-            value="$0.00" 
+            title={t.dashboard.segment.toUpperCase()} 
+            value={getSegmentInfo()} 
             unit="" 
-            valueClass="text-emerald-400"
-        />
-        <StatCard 
-            title={t.dashboard.ventFan} 
-            value={t.status.OFF} 
-            unit="" 
-            valueClass="text-zinc-500"
+            valueClass="text-purple-400"
         />
       </div>
 
@@ -233,73 +557,89 @@ const Dashboard = () => {
       <div className="flex-1 bg-kiln-card border border-kiln-border rounded-xl shadow-lg shadow-black/20 flex flex-col overflow-hidden min-h-[400px]">
         {/* Header */}
         <div className="p-5 border-b border-kiln-border flex flex-col md:flex-row justify-between items-center gap-4 bg-kiln-card/50">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                {t.dashboard.firingProfile}
-            </h2>
+            <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    {t.dashboard.firingProfile}
+                </h2>
+                <div className="flex items-center gap-3">
+                    <span className={`text-sm font-bold ${status.pcbTemp && status.pcbTemp > 50 ? 'text-red-500 animate-pulse' : 'text-zinc-500'}`}>
+                        PCB: {status.pcbTemp?.toFixed(1)}°C
+                    </span>
+                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${status.status === 'FIRING' ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-400'}`}>
+                        {status.status}
+                    </div>
+                </div>
+            </div>
             
-            <div className="flex items-center gap-3">
-                 <select 
-                    className="bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg focus:ring-kiln-accent focus:border-kiln-accent block p-2.5 min-w-[200px]"
-                    value={selectedScheduleId}
-                    onChange={(e) => setSelectedScheduleId(e.target.value)}
-                 >
-                     <option value="" disabled>{t.dashboard.selectSchedule}</option>
-                     {schedules.map(s => (
-                         <option key={s.id} value={s.id}>{s.name}</option>
-                     ))}
-                 </select>
-
-                 <button className="flex items-center gap-2 px-4 py-2 bg-amber-600/10 text-amber-500 border border-amber-600/20 rounded-lg hover:bg-amber-600/20 transition-colors text-sm font-medium">
-                    <Timer size={16} /> {t.dashboard.delayStart}
-                 </button>
-                 
-                 {status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' ? (
-                     <button 
-                        onClick={handleStartFiring}
-                        className="flex items-center gap-2 px-5 py-2 bg-kiln-accent text-black rounded-lg hover:bg-emerald-400 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-                     >
-                        <Play size={16} fill="black" /> {t.dashboard.startFiring}
-                     </button>
-                 ) : (
-                     <button 
-                        onClick={handleStopFiring}
-                        className="flex items-center gap-2 px-5 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)]"
-                     >
-                        <Square size={16} fill="white" /> {t.dashboard.stopFiring}
-                     </button>
+            <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+                 {/* On-the-fly controls */}
+                 {status.status !== 'IDLE' && status.status !== 'COMPLETE' && status.status !== 'ERROR' && (
+                    <div className="hidden md:flex items-center gap-1.5 mr-2 border-r border-zinc-700 pr-2 shrink-0">
+                        <button onClick={handleAddTimeClick} className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors border border-zinc-700 whitespace-nowrap">
+                            <Clock size={13} /> {t.dashboard.addTime}
+                        </button>
+                        <button onClick={handleAddTempClick} className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors border border-zinc-700 whitespace-nowrap">
+                            <Thermometer size={13} /> {t.dashboard.addTemp}
+                        </button>
+                        <button onClick={handleSkip} className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors border border-zinc-700 whitespace-nowrap">
+                            <Play size={13} className="fill-current" /> {t.dashboard.skip}
+                        </button>
+                    </div>
                  )}
+
+                 <div className="relative shrink-0 hidden md:block">
+                     {status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' ? (
+                         <button 
+                            onClick={handleStartFiring}
+                            className="flex items-center gap-2 px-5 py-2 bg-kiln-accent text-black rounded-lg hover:bg-emerald-400 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] whitespace-nowrap"
+                         >
+                            <Play size={16} fill="black" /> {t.dashboard.startFiring}
+                         </button>
+                     ) : (
+                         <button 
+                            onClick={handleStopFiring}
+                            className="flex items-center gap-2 px-5 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)] whitespace-nowrap"
+                         >
+                            <Square size={16} fill="white" /> {t.dashboard.stopFiring}
+                         </button>
+                     )}
+                 </div>
             </div>
         </div>
 
         {/* Chart */}
         <div className="flex-1 p-6 relative">
-            <Line options={chartOptions} data={{
-                labels: history.map(h => h.time),
-                datasets: [
-                    { 
-                        label: 'Temperature',
-                        data: history.map(h => h.temp), 
-                        borderColor: '#3b82f6', // Blue trace like in screenshot? Or Green? Screenshot has flat line. Let's stick to blue/theme.
-                        // Screenshot image_2 shows a flat blue line near 0.
-                        backgroundColor: (context: any) => {
-                            const ctx = context.chart.ctx;
-                            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
-                            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.1)');
-                            gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
-                            return gradient;
-                        },
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0
+            <Line options={{
+                ...chartOptions,
+                scales: {
+                    x: {
+                        type: 'linear',
+                        grid: { color: '#27272a' },
+                        ticks: { color: '#71717a', callback: (v) => v + 'h' }
                     },
-                    { 
-                        label: 'Setpoint',
-                        data: history.map(h => h.target), 
-                        borderColor: '#f97316', // Orange setpoint
-                        borderDash: [4, 4], 
-                        borderWidth: 1,
-                        pointRadius: 0
+                    y: {
+                        grid: { color: '#27272a' },
+                        ticks: { color: '#71717a' }
+                    }
+                }
+            }} data={{
+                datasets: [
+                    {
+                        label: 'Target Profile',
+                        data: getTargetProfile(activeSchedule),
+                        borderColor: '#6366f1', // Indigo (Target)
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        tension: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'Actual Temp',
+                        data: history,
+                        borderColor: '#10b981', // Emerald
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
                     }
                 ]
             }} />
@@ -308,6 +648,46 @@ const Dashboard = () => {
                 {t.dashboard.setpoint}
             </div>
         </div>
+      </div>
+      {/* Schedule Selection Modal (Mobile) - MOVED TO ROOT */}
+      {isScheduleMenuOpen && (
+          <div className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex flex-col p-4 animate-in slide-in-from-bottom-10 duration-200">
+              <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Sliders size={24} className="text-kiln-accent" />
+                      {t.schedules.library}
+                  </h2>
+                  <div className="flex gap-2">
+                      <button onClick={fetchSchedules} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+                          <Activity size={20} />
+                      </button>
+                      <button onClick={() => setIsScheduleMenuOpen(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+                          <Check size={24} />
+                      </button>
+                  </div>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar md:scrollbar-default">
+                  {schedules.length === 0 ? (
+                      <div className="text-center p-8 text-zinc-500 flex flex-col items-center gap-2">
+                          <Sliders size={48} className="opacity-20" />
+                          <div className="font-bold">{t.schedules.selectToEdit}</div>
+                          <div className="text-xs">{t.schedules.orCreate}</div>
+                      </div>
+                  ) : (
+                      schedules.map(s => (
+                          <button
+                              key={s.id}
+                              onClick={() => { setSelectedScheduleId(s.id); setIsScheduleMenuOpen(false); }}
+                              className={`w-full p-4 rounded-xl text-left border transition-all ${selectedScheduleId === s.id ? 'bg-zinc-800 border-kiln-accent' : 'bg-zinc-900/50 border-zinc-800'}`}
+                          >
+                              <div className="font-bold text-white text-lg">{s.name}</div>
+                              <div className="text-sm text-zinc-500">{s.steps.length} segments</div>
+                          </button>
+                      ))
+                  )}
+              </div>
+          </div>
+      )}
       </div>
     </div>
   );
