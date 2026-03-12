@@ -1,7 +1,14 @@
-.pio
-.vscode/.browse.c_cpp.db*
-.vscode/c_cpp_properties.json
-.vscode/launch.json
-.vscode/ipch
-/.component_cache/
-/.pio/libdeps/
+.pio/
+.vscode/
+.cache/
+build/
+*.o
+*.a
+*.so
+*.bin
+*.elf
+compile_commands.json
+dependencies.lock
+
+# Ігнорування компонентів, що керуються ESP-IDF
+/managed_components/

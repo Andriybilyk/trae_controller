@@ -29,6 +29,9 @@ private:
     static esp_err_t api_schedules_save_handler(httpd_req_t *req);
     static esp_err_t api_start_handler(httpd_req_t *req);
     static esp_err_t api_stop_handler(httpd_req_t *req);
+    static esp_err_t api_skip_handler(httpd_req_t *req);
+    static esp_err_t api_add_temp_handler(httpd_req_t *req);
+    static esp_err_t api_add_time_handler(httpd_req_t *req);
     static esp_err_t manifest_handler(httpd_req_t *req);
     
     uint64_t lastBroadcast;

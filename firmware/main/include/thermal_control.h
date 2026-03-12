@@ -42,8 +42,11 @@ public:
     void startSchedule(const std::string& scheduleJson);
     void loadSchedule(const std::string& scheduleJson);
     void start();
-    void stop(const std::string& reason = "User Request");
+    void stop(const std::string& reason = std::string("User Request"));
     void emergencyStop(const std::string& reason);
+    void skipCurrentStep();
+    void addTemperatureToTarget(float tempToAdd);
+    void addTimeToHold(float minutesToAdd);
     
     // Getters
     KilnState getState();

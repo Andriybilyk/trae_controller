@@ -6,8 +6,10 @@
 #include "dns_server.h"
 #include <ArduinoJson.h>
 #include <string>
-#include <ctype.h>
+#include <cctype>
 #include <algorithm>
+#include <cstring> // For strlen, strstr
+#include <cstdio>  // For FILE, fopen, snprintf
 
 static const char *TAG = "SERVER";
 
@@ -412,6 +414,42 @@ void WiFiServerManager::setupRoutes() {
     err = httpd_register_uri_handler(server, &api_stop_uri);
     if (err != ESP_OK) ESP_LOGE(TAG, "Failed to register api_stop handler: %d", err);
 
+    httpd_uri_t api_skip_uri = {
+        .uri       = "/api/skip",
+        .method    = HTTP_POST,
+        .handler   = api_skip_handler,
+        .user_ctx  = NULL,
+        .is_websocket = false,
+        .handle_ws_control_frames = false,
+        .supported_subprotocol = NULL
+    };
+    err = httpd_register_uri_handler(server, &api_skip_uri);
+    if (err != ESP_OK) ESP_LOGE(TAG, "Failed to register api_skip handler: %d", err);
+
+    httpd_uri_t api_add_temp_uri = {
+        .uri       = "/api/addTemp",
+        .method    = HTTP_POST,
+        .handler   = api_add_temp_handler,
+        .user_ctx  = NULL,
+        .is_websocket = false,
+        .handle_ws_control_frames = false,
+        .supported_subprotocol = NULL
+    };
+    err = httpd_register_uri_handler(server, &api_add_temp_uri);
+    if (err != ESP_OK) ESP_LOGE(TAG, "Failed to register api_add_temp handler: %d", err);
+
+    httpd_uri_t api_add_time_uri = {
+        .uri       = "/api/addTime",
+        .method    = HTTP_POST,
+        .handler   = api_add_time_handler,
+        .user_ctx  = NULL,
+        .is_websocket = false,
+        .handle_ws_control_frames = false,
+        .supported_subprotocol = NULL
+    };
+    err = httpd_register_uri_handler(server, &api_add_time_uri);
+    if (err != ESP_OK) ESP_LOGE(TAG, "Failed to register api_add_time handler: %d", err);
+
     httpd_uri_t manifest_uri = {
         .uri       = "/manifest.json",
         .method    = HTTP_GET,
@@ -743,6 +781,51 @@ esp_err_t WiFiServerManager::api_stop_handler(httpd_req_t *req) {
     ESP_LOGI(TAG, "Received Stop Command");
     thermalCtrl.stop("API Request");
     httpd_resp_sendstr(req, "{\"status\":\"stopped\"}");
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_skip_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "Received Skip Command");
+    thermalCtrl.skipCurrentStep();
+    httpd_resp_sendstr(req, "{\"status\":\"skip_received\"}");
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_add_temp_handler(httpd_req_t *req) {
+    char buf[100];
+    int ret = httpd_req_recv(req, buf, sizeof(buf));
+    if (ret <= 0) {
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        ESP_LOGE(TAG, "Failed to receive addTemp value");
+        return ESP_FAIL;
+    }
+    buf[ret] = '\0';
+
+    float tempToAdd = atof(buf);
+    ESP_LOGI(TAG, "Received Add Temp Command: %.2f C", tempToAdd);
+    thermalCtrl.addTemperatureToTarget(tempToAdd);
+    httpd_resp_sendstr(req, "{\"status\":\"add_temp_received\", \"value\":%.2f}");
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_add_time_handler(httpd_req_t *req) {
+    char buf[100];
+    int ret = httpd_req_recv(req, buf, sizeof(buf));
+    if (ret <= 0) {
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+            httpd_resp_send_408(req);
+        }
+        ESP_LOGE(TAG, "Failed to receive addTime value");
+        return ESP_FAIL;
+    }
+    buf[ret] = '\0';
+
+    float minutesToAdd = atof(buf);
+    ESP_LOGI(TAG, "Received Add Time Command: %.2f minutes", minutesToAdd);
+    thermalCtrl.addTimeToHold(minutesToAdd);
+    httpd_resp_sendstr(req, "{\"status\":\"add_time_received\", \"value\":%.2f}");
     return ESP_OK;
 }
 
