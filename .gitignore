@@ -1,0 +1,34 @@
+# Node / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Builds / artifacts
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Vite
+frontend/dist/
+frontend/.vite/
+
+# PlatformIO / embedded build artifacts
+.pio/
+firmware/.pio/
+firmware/.pioenvs/
+firmware/.piolibdeps/
+firmware/.cache/
+
+# ESP-IDF style build dirs
+firmware/build/
+
+# OS / tooling noise
+.vercel/
+.DS_Store
+Thumbs.db
+# clangd / CMake
+compile_commands.json
+
