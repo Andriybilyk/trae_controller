@@ -23,7 +23,7 @@ const chartOptions = {
         padding: 10,
         displayColors: false,
         callbacks: {
-            label: (context: any) => `${context.dataset.label}: ${context.raw}°C`
+            label: (context: any) => `${context.dataset.label}: ${context.raw}??C`
         }
     }
   },
@@ -264,7 +264,7 @@ const Dashboard = () => {
                           : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}
                   >
                       <div className="font-bold text-white text-sm mb-1 pr-6 truncate">{s.name}</div>
-                      <div className="text-xs text-zinc-500">{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.steps} • {s.type || t.schedules.custom}</div>
+                      <div className="text-xs text-zinc-500">{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.steps} ??? {s.type || t.schedules.custom}</div>
                       {selectedScheduleId === s.id && (
                           <div className="absolute top-4 right-4 text-kiln-accent">
                               <Check size={16} />
@@ -428,32 +428,32 @@ const Dashboard = () => {
                               <div key={index} className="flex flex-col gap-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
                                   <div className="flex justify-between items-center">
                                       <div className="text-sm font-bold text-zinc-300">{t.dashboard.stepHold} {index + 1} {step.type === 'hold' ? t.dashboard.holdSuffix : t.dashboard.tempSuffix}</div>
-                                      <div className="text-xs text-zinc-500">{t.dashboard.currentTemp}: {step.target}°C</div>
+                                      <div className="text-xs text-zinc-500">{t.dashboard.currentTemp}: {step.target}??C</div>
                                   </div>
                                   <div className="grid grid-cols-4 gap-2">
                                       <button 
                                           onClick={() => submitAddTemp(1, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +1°C
+                                          +1??C
                                       </button>
                                       <button 
                                           onClick={() => submitAddTemp(5, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +5°C
+                                          +5??C
                                       </button>
                                       <button 
                                           onClick={() => submitAddTemp(10, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +10°C
+                                          +10??C
                                       </button>
                                       <button 
                                           onClick={() => submitAddTemp(50, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +50°C
+                                          +50??C
                                       </button>
                                   </div>
                               </div>
@@ -477,17 +477,17 @@ const Dashboard = () => {
                 <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">{t.dashboard.currentTemp}</div>
                 <div className="text-5xl lg:text-6xl font-bold text-white tracking-tighter tabular-nums leading-none">
                     {(status.temp || 0).toFixed(1)}
-                    <span className="text-2xl lg:text-3xl text-zinc-600 font-normal ml-1 align-top">°C</span>
+                    <span className="text-2xl lg:text-3xl text-zinc-600 font-normal ml-1 align-top">??C</span>
                 </div>
             </div>
             
             <div className="relative z-10 flex flex-col items-center md:items-end gap-2 text-center md:text-right">
                 <div className={`text-2xl lg:text-3xl font-bold tracking-tight ${isIdle ? 'text-zinc-500' : 'text-kiln-accent'}`}>
-                    {t.status[status.status] || status.status}
+                    {(t.status as Record<string, string>)[status.status] || status.status}
                 </div>
                 <div className="text-xs font-medium text-zinc-400 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-zinc-800 inline-flex items-center gap-2">
                     <span className="text-indigo-400 uppercase tracking-wider">{t.dashboard.setpoint}</span>
-                    <span className="text-white font-mono text-lg leading-none">{(status.target || 0).toFixed(0)}°C</span>
+                    <span className="text-white font-mono text-lg leading-none">{(status.target || 0).toFixed(0)}??C</span>
                 </div>
             </div>
             
@@ -518,7 +518,7 @@ const Dashboard = () => {
                 </h2>
                 <div className="flex items-center gap-3">
                     <span className={`text-sm font-bold ${status.pcbTemp && status.pcbTemp > 50 ? 'text-red-500 animate-pulse' : 'text-zinc-500'}`}>
-                        PCB: {status.pcbTemp?.toFixed(1)}°C
+                        PCB: {status.pcbTemp?.toFixed(1)}??C
                     </span>
                     <div className={`px-3 py-1 rounded-full text-xs font-bold ${!isIdle ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-400'}`}>
                         {status.status}

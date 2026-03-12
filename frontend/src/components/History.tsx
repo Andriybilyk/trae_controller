@@ -57,7 +57,7 @@ const chartOptions = {
         min: 0, 
         grid: { color: '#27272a' }, 
         ticks: { color: '#71717a' },
-        title: { display: true, text: 'Temperature (°C)', color: '#a1a1aa' }
+        title: { display: true, text: 'Temperature (??C)', color: '#a1a1aa' }
     }
   },
   plugins: {
@@ -84,7 +84,7 @@ const History = () => {
             const data = await response.json();
             setHistory(data);
         } catch (err) {
-            setError(err.message);
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setLoading(false);
         }
@@ -173,7 +173,7 @@ const History = () => {
                                         <p className="text-xs text-zinc-400">{new Date(item.startTime).toLocaleString()}</p>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-zinc-300"><Clock size={16} className="text-zinc-500" /><span>{formatDuration(item.duration)}</span></div>
-                                    <div className="flex items-center gap-2 text-sm text-zinc-300"><Thermometer size={16} className="text-zinc-500" /><span>{typeof item.peakTemp === 'number' ? `${item.peakTemp.toFixed(0)}°C ${t.history.peakTemp}` : '--'}</span></div>
+                                    <div className="flex items-center gap-2 text-sm text-zinc-300"><Thermometer size={16} className="text-zinc-500" /><span>{typeof item.peakTemp === 'number' ? `${item.peakTemp.toFixed(0)}??C ${t.history.peakTemp}` : '--'}</span></div>
                                     <div className="flex justify-end">
                                         <StatusBadge status={item.status} />
                                     </div>

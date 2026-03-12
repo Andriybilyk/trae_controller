@@ -18,6 +18,7 @@ interface Schedule {
     id: string;
     name: string;
     steps: any[];
+    stepsCount?: number;
 }
 
 // --- SUB-COMPONENTS ---
@@ -63,7 +64,7 @@ const DashboardView = ({
                     <div className="text-zinc-500 font-bold uppercase tracking-widest mb-0 text-[10px]">{t.dashboard.currentTemp}</div>
                     <div className="text-5xl font-bold text-white font-mono flex items-start leading-none tracking-tighter">
                         {status.temp.toFixed(1)}
-                        <span className="text-xl text-zinc-600 mt-1 ml-1">°C</span>
+                        <span className="text-xl text-zinc-600 mt-1 ml-1">??C</span>
                     </div>
                 </div>
 
@@ -71,7 +72,7 @@ const DashboardView = ({
                     <div className="mb-2 space-y-1">
                         <div className="flex justify-between items-end">
                             <span className="text-zinc-400 font-medium text-[10px]">{t.schedules.targetTemp}</span>
-                            <span className="text-xl text-white font-mono leading-none">{status.target}°C</span>
+                            <span className="text-xl text-white font-mono leading-none">{status.target}??C</span>
                         </div>
                         
                         { (!isIdle && status.timeRemaining !== undefined) && (
@@ -113,7 +114,7 @@ const DashboardView = ({
                         <>
                              <div className="text-zinc-500 uppercase text-[10px] font-bold tracking-widest mb-1">{t.dashboard.stepHold}</div>
                              <div className="text-4xl font-bold text-white mb-1 font-mono">{status.step} <span className="text-lg text-zinc-600">/ {status.totalSteps}</span></div>
-                             <div className="text-zinc-400 text-[10px]">Ramp to {status.target}°C</div>
+                             <div className="text-zinc-400 text-[10px]">Ramp to {status.target}??C</div>
                         </>
                     )}
                 </div>
@@ -293,7 +294,7 @@ const SchedulesView = React.memo(({
                         <div className="text-base font-bold text-white truncate">{s.name}</div>
                         <div className="flex gap-2 text-zinc-500 text-[10px]">
                             <span>{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.segments}</span>
-                            <span>• {t.schedules.custom}</span>
+                            <span>??? {t.schedules.custom}</span>
                         </div>
                     </div>
                     

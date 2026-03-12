@@ -140,7 +140,7 @@ const ScheduleEditor = () => {
 
       const success = await saveSchedule(updatedSchedule);
       if (success) {
-          toast.success(t.schedules.save + " OK!");
+          toast.success(t.schedules.saveBtn + " OK!");
           // If name changed, the ID changed, so we need to select the new ID
           if (safeName !== selectedSchedule.id) {
               setSelectedScheduleId(safeName);
@@ -316,14 +316,14 @@ const ScheduleEditor = () => {
                 <div className="mb-4 flex flex-col md:flex-row justify-between items-center gap-2 shrink-0 px-1">
                     <div className="w-full flex items-center gap-2">
                         <button onClick={() => setShowMobileLibrary(true)} className="md:hidden p-2 -ml-2 text-zinc-400 hover:text-white">
-                            ←
+                            ???
                         </button>
                         <input className="text-xl md:text-3xl font-bold text-white bg-transparent border-none p-0 w-full focus:ring-0 truncate" value={scheduleName} onChange={e => setScheduleName(e.target.value)} />
                     </div>
                     
                     <div className="flex gap-2 w-full md:w-auto">
                         <button onClick={handleSave} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-kiln-accent hover:bg-emerald-400 text-black px-3 py-2 rounded-lg font-bold text-xs shadow-lg shadow-emerald-900/20 whitespace-nowrap">
-                            <Save size={14} /> {t.schedules.save}
+                            <Save size={14} /> {t.schedules.saveBtn}
                         </button>
                         <button onClick={handleDelete} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20"><Trash2 size={16}/></button>
                     </div>
