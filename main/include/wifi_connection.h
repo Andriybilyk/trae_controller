@@ -1,0 +1,43 @@
+#pragma once
+
+#include "esp_err.h"
+#include <string>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Initialize WiFi in Station mode.
+ * @return true if connected, false otherwise.
+ */
+bool wifi_init_sta(void);
+
+/**
+ * @brief Initialize WiFi in SoftAP mode (for configuration).
+ */
+void wifi_init_softap(void);
+
+/**
+ * @brief Check if WiFi credentials are saved in NVS.
+ */
+bool wifi_is_configured(void);
+
+/**
+ * @brief Save WiFi credentials to NVS.
+ */
+void wifi_save_creds(const char* ssid, const char* password);
+
+/**
+ * @brief Erase WiFi credentials from NVS.
+ */
+void wifi_erase_creds(void);
+
+/**
+ * @brief Scan for available networks and return JSON string.
+ */
+std::string wifi_scan_networks(void);
+
+#ifdef __cplusplus
+}
+#endif
