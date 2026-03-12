@@ -132,7 +132,6 @@ void ThermalController::processSchedule() {
         
         if (state.currentTemp >= step.value - 1.0f) { // Hysteresis 1.0C
             state.currentStep++;
-            ESP_LOGI(TAG, "HOLD Step %d completed. Moving to next step.", state.currentStep);
             ESP_LOGI(TAG, "RAMP Step %d completed. Moving to next step.", state.currentStep);
             stepStartTime = esp_timer_get_time() / 1000;
             stepStartTemp = state.currentTemp;
@@ -143,6 +142,7 @@ void ThermalController::processSchedule() {
         setpoint = state.targetTemp; // Keep previous target
         if (elapsed >= (uint32_t)(step.value * 60)) {
             state.currentStep++;
+            ESP_LOGI(TAG, "HOLD Step %d completed. Moving to next step.", state.currentStep);
             stepStartTime = esp_timer_get_time() / 1000;
             stepStartTemp = state.currentTemp;
         }
