@@ -5,6 +5,7 @@
 #pragma once
 
 #include <ArduinoJson/Memory/ResourceManager.hpp>
+#include <ArduinoJson/Strings/JsonString.hpp>
 
 ARDUINOJSON_BEGIN_PRIVATE_NAMESPACE
 
@@ -43,7 +44,7 @@ class StringBuffer {
     if (isTinyString(s, size_))
       data->setTinyString(adaptString(s, size_));
     else
-      data->setOwnedString(commitStringNode());
+      data->setLongString(commitStringNode());
   }
 
   void saveRaw(VariantData* data) {

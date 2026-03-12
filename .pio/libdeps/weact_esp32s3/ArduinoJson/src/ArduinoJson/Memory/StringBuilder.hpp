@@ -5,6 +5,7 @@
 #pragma once
 
 #include <ArduinoJson/Memory/ResourceManager.hpp>
+#include <ArduinoJson/Strings/JsonString.hpp>
 
 ARDUINOJSON_BEGIN_PRIVATE_NAMESPACE
 
@@ -45,7 +46,7 @@ class StringBuilder {
     } else {
       node->references++;
     }
-    variant->setOwnedString(node);
+    variant->setLongString(node);
   }
 
   void append(const char* s) {

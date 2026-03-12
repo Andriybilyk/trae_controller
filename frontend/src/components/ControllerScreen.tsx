@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Play, Square, Thermometer, Clock, Activity, Wifi, Settings, AlertTriangle, ArrowRight, X } from 'lucide-react';
+import { Play, Square, Thermometer, Clock, Activity, Wifi, Settings, AlertTriangle, ArrowRight, X, Trash2 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 // Types
@@ -43,108 +43,113 @@ const DashboardView = ({
     onStart: () => void; 
     onStop: () => void; 
     onOpenLibrary: () => void; 
-}) => (
-    <div className="grid grid-cols-2 h-full">
-        {/* Left Column: Temperature & Status */}
-        <div className="p-6 border-r border-zinc-800 flex flex-col justify-between relative">
-            
-            {/* Status Badge */}
-            <div className="absolute top-6 right-6">
-                 <span className={`px-4 py-2 rounded-full text-white font-bold text-sm ${status.status === 'IDLE' ? 'bg-zinc-800' : status.status === 'ERROR' ? 'bg-red-500' : 'bg-kiln-accent text-black'}`}>
-                    {status.status}
-                </span>
-            </div>
+}) => {
+    // Unified Idle Logic
+    const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR';
 
-            <div>
-                <div className="text-zinc-500 font-bold uppercase tracking-widest mb-2">{t.dashboard.currentTemp}</div>
-                <div className="text-8xl font-bold text-white font-mono flex items-start leading-none tracking-tighter">
-                    {status.temp.toFixed(1)}
-                    <span className="text-4xl text-zinc-600 mt-4 ml-2">°C</span>
+    return (
+        <div className="grid grid-cols-2 h-full gap-2">
+            {/* Left Column: Temperature & Status */}
+            <div className="p-3 border-r border-zinc-800 flex flex-col justify-between relative">
+                
+                {/* Status Badge */}
+                <div className="absolute top-2 right-2">
+                     <span className={`px-2 py-1 rounded-full text-white font-bold text-[10px] ${status.status === 'IDLE' ? 'bg-zinc-800' : status.status === 'ERROR' ? 'bg-red-500' : 'bg-kiln-accent text-black'}`}>
+                        {status.status}
+                    </span>
                 </div>
-            </div>
 
-            <div className="bg-zinc-900/50 rounded-2xl p-6 border border-zinc-800">
-                <div className="mb-4 space-y-4">
-                    <div className="flex justify-between items-end">
-                        <span className="text-zinc-400 font-medium">{t.schedules.targetTemp}</span>
-                        <span className="text-4xl text-white font-mono leading-none">{status.target}°C</span>
+                <div className="mt-4">
+                    <div className="text-zinc-500 font-bold uppercase tracking-widest mb-0 text-[10px]">{t.dashboard.currentTemp}</div>
+                    <div className="text-5xl font-bold text-white font-mono flex items-start leading-none tracking-tighter">
+                        {status.temp.toFixed(1)}
+                        <span className="text-xl text-zinc-600 mt-1 ml-1">°C</span>
+                    </div>
+                </div>
+
+                <div className="bg-zinc-900/50 rounded-xl p-3 border border-zinc-800">
+                    <div className="mb-2 space-y-1">
+                        <div className="flex justify-between items-end">
+                            <span className="text-zinc-400 font-medium text-[10px]">{t.schedules.targetTemp}</span>
+                            <span className="text-xl text-white font-mono leading-none">{status.target}°C</span>
+                        </div>
+                        
+                        { (!isIdle && status.timeRemaining !== undefined) && (
+                            <div className="flex justify-between items-end">
+                                <span className="text-zinc-400 font-medium text-[10px]">{t.dashboard.timeRemaining}</span>
+                                <span className="text-xl text-white font-mono leading-none">{formatMinutesToHM(status.timeRemaining)}</span>
+                            </div>
+                        )}
                     </div>
                     
-                    { (status.status !== 'IDLE' && status.status !== 'COMPLETE' && status.status !== 'ERROR' && status.timeRemaining !== undefined) && (
-                        <div className="flex justify-between items-end">
-                            <span className="text-zinc-400 font-medium">{t.dashboard.timeRemaining}</span>
-                            <span className="text-4xl text-white font-mono leading-none">{formatMinutesToHM(status.timeRemaining)}</span>
-                        </div>
+                    {/* Progress Bar */}
+                    <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden">
+                        <div 
+                            className="bg-kiln-accent h-full transition-all duration-500" 
+                            style={{ width: status.target > 0 ? `${Math.min((status.temp / status.target) * 100, 100)}%` : '0%' }}
+                        ></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Column: Controls */}
+            <div className="p-3 flex flex-col gap-2">
+                {/* Active Program Info */}
+                <div className="flex-1 bg-zinc-900/30 rounded-xl p-2 border border-zinc-800 flex flex-col justify-center items-center text-center relative overflow-hidden group">
+                    {isIdle ? (
+                        selectedSchedule ? (
+                            <div onClick={onOpenLibrary} className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                                <div className="text-kiln-accent font-bold mb-1 uppercase tracking-wider text-[10px]">{t.schedules.selectedProgram}</div>
+                                <div className="text-lg font-bold text-white mb-1 leading-tight truncate w-full px-2">{selectedSchedule.name}</div>
+                                <div className="text-zinc-500 text-[10px]">{selectedSchedule.steps ? selectedSchedule.steps.length : 0} {t.schedules.segments}</div>
+                            </div>
+                        ) : (
+                            <div onClick={onOpenLibrary} className="cursor-pointer w-full h-full flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors rounded-lg">
+                                <div className="mb-1 opacity-30"><Activity size={32} className="mx-auto" /></div>
+                                <div className="text-sm font-bold text-zinc-400">{t.dashboard.selectSchedule}</div>
+                            </div>
+                        )
+                    ) : (
+                        <>
+                             <div className="text-zinc-500 uppercase text-[10px] font-bold tracking-widest mb-1">{t.dashboard.stepHold}</div>
+                             <div className="text-4xl font-bold text-white mb-1 font-mono">{status.step} <span className="text-lg text-zinc-600">/ {status.totalSteps}</span></div>
+                             <div className="text-zinc-400 text-[10px]">Ramp to {status.target}°C</div>
+                        </>
                     )}
                 </div>
-                
-                {/* Progress Bar */}
-                <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden">
-                    <div 
-                        className="bg-kiln-accent h-full transition-all duration-500" 
-                        style={{ width: status.target > 0 ? `${Math.min((status.temp / status.target) * 100, 100)}%` : '0%' }}
-                    ></div>
+
+                {/* Big Action Buttons */}
+                <div className="grid grid-cols-2 gap-2 h-20">
+                    {isIdle ? (
+                        <button 
+                            onClick={onStart}
+                            disabled={!selectedSchedule}
+                            className={`rounded-xl font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${selectedSchedule ? 'bg-kiln-accent hover:bg-emerald-400 text-black shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
+                        >
+                            <Play size={20} fill={selectedSchedule ? "black" : "currentColor"} />
+                            {selectedSchedule ? t.dashboard.startFiring : t.dashboard.selectSchedule}
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={onStop}
+                            className="bg-red-500 hover:bg-red-400 text-white rounded-xl font-bold text-sm flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-[0_0_15px_rgba(239,68,68,0.3)] col-span-2"
+                        >
+                            <Square size={20} fill="white" />
+                            {t.dashboard.stopFiring}
+                        </button>
+                    )}
+
+                    {isIdle && (
+                        <button onClick={onOpenLibrary} className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-bold text-sm flex flex-col items-center justify-center gap-1 transition-colors active:scale-95 border border-zinc-700">
+                            <Thermometer size={20} />
+                            {t.nav.schedules}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
-
-        {/* Right Column: Controls */}
-        <div className="p-6 flex flex-col gap-4">
-            {/* Active Program Info */}
-            <div className="flex-1 bg-zinc-900/30 rounded-2xl p-6 border border-zinc-800 flex flex-col justify-center items-center text-center relative overflow-hidden group">
-                {status.status === 'IDLE' ? (
-                    selectedSchedule ? (
-                        <div onClick={onOpenLibrary} className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
-                            <div className="text-kiln-accent font-bold mb-2 uppercase tracking-wider text-xs">{t.schedules.selectedProgram}</div>
-                            <div className="text-3xl font-bold text-white mb-4">{selectedSchedule.name}</div>
-                            <div className="text-zinc-500 text-sm">{selectedSchedule.steps.length} {t.schedules.segments} • {t.schedules.selectToEdit}</div>
-                        </div>
-                    ) : (
-                        <div onClick={onOpenLibrary} className="cursor-pointer w-full h-full flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors rounded-xl">
-                            <div className="mb-4 opacity-30"><Activity size={64} className="mx-auto" /></div>
-                            <div className="text-xl font-bold text-zinc-400">{t.dashboard.selectSchedule}</div>
-                            <div className="text-sm text-zinc-600 mt-2">{t.schedules.orCreate}</div>
-                        </div>
-                    )
-                ) : (
-                    <>
-                         <div className="text-zinc-500 uppercase text-xs font-bold tracking-widest mb-2">{t.dashboard.stepHold}</div>
-                         <div className="text-6xl font-bold text-white mb-2 font-mono">{status.step} <span className="text-2xl text-zinc-600">/ {status.totalSteps}</span></div>
-                         <div className="text-zinc-400">Ramp to {status.target}°C</div>
-                    </>
-                )}
-            </div>
-
-            {/* Big Action Buttons */}
-            <div className="grid grid-cols-2 gap-4 h-32">
-                {status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' ? (
-                    <button 
-                        onClick={onStart}
-                        className={`rounded-2xl font-bold text-xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 ${selectedSchedule ? 'bg-kiln-accent hover:bg-emerald-400 text-black shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'bg-zinc-800 text-zinc-500'}`}
-                    >
-                        <Play size={32} fill={selectedSchedule ? "black" : "currentColor"} />
-                        {t.dashboard.startFiring}
-                    </button>
-                ) : (
-                    <button 
-                        onClick={onStop}
-                        className="bg-red-500 hover:bg-red-400 text-white rounded-2xl font-bold text-xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 shadow-[0_0_30px_rgba(239,68,68,0.3)] col-span-2"
-                    >
-                        <Square size={32} fill="white" />
-                        {t.dashboard.stopFiring}
-                    </button>
-                )}
-
-                {(status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR') && (
-                    <button onClick={onOpenLibrary} className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-2xl font-bold text-xl flex flex-col items-center justify-center gap-2 transition-colors active:scale-95 border border-zinc-700">
-                        <Thermometer size={32} />
-                        {t.nav.schedules}
-                    </button>
-                )}
-            </div>
-        </div>
-    </div>
-);
+    );
+};
 
 const EditorView = ({
     editingSchedule,
@@ -170,21 +175,21 @@ const EditorView = ({
     return (
         <div className="h-full flex flex-col p-6">
             {/* Header */}
-            <div className="flex justify-between items-center mb-4 shrink-0">
-                <div className="flex-1">
+            <div className="flex justify-between items-center mb-2 shrink-0">
+                <div className="flex-1 mr-4">
                     <input 
-                        className="text-2xl font-bold text-white bg-transparent border-none p-0 w-full focus:ring-0 focus:border-b focus:border-kiln-accent placeholder-zinc-600"
+                        className="text-xl font-bold text-white bg-transparent border-none p-0 w-full focus:ring-0 focus:border-b focus:border-kiln-accent placeholder-zinc-600"
                         value={editingSchedule.name}
                         onChange={(e) => setEditingSchedule({ ...editingSchedule, name: e.target.value })}
                         placeholder={t.schedules.programName}
                     />
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={onSave} className="flex items-center gap-2 px-6 py-2 bg-kiln-accent hover:bg-emerald-400 text-black rounded-xl font-bold transition-colors">
-                        <Settings size={18} /> Save
+                <div className="flex items-center gap-2">
+                    <button onClick={onSave} className="flex items-center gap-2 px-4 py-2 bg-kiln-accent hover:bg-emerald-400 text-black rounded-xl font-bold transition-colors text-sm">
+                        <Settings size={16} /> {t.schedules.saveSchedule}
                     </button>
-                    <button onClick={onClose} className="p-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white">
-                        <X size={24} />
+                    <button onClick={onClose} className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-white">
+                        <X size={20} />
                     </button>
                 </div>
             </div>
@@ -199,41 +204,41 @@ const EditorView = ({
                 
                 {editingSchedule.steps.map((step: any, index: number) => (
                     <div key={index} className="bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex items-center gap-4">
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-zinc-500 text-sm">
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center font-bold text-zinc-500 text-sm shrink-0">
                             {index + 1}
                         </div>
                         
-                        <div className="flex-1 grid grid-cols-3 gap-4">
+                        <div className="flex-1 grid grid-cols-3 gap-2">
                             <div className="flex flex-col">
-                                <label className="text-[12px] text-zinc-500 uppercase font-bold">{t.schedules.rateLabel}</label>
+                                <label className="text-[10px] text-zinc-500 uppercase font-bold truncate">{t.schedules.rateLabel}</label>
                                 <input 
                                     type="number" 
-                                    className="bg-transparent text-white font-mono font-bold text-2xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"
+                                    className="bg-transparent text-white font-mono font-bold text-xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"
                                     value={step.rate}
                                     onChange={(e) => onEditStep(index, 'rate', e.target.value)}
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-[12px] text-zinc-500 uppercase font-bold">{t.schedules.targetLabel}</label>
+                                <label className="text-[10px] text-zinc-500 uppercase font-bold truncate">{t.schedules.targetLabel}</label>
                                 <input 
                                     type="number" 
-                                    className="bg-transparent text-white font-mono font-bold text-2xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"
+                                    className="bg-transparent text-white font-mono font-bold text-xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"
                                     value={step.target}
                                     onChange={(e) => onEditStep(index, 'target', e.target.value)}
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-[12px] text-zinc-500 uppercase font-bold">{t.schedules.holdLabel}</label>
+                                <label className="text-[10px] text-zinc-500 uppercase font-bold truncate">{t.schedules.holdLabel}</label>
                                 <input 
                                     type="number" 
-                                    className="bg-transparent text-white font-mono font-bold text-2xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"
+                                    className="bg-transparent text-white font-mono font-bold text-xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"
                                     value={step.holdTime}
                                     onChange={(e) => onEditStep(index, 'holdTime', e.target.value)}
                                 />
                             </div>
                         </div>
 
-                        <button onClick={() => onRemoveStep(index)} className="p-2 text-zinc-600 hover:text-red-500 transition-colors">
+                        <button onClick={() => onRemoveStep(index)} className="p-2 text-zinc-600 hover:text-red-500 transition-colors shrink-0">
                             <X size={20} />
                         </button>
                     </div>
@@ -277,45 +282,44 @@ const SchedulesView = React.memo(({
             </button>
         </div>
         
-        <div className="grid grid-cols-2 gap-4 overflow-y-auto pb-4 pr-2 custom-scrollbar">
+        <div className="grid grid-cols-1 gap-2 overflow-y-auto pb-4 pr-2 custom-scrollbar">
             {schedules.map(s => (
                 <button 
                     key={s.id}
                     onClick={() => onEdit(s)}
-                    className={`p-6 rounded-2xl text-left border transition-all active:scale-98 group flex items-center justify-between ${selectedSchedule?.id === s.id ? 'bg-zinc-800 border-kiln-accent ring-2 ring-kiln-accent/50' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}
+                    className={`p-3 rounded-xl text-left border transition-all active:scale-98 group flex items-center justify-between ${selectedSchedule?.id === s.id ? 'bg-zinc-800 border-kiln-accent ring-1 ring-kiln-accent/50' : 'bg-zinc-900 border-zinc-800 hover:bg-zinc-800'}`}
                 >
-                    <div className="flex-1 overflow-hidden">
-                        <div className="text-xl font-bold text-white mb-2 truncate">{s.name}</div>
-                        <div className="flex justify-between text-zinc-500 text-sm mb-4">
-                            <span>{s.steps.length} {t.schedules.segments}</span>
-                            <span>Custom</span>
+                    <div className="flex-1 overflow-hidden mr-2">
+                        <div className="text-base font-bold text-white truncate">{s.name}</div>
+                        <div className="flex gap-2 text-zinc-500 text-[10px]">
+                            <span>{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.segments}</span>
+                            <span>• {t.schedules.custom}</span>
                         </div>
                     </div>
                     
-                    {/* Quick Select Button */}
-                    <div 
-                        className="ml-4 shrink-0"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onSelect(s);
-                        }}
-                    >
-                         <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-colors ${selectedSchedule?.id === s.id ? 'bg-kiln-accent text-black' : 'bg-zinc-700 text-white group-hover:bg-kiln-accent group-hover:text-black'}`}>
-                            <Play size={24} fill="currentColor" />
-                         </div>
+                    {/* Buttons: Select & Delete */}
+                    <div className="flex gap-2 shrink-0">
+                        <div 
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${selectedSchedule?.id === s.id ? 'bg-kiln-accent text-black' : 'bg-zinc-700 text-white group-hover:bg-kiln-accent group-hover:text-black'}`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onSelect(s);
+                            }}
+                        >
+                            <Play size={16} fill="currentColor" />
+                        </div>
                     </div>
                 </button>
             ))}
-            
             {/* Add New Button */}
              <button 
                 onClick={onNew}
-                className="p-6 rounded-2xl border border-dashed border-zinc-700 flex flex-col items-center justify-center gap-3 text-zinc-500 hover:text-white hover:border-zinc-500 transition-colors"
+                className="p-3 rounded-xl border border-dashed border-zinc-700 flex items-center justify-center gap-2 text-zinc-500 hover:text-white hover:border-zinc-500 transition-colors"
             >
-                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
-                    <Settings size={24} />
+                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
+                    <Settings size={16} />
                 </div>
-                <span className="font-medium">{t.schedules.newSchedule}</span>
+                <span className="font-medium text-sm">{t.schedules.newSchedule}</span>
             </button>
         </div>
     </div>
@@ -365,7 +369,15 @@ const ControllerScreen = () => {
         if (view === 'SCHEDULES') {
             fetch(`${API_BASE_URL}/schedules`)
                 .then(res => res.json())
-                .then(data => setSchedules(data))
+                .then(data => {
+                    // Ensure steps array exists or use stepsCount
+                    const processed = data.map((s: any) => ({
+                        ...s,
+                        steps: s.steps || [],
+                        stepsCount: s.stepsCount || (s.steps ? s.steps.length : 0)
+                    }));
+                    setSchedules(processed);
+                })
                 .catch(e => console.error(e));
         }
     }, [view]);
@@ -376,10 +388,11 @@ const ControllerScreen = () => {
             return;
         }
         try {
+            // Ensure we send the full object structure expected by backend
             await fetch(`${API_BASE_URL}/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(selectedSchedule)
+                body: JSON.stringify({ schedule: selectedSchedule })
             });
             setView('DASHBOARD');
         } catch (e) {
@@ -389,20 +402,36 @@ const ControllerScreen = () => {
 
     const handleSaveSchedule = async () => {
         if (!editingSchedule) return;
+        
+        // Ensure name is safe for file system
+        const safeName = editingSchedule.name.replace(/ /g, "_").replace(/\//g, "");
+        const scheduleToSave = {
+            ...editingSchedule,
+            name: safeName,
+            id: safeName // Ensure ID matches name for consistency
+        };
+
         try {
             await fetch(`${API_BASE_URL}/schedules`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editingSchedule)
+                body: JSON.stringify(scheduleToSave)
             });
             // Reload list
             const res = await fetch(`${API_BASE_URL}/schedules`);
             const data = await res.json();
-            setSchedules(data);
+            
+            // Process data same as initial load
+            const processed = data.map((s: any) => ({
+                ...s,
+                steps: s.steps || [],
+                stepsCount: s.stepsCount || (s.steps ? s.steps.length : 0)
+            }));
+            setSchedules(processed);
             
             // If this was a new schedule, select it
             if (!selectedSchedule || selectedSchedule.id === editingSchedule.id) {
-                setSelectedSchedule(editingSchedule);
+                setSelectedSchedule(scheduleToSave);
             }
             setView('SCHEDULES');
         } catch (e) {
@@ -436,64 +465,86 @@ const ControllerScreen = () => {
         setEditingSchedule({ ...editingSchedule, steps: newSteps });
     };
 
-    const handleNewSchedule = () => {
-        setEditingSchedule({
-            id: crypto.randomUUID(),
-            name: "New Program",
-            steps: []
-        });
-        setView('EDITOR');
-    };
-
     const handleStopFiring = () => {
         setShowStopConfirm(true);
     };
 
     const confirmStop = async () => {
-        await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
-        setShowStopConfirm(false);
+        try {
+            await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
+            setShowStopConfirm(false);
+        } catch (e) {
+            console.error("Error stopping");
+        }
     };
-    
-    // Handlers for SchedulesView
+
     const handleSelectSchedule = (s: Schedule) => {
         setSelectedSchedule(s);
         setView('DASHBOARD');
     };
 
-    const handleEditSchedule = (s: Schedule) => {
-        setEditingSchedule(s);
+    const handleNewSchedule = () => {
+        // Just use a random string for temporary ID
+        const tempId = Math.random().toString(36).substring(2, 15);
+        
+        const newSchedule = {
+            id: tempId,
+            name: t.schedules.newSchedule, // Use localized name
+            steps: []
+        };
+        setEditingSchedule(newSchedule);
+        setView('EDITOR');
+    };
+
+    const handleEditSchedule = async (s: Schedule) => {
+        // Fetch full details if steps are missing
+        if (!s.steps || s.steps.length === 0) {
+            try {
+                const res = await fetch(`${API_BASE_URL}/schedules?name=${encodeURIComponent(s.name)}`);
+                if (res.ok) {
+                    const detailed = await res.json();
+                    setEditingSchedule({ ...s, steps: detailed.steps || [] });
+                } else {
+                    setEditingSchedule({ ...s, steps: [] });
+                }
+            } catch (e) {
+                setEditingSchedule({ ...s, steps: [] });
+            }
+        } else {
+            setEditingSchedule(s);
+        }
         setView('EDITOR');
     };
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-zinc-950 p-8 select-none">
-            <h2 className="text-zinc-500 mb-4 font-mono text-sm">Waveshare 4.3" ESP32-S3 Simulator (800x480)</h2>
+            <h2 className="text-zinc-500 mb-4 font-mono text-sm">Trae Controller 4.0" Simulator (480x320)</h2>
             
             {/* The Screen Container */}
             <div 
                 className="relative bg-black overflow-hidden shadow-2xl border-[12px] border-zinc-900 rounded-[2rem]"
-                style={{ width: '800px', height: '480px' }}
+                style={{ width: '480px', height: '320px' }}
             >
                 {/* Header Bar */}
-                <div className="h-14 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 flex justify-between items-center px-6 absolute top-0 left-0 right-0 z-10">
-                    <div className="flex items-center gap-3">
-                        <Activity className="text-kiln-accent" size={20} />
-                        <span className="text-lg font-bold text-white tracking-wider">KILN PRO</span>
+                <div className="h-10 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800 flex justify-between items-center px-4 absolute top-0 left-0 right-0 z-10">
+                    <div className="flex items-center gap-2">
+                        <Activity className="text-kiln-accent" size={16} />
+                        <span className="text-sm font-bold text-white tracking-wider">KILN PRO</span>
                     </div>
-                    <div className="flex items-center gap-4 text-zinc-400 font-mono text-sm">
+                    <div className="flex items-center gap-3 text-zinc-400 font-mono text-xs">
                         <button 
                             onClick={() => setLanguage(language === 'en' ? 'ua' : 'en')} 
-                            className="px-3 py-1 bg-zinc-800 rounded-lg hover:bg-zinc-700 text-white font-bold uppercase transition-colors text-xs tracking-wider"
+                            className="px-2 py-0.5 bg-zinc-800 rounded hover:bg-zinc-700 text-white font-bold uppercase transition-colors text-[10px] tracking-wider"
                         >
                             {language}
                         </button>
                         <span>{currentTime}</span>
-                        <Wifi size={18} className={status.status !== 'ERROR' ? "text-emerald-500" : "text-zinc-600"} />
+                        <Wifi size={14} className={status.status !== 'ERROR' ? "text-emerald-500" : "text-zinc-600"} />
                     </div>
                 </div>
 
                 {/* Main Content Area (With Padding for Header) */}
-                <div className="pt-14 h-full bg-black text-white relative">
+                <div className="pt-10 h-full bg-black text-white relative text-sm">
                     {view === 'DASHBOARD' && (
                         <DashboardView 
                             status={status}

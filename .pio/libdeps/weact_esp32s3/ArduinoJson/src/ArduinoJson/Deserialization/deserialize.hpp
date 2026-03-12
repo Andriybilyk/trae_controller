@@ -50,7 +50,7 @@ DeserializationError doDeserialize(TDestination&& dst, TReader reader,
   auto resources = VariantAttorney::getResourceManager(dst);
   dst.clear();
   auto err = TDeserializer<TReader>(resources, reader)
-                 .parse(*data, options.filter, options.nestingLimit);
+                 .parse(data, options.filter, options.nestingLimit);
   shrinkJsonDocument(dst);
   return err;
 }

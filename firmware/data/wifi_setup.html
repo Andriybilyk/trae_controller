@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRAE Kiln Controller - WiFi Setup</title>
+    <style>
+        :root {
+            --primary-color: #ff6b00;
+            --background-color: #f4f4f4;
+            --card-color: #ffffff;
+            --text-color: #333;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: var(--card-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 24px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+        h2 { margin: 0; font-size: 1.2rem; font-weight: 500; }
+        
+        .form-group { margin-bottom: 16px; text-align: left; }
+        label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #e65100; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        #scan-btn {
+            background-color: #f0f0f0;
+            color: #333;
+            margin-bottom: 16px;
+        }
+        #scan-btn:hover { background-color: #e0e0e0; }
+
+        .network-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 16px 0;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            display: none;
+        }
+        .network-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .network-item:last-child { border-bottom: none; }
+        .network-item:hover { background-color: #fafafa; }
+        .rssi { font-size: 0.8em; color: #888; }
+        .lock-icon { font-size: 0.8em; margin-right: 4px; }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .footer {
+            margin-top: 24px;
+            font-size: 0.8rem;
+            color: #888;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">TRAE KILN</div>
+            <h2>Налаштування Wi-Fi</h2>
+            <p style="color: #666; font-size: 0.9rem;">Оберіть мережу для підключення</p>
+        </div>
+
+        <button id="scan-btn" onclick="scanNetworks()">Сканувати мережі</button>
+        <ul id="network-list" class="network-list"></ul>
+
+        <form action="/save_wifi" method="POST" onsubmit="return validateForm()">
+            <div class="form-group">
+                <label for="ssid">Назва мережі (SSID)</label>
+                <input type="text" id="ssid" name="ssid" placeholder="Введіть або оберіть зі списку" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Пароль</label>
+                <input type="password" id="password" name="password" placeholder="Пароль мережі">
+            </div>
+            <button type="submit" id="connect-btn">Підключитися</button>
+        </form>
+        
+        <div class="footer">
+            &copy; 2025 TRAE Controller
+        </div>
+    </div>
+
+    <script>
+        function scanNetworks() {
+            const list = document.getElementById('network-list');
+            const btn = document.getElementById('scan-btn');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Сканування...';
+            list.style.display = 'block';
+            list.innerHTML = '';
+            
+            fetch('/scan_wifi')
+                .then(response => response.json())
+                .then(networks => {
+                    // Dedup based on SSID
+                    const unique = [];
+                    const seen = new Set();
+                    networks.forEach(n => {
+                        if(n.ssid && !seen.has(n.ssid)){
+                            seen.add(n.ssid);
+                            unique.push(n);
+                        }
+                    });
+                    
+                    // Sort by RSSI
+                    unique.sort((a,b) => b.rssi - a.rssi);
+
+                    if (unique.length === 0) {
+                        list.innerHTML = '<li class="network-item" style="justify-content:center;">Мереж не знайдено</li>';
+                    } else {
+                        unique.forEach(net => {
+                            const li = document.createElement('li');
+                            li.className = 'network-item';
+                            // Simple signal strength icon approximation
+                            let signal = 'good';
+                            if (net.rssi < -80) signal = 'weak';
+                            else if (net.rssi > -60) signal = 'strong';
+                            
+                            const isSecure = net.auth != 0; // 0 is OPEN
+
+                            li.innerHTML = `
+                                <div style="display:flex; align-items:center;">
+                                    ${isSecure ? '<span class="lock-icon">🔒</span>' : ''}
+                                    <span style="font-weight:500">${net.ssid}</span>
+                                </div>
+                                <span class="rssi">${net.rssi} dBm</span>
+                            `;
+                            li.onclick = () => {
+                                document.getElementById('ssid').value = net.ssid;
+                                document.getElementById('password').focus();
+                                // Highlight selection
+                                Array.from(list.children).forEach(c => c.style.backgroundColor = '');
+                                li.style.backgroundColor = '#fff3e0';
+                            };
+                            list.appendChild(li);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    list.innerHTML = '<li class="network-item" style="color:red; justify-content:center;">Помилка сканування</li>';
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Сканувати мережі';
+                });
+        }
+        
+        function validateForm() {
+            const btn = document.getElementById('connect-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner"></div> Підключення...';
+            return true;
+        }
+
+        // Auto scan on load
+        window.onload = scanNetworks;
+    </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+dependencies:
+  lvgl/lvgl: "^8.3.0"
+  bblanchon/arduinojson: "^6.21.3"
+  joltwallet/littlefs: "^1.20.4"
+  espressif/mdns: "^1.2.0"
+  lovyangfx:
+    git: https://github.com/lovyan03/LovyanGFX.git
+    version: "*"

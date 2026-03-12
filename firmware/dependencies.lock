@@ -1,0 +1,56 @@
+dependencies:
+  bblanchon/arduinojson:
+    component_hash: 05d4e1f42ff990f476997964f976f5afd5eead397cce442488c282e070c22739
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 6.21.6
+  espressif/mdns:
+    component_hash: 7c0fa01a1cd0e72a87ec1928c3b661c0a3a9034a6d3a69dcf4850db8c6f272db
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.10.1
+  idf:
+    source:
+      type: idf
+    version: 5.5.3
+  joltwallet/littlefs:
+    component_hash: dcea25bcef2de023f089f5f01e8d8c46ad1b8ffef75861ad5ffb4098555839df
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.20.4
+  lovyangfx:
+    component_hash: 0b92a7779258fb32ff9c135e5e7a47cddae402db5d639293c0cc10e4d2278ede
+    dependencies: []
+    source:
+      git: https://github.com/lovyan03/LovyanGFX.git
+      path: .
+      type: git
+    version: 42998359d8a2eaf188643da7813122c6c3efd2fd
+  lvgl/lvgl:
+    component_hash: d7c1ac037ae6e85d94897f807d6e7ba0946a83e720074fc95a4f6241da9f9f53
+    dependencies: []
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 8.4.0
+direct_dependencies:
+- bblanchon/arduinojson
+- espressif/mdns
+- joltwallet/littlefs
+- lovyangfx
+- lvgl/lvgl
+manifest_hash: edfade12432c84082bad9b3141328236a314f90212cc895a4957b34484f30ab9
+target: esp32s3
+version: 2.0.0

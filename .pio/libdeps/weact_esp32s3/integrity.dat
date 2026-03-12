@@ -1,9 +1,10 @@
-knolleary/PubSubClient
-https://github.com/me-no-dev/AsyncTCP.git
-br3ttb/PID
-https://github.com/adafruit/Adafruit_BusIO.git
-https://github.com/adafruit/Adafruit-MAX6675-Library.git
-https://github.com/me-no-dev/ESPAsyncWebServer.git
+https://github.com/tzapu/WiFiManager.git
+https://github.com/knolleary/pubsubclient.git
 https://github.com/adafruit/Adafruit-GFX-Library.git
-bblanchon/ArduinoJson
+https://github.com/me-no-dev/ESPAsyncWebServer.git
+https://github.com/adafruit/Adafruit_BusIO.git
+https://github.com/bblanchon/ArduinoJson.git
+https://github.com/br3ttb/Arduino-PID-Library.git
 https://github.com/adafruit/Adafruit_SSD1306.git
+https://github.com/me-no-dev/AsyncTCP.git
+https://github.com/RobTillaart/MAX6675.git

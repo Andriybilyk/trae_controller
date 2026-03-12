@@ -330,5 +330,183 @@
       }
     ],
     "created": "2026-02-25T18:48:20.036Z"
+  },
+  {
+    "id": "1773253198966",
+    "name": "Glass_82_slump",
+    "type": "glass",
+    "steps": [
+      {
+        "id": 1773253198920.659,
+        "type": "ramp",
+        "rate": 222,
+        "target": 677
+      },
+      {
+        "id": 1773253198920.7578,
+        "type": "ramp",
+        "rate": 0,
+        "target": null
+      },
+      {
+        "id": 1773253198921.4944,
+        "type": "hold",
+        "holdTime": 30,
+        "target": null
+      },
+      {
+        "id": 1773253198920.0505,
+        "type": "ramp",
+        "rate": 333,
+        "target": 720
+      },
+      {
+        "id": 1773253198920.421,
+        "type": "ramp",
+        "rate": 0,
+        "target": null
+      },
+      {
+        "id": 1773253198921.796,
+        "type": "hold",
+        "holdTime": 10,
+        "target": null
+      },
+      {
+        "id": 1773253198920.5154,
+        "type": "ramp",
+        "rate": 9999,
+        "target": 538
+      },
+      {
+        "id": 1773253198920.594,
+        "type": "ramp",
+        "rate": 0,
+        "target": null
+      },
+      {
+        "id": 1773253198921.9978,
+        "type": "hold",
+        "holdTime": 90,
+        "target": null
+      },
+      {
+        "id": 1773253198920.0986,
+        "type": "ramp",
+        "rate": 83,
+        "target": 470
+      },
+      {
+        "id": 1773253198920.17,
+        "type": "ramp",
+        "rate": 9999,
+        "target": 25
+      }
+    ],
+    "created": "2026-03-11T18:19:58.966Z",
+    "glassDetails": {
+      "coe": 82,
+      "type": "slump",
+      "thickness": 4
+    },
+    "stepsCount": 11
+  },
+  {
+    "id": "1773253199163",
+    "name": "Glass_82_slump",
+    "type": "glass",
+    "steps": [
+      {
+        "id": 1773253199158.6064,
+        "type": "ramp",
+        "rate": 222,
+        "target": 677
+      },
+      {
+        "id": 1773253199158.0461,
+        "type": "ramp",
+        "rate": 100,
+        "target": null
+      },
+      {
+        "id": 1773253199158.4634,
+        "type": "ramp",
+        "rate": 0,
+        "target": null
+      },
+      {
+        "id": 1773253199159.853,
+        "type": "hold",
+        "holdTime": 30,
+        "target": null
+      },
+      {
+        "id": 1773253199158.419,
+        "type": "ramp",
+        "rate": 333,
+        "target": 720
+      },
+      {
+        "id": 1773253199158.6543,
+        "type": "ramp",
+        "rate": 100,
+        "target": null
+      },
+      {
+        "id": 1773253199158.9521,
+        "type": "ramp",
+        "rate": 0,
+        "target": null
+      },
+      {
+        "id": 1773253199159.2834,
+        "type": "hold",
+        "holdTime": 10,
+        "target": null
+      },
+      {
+        "id": 1773253199158.5588,
+        "type": "ramp",
+        "rate": 9999,
+        "target": 538
+      },
+      {
+        "id": 1773253199158.8196,
+        "type": "ramp",
+        "rate": 100,
+        "target": null
+      },
+      {
+        "id": 1773253199158.1494,
+        "type": "ramp",
+        "rate": 0,
+        "target": null
+      },
+      {
+        "id": 1773253199159.227,
+        "type": "hold",
+        "holdTime": 90,
+        "target": null
+      },
+      {
+        "id": 1773253199158.0554,
+        "type": "ramp",
+        "rate": 83,
+        "target": 470
+      },
+      {
+        "id": 1773253199158.1326,
+        "type": "ramp",
+        "rate": 9999,
+        "target": 25
+      }
+    ],
+    "created": "2026-03-11T18:19:59.163Z",
+    "glassDetails": {
+      "coe": 82,
+      "type": "slump",
+      "thickness": 4
+    },
+    "stepsCount": 14
   }
 ]

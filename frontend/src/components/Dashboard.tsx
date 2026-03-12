@@ -3,26 +3,10 @@ import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useSchedules, Schedule } from '../contexts/SchedulesContext';
 import { API_BASE_URL } from '../config';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-interface Step {
-    id: number;
-    type: 'ramp' | 'hold';
-    target: number;
-    rate?: number;
-    holdTime?: number;
-    fan?: boolean;
-}
-
-interface Schedule {
-    id: string;
-    name: string;
-    steps: Step[];
-    favorite?: boolean;
-    type?: string;
-}
 
 const chartOptions = {
   responsive: true,
@@ -58,7 +42,7 @@ const chartOptions = {
 };
 
 const StatCard = ({ title, value, unit, colorClass, valueClass, subValue, subValueClass, className }: any) => (
-  <div className={`bg-kiln-card border border-kiln-border rounded-xl p-5 flex flex-col justify-center shadow-lg shadow-black/20 min-w-0 h-28 relative overflow-hidden ${className || ''}`}>
+  <div className={`bg-kiln-card border kiln-border rounded-xl p-5 flex flex-col justify-center shadow-lg shadow-black/20 min-w-0 h-28 relative overflow-hidden ${className || ''}`}>
     <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 truncate">{title}</div>
     <div className={`text-xl lg:text-2xl font-bold tracking-tight truncate ${valueClass || 'text-white'}`}>
       {value} <span className="text-sm text-zinc-600 font-normal ml-0.5 align-baseline">{unit}</span>
@@ -86,6 +70,8 @@ interface StatusData {
 
 const Dashboard = () => {
   const { t } = useLanguage();
+  const { schedules, getScheduleDetails, refreshSchedules } = useSchedules();
+  
   const [status, setStatus] = useState<StatusData>({ 
       temp: 25, 
       target: 0, 
@@ -97,12 +83,19 @@ const Dashboard = () => {
       history: []
   });
   
-  // Chart History State (Now derived from backend)
   const [history, setHistory] = useState<{x: number, y: number}[]>([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
+  const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
+
+  // Unified Idle Logic
+  const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR';
+
+  // Derived active schedule
+  const activeSchedule = schedules.find(s => s.id === selectedScheduleId);
 
   // Helper to calculate target profile points
   const getTargetProfile = (schedule: Schedule | undefined) => {
-      if (!schedule) return [];
+      if (!schedule || !schedule.steps) return [];
       const points = [{x: 0, y: 25}];
       let currentTime = 0;
       let currentTemp = 25;
@@ -123,25 +116,15 @@ const Dashboard = () => {
       });
       return points;
   };
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
-  const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
-
-  // Fetch Schedules
-  const fetchSchedules = async () => {
-      try {
-          const res = await fetch(`${API_BASE_URL}/schedules`);
-          if (res.ok) {
-              const data = await res.json();
-              setSchedules(data);
-              if (data.length > 0 && !selectedScheduleId) {
-                  setSelectedScheduleId(data[0].id);
-              }
+  
+  // Load details when selected (if missing)
+  useEffect(() => {
+      if (activeSchedule) {
+          if (!activeSchedule.steps || activeSchedule.steps.length === 0) {
+              getScheduleDetails(activeSchedule);
           }
-      } catch (e) {
-          console.error("Failed to fetch schedules");
       }
-  };
+  }, [selectedScheduleId, schedules]);
 
   useEffect(() => {
     // Fetch Status from Backend
@@ -151,21 +134,8 @@ const Dashboard = () => {
             if (res.ok) {
                 const d = await res.json();
                 setStatus(d);
-                
-                // Show Error Toast
-                if (d.error) {
-                    // TODO: Implement proper toast here. For now alert on new error.
-                    // if (d.error !== lastError) toast.error(d.error);
-                }
-
-                // Update History for Chart
                 if (d.history && Array.isArray(d.history)) {
                     setHistory(d.history);
-                } else {
-                    // Fallback for old API/Sim
-                    if (d.status === 'IDLE') {
-                        setHistory([]);
-                    }
                 }
             }
         } catch (e) {
@@ -173,24 +143,27 @@ const Dashboard = () => {
         }
     };
 
-    fetchSchedules();
     const interval = setInterval(fetchStatus, 1000);
     return () => clearInterval(interval);
   }, []);
 
   const handleStartFiring = async () => {
-      const schedule = schedules.find(s => s.id === selectedScheduleId);
-      if (!schedule) {
+      if (!activeSchedule) {
           alert("Please select a schedule first");
           return;
       }
 
       try {
-          await fetch(`${API_BASE_URL}/start`, {
+          const res = await fetch(`${API_BASE_URL}/start`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(schedule)
+              body: JSON.stringify({ schedule: activeSchedule })
           });
+          
+          if (!res.ok) {
+              const err = await res.json();
+              alert("Error: " + (err.error || "Start Failed"));
+          }
       } catch (e) {
           alert("Error starting firing");
       }
@@ -200,20 +173,14 @@ const Dashboard = () => {
   const [showAddTimeModal, setShowAddTimeModal] = useState(false);
   const [showAddTempModal, setShowAddTempModal] = useState(false);
 
-  // ... (existing useEffects)
-
   const handleStopFiring = async () => {
-      // Instead of browser confirm, show custom UI
       setShowStopConfirm(true);
   };
 
   const handleSkip = async () => {
       try {
           await fetch(`${API_BASE_URL}/skip`, { method: 'POST' });
-          // toast.success(t.dashboard.skip + " OK");
-      } catch (e) {
-          // toast.error("Error skipping step");
-      }
+      } catch (e) {}
   };
 
   const submitAddTime = async (minutes: number, stepIndex: number) => {
@@ -223,10 +190,7 @@ const Dashboard = () => {
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({ minutes, stepIndex })
           });
-          // toast.success(`Added ${minutes} min to step ${stepIndex + 1}`);
-      } catch (e) {
-          // toast.error("Error adding time");
-      }
+      } catch (e) {}
   };
 
   const handleAddTimeClick = () => {
@@ -240,10 +204,7 @@ const Dashboard = () => {
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({ degrees, stepIndex })
           });
-          // toast.success(`Added ${degrees}°C to step ${stepIndex + 1}`);
-      } catch (e) {
-          // toast.error("Error adding temp");
-      }
+      } catch (e) {}
   };
 
   const handleAddTempClick = () => {
@@ -260,34 +221,25 @@ const Dashboard = () => {
   };
 
   const getSegmentInfo = () => {
-      // If firing, show progress
-      if (status.status !== 'IDLE' && status.status !== 'COMPLETE' && status.status !== 'ERROR') {
-          return `${status.step || 1} / ${status.totalSteps || activeSchedule?.steps.length || '?'}`;
+      if (!isIdle) {
+          return `${status.step || 1} / ${status.totalSteps || activeSchedule?.steps?.length || '?'}`;
       }
-
-      // If just selected, show total segments
-      if (activeSchedule) {
+      if (activeSchedule && activeSchedule.steps) {
           return `${t.dashboard.total}: ${activeSchedule.steps.length}`;
       }
-      
       return "-- / --";
   };
 
   const formatTimeRemaining = (status: any) => {
       if (status.status === 'IDLE') return "--:--";
       if (status.status === 'COMPLETE') return t.dashboard.done;
-      
-      // Use server provided estimate
       if (status.timeRemaining !== undefined) {
           const hours = Math.floor(status.timeRemaining / 60);
           const mins = Math.floor(status.timeRemaining % 60);
           return `${hours}${t.dashboard.hourSuffix} ${mins}${t.dashboard.minSuffix}`;
       }
-
       return "--:--";
   };
-
-  const activeSchedule = schedules.find(s => s.id === selectedScheduleId);
 
   return (
     <div className="flex h-full gap-6 p-4 md:p-6 max-w-[1600px] mx-auto overflow-hidden flex-col md:flex-row">
@@ -300,7 +252,10 @@ const Dashboard = () => {
           </h2>
           
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {schedules.map(s => (
+              {!schedules || schedules.length === 0 ? (
+                  <div className="text-zinc-500 text-sm p-4 text-center">No schedules found</div>
+              ) : (
+                  schedules.map(s => (
                   <div 
                       key={s.id}
                       onClick={() => setSelectedScheduleId(s.id)}
@@ -308,15 +263,15 @@ const Dashboard = () => {
                           ? 'bg-zinc-800 border-kiln-accent shadow-[0_0_0_1px_rgba(16,185,129,1)]' 
                           : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}
                   >
-                      <div className="font-bold text-sm text-white mb-1 pr-6 truncate">{s.name}</div>
-                      <div className="text-xs text-zinc-500">{s.steps.length} segments • {s.type || 'Custom'}</div>
+                      <div className="font-bold text-white text-sm mb-1 pr-6 truncate">{s.name}</div>
+                      <div className="text-xs text-zinc-500">{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.steps} • {s.type || t.schedules.custom}</div>
                       {selectedScheduleId === s.id && (
                           <div className="absolute top-4 right-4 text-kiln-accent">
                               <Check size={16} />
                           </div>
                       )}
                   </div>
-              ))}
+              )))}
           </div>
       </div>
 
@@ -326,7 +281,7 @@ const Dashboard = () => {
       {/* Mobile Schedule Selector (Sticky Top) */}
       <div className="md:hidden sticky top-0 z-30 bg-kiln-bg/95 backdrop-blur-sm pb-2 pt-1">
           <button 
-              onClick={() => { setIsScheduleMenuOpen(true); fetchSchedules(); }}
+              onClick={() => { setIsScheduleMenuOpen(true); refreshSchedules(); }}
               className="w-full bg-zinc-800 border border-zinc-700 p-4 rounded-xl flex justify-between items-center text-white font-bold shadow-lg active:scale-98 transition-transform"
           >
               <span className="flex items-center gap-2">
@@ -337,8 +292,6 @@ const Dashboard = () => {
           </button>
       </div>
 
-
-      
       {/* Custom Stop Confirmation Modal */}
       {showStopConfirm && (
           <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -372,12 +325,14 @@ const Dashboard = () => {
 
       {/* MOBILE CONTROL BAR (Fixed Bottom) */}
       <div className="md:hidden fixed bottom-16 left-0 right-0 bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800 p-3 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
-          {status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' ? (
+          {isIdle ? (
               <button 
                   onClick={handleStartFiring}
-                  className="w-full py-3 bg-kiln-accent text-black rounded-xl hover:bg-emerald-400 transition-all text-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center justify-center gap-2"
+                  disabled={!activeSchedule}
+                  className={`w-full py-3 rounded-xl transition-all text-lg font-bold flex items-center justify-center gap-2 ${activeSchedule ? 'bg-kiln-accent text-black hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
               >
-                  <Play size={20} fill="black" /> {t.dashboard.startFiring}
+                  <Play size={20} fill={activeSchedule ? "black" : "currentColor"} /> 
+                  {activeSchedule ? t.dashboard.startFiring : t.dashboard.selectSchedule}
               </button>
           ) : (
               <div className="flex flex-col gap-2">
@@ -527,7 +482,7 @@ const Dashboard = () => {
             </div>
             
             <div className="relative z-10 flex flex-col items-center md:items-end gap-2 text-center md:text-right">
-                <div className={`text-2xl lg:text-3xl font-bold tracking-tight ${status.status === 'IDLE' ? 'text-zinc-500' : 'text-kiln-accent'}`}>
+                <div className={`text-2xl lg:text-3xl font-bold tracking-tight ${isIdle ? 'text-zinc-500' : 'text-kiln-accent'}`}>
                     {t.status[status.status] || status.status}
                 </div>
                 <div className="text-xs font-medium text-zinc-400 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-zinc-800 inline-flex items-center gap-2">
@@ -537,7 +492,7 @@ const Dashboard = () => {
             </div>
             
             {/* Background Glow */}
-            <div className={`absolute -right-10 -top-10 w-64 h-64 bg-kiln-accent/5 rounded-full blur-3xl pointer-events-none transition-opacity duration-700 ${status.status !== 'IDLE' ? 'opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute -right-10 -top-10 w-64 h-64 bg-kiln-accent/5 rounded-full blur-3xl pointer-events-none transition-opacity duration-700 ${!isIdle ? 'opacity-100' : 'opacity-0'}`} />
         </div>
 
         <StatCard 
@@ -565,7 +520,7 @@ const Dashboard = () => {
                     <span className={`text-sm font-bold ${status.pcbTemp && status.pcbTemp > 50 ? 'text-red-500 animate-pulse' : 'text-zinc-500'}`}>
                         PCB: {status.pcbTemp?.toFixed(1)}°C
                     </span>
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${status.status === 'FIRING' ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-400'}`}>
+                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${!isIdle ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-400'}`}>
                         {status.status}
                     </div>
                 </div>
@@ -573,7 +528,7 @@ const Dashboard = () => {
             
             <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
                  {/* On-the-fly controls */}
-                 {status.status !== 'IDLE' && status.status !== 'COMPLETE' && status.status !== 'ERROR' && (
+                 {!isIdle && (
                     <div className="hidden md:flex items-center gap-1.5 mr-2 border-r border-zinc-700 pr-2 shrink-0">
                         <button onClick={handleAddTimeClick} className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors border border-zinc-700 whitespace-nowrap">
                             <Clock size={13} /> {t.dashboard.addTime}
@@ -588,12 +543,14 @@ const Dashboard = () => {
                  )}
 
                  <div className="relative shrink-0 hidden md:block">
-                     {status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' ? (
+                     {isIdle ? (
                          <button 
                             onClick={handleStartFiring}
-                            className="flex items-center gap-2 px-5 py-2 bg-kiln-accent text-black rounded-lg hover:bg-emerald-400 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(16,185,129,0.2)] whitespace-nowrap"
+                            disabled={!activeSchedule}
+                            className={`flex items-center gap-2 px-5 py-2 rounded-lg transition-colors text-sm font-bold whitespace-nowrap ${activeSchedule ? 'bg-kiln-accent text-black hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
                          >
-                            <Play size={16} fill="black" /> {t.dashboard.startFiring}
+                            <Play size={16} fill={activeSchedule ? "black" : "currentColor"} /> 
+                            {activeSchedule ? t.dashboard.startFiring : t.dashboard.selectSchedule}
                          </button>
                      ) : (
                          <button 
@@ -658,7 +615,7 @@ const Dashboard = () => {
                       {t.schedules.library}
                   </h2>
                   <div className="flex gap-2">
-                      <button onClick={fetchSchedules} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
+                      <button onClick={refreshSchedules} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
                           <Activity size={20} />
                       </button>
                       <button onClick={() => setIsScheduleMenuOpen(false)} className="p-2 bg-zinc-800 rounded-full text-zinc-400 hover:text-white">
@@ -667,7 +624,7 @@ const Dashboard = () => {
                   </div>
               </div>
               <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar md:scrollbar-default">
-                  {schedules.length === 0 ? (
+                  {(!schedules || schedules.length === 0) ? (
                       <div className="text-center p-8 text-zinc-500 flex flex-col items-center gap-2">
                           <Sliders size={48} className="opacity-20" />
                           <div className="font-bold">{t.schedules.selectToEdit}</div>
@@ -681,7 +638,7 @@ const Dashboard = () => {
                               className={`w-full p-4 rounded-xl text-left border transition-all ${selectedScheduleId === s.id ? 'bg-zinc-800 border-kiln-accent' : 'bg-zinc-900/50 border-zinc-800'}`}
                           >
                               <div className="font-bold text-white text-lg">{s.name}</div>
-                              <div className="text-sm text-zinc-500">{s.steps.length} segments</div>
+                              <div className="text-sm text-zinc-500">{s.steps?.length || 0} segments</div>
                           </button>
                       ))
                   )}

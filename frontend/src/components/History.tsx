@@ -100,10 +100,24 @@ const History = () => {
             const response = await fetch(`${API_BASE_URL}/history/${id}`);
             if (!response.ok) throw new Error('Failed to load firing details.');
             const data: FiringDetail = await response.json();
-            setSelectedFiring(data);
+            
+            // Validate data
+            if (!data || !data.summary) {
+                console.warn("Invalid data received", data);
+                // Fallback: try to find summary in main list if detail fetch failed but returned 200 (edge case)
+                const summary = history.find(h => h.id === id);
+                if (summary) {
+                    setSelectedFiring({ summary, data: [] });
+                } else {
+                    throw new Error("Data invalid");
+                }
+            } else {
+                setSelectedFiring(data);
+            }
         } catch (err) {
             console.error(err);
-            // You might want to show a toast notification here
+            // Don't show full error UI, just log and maybe show toast
+            // Or set a partial state if possible
         } finally {
             setIsDetailLoading(false);
         }
@@ -117,9 +131,9 @@ const History = () => {
 
     const StatusBadge = ({ status }: { status: FiringSummary['status'] }) => {
         const statusMap = {
-            COMPLETED: { icon: <CheckCircle size={14} />, text: 'Completed', className: 'bg-green-500/10 text-green-400 border-green-500/20' },
-            ERROR: { icon: <AlertTriangle size={14} />, text: 'Error', className: 'bg-red-500/10 text-red-400 border-red-500/20' },
-            STOPPED: { icon: <XCircle size={14} />, text: 'Stopped', className: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
+            COMPLETED: { icon: <CheckCircle size={14} />, text: t.history.completed, className: 'bg-green-500/10 text-green-400 border-green-500/20' },
+            ERROR: { icon: <AlertTriangle size={14} />, text: t.history.error, className: 'bg-red-500/10 text-red-400 border-red-500/20' },
+            STOPPED: { icon: <XCircle size={14} />, text: t.history.stopped, className: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
         };
         const current = statusMap[status] || statusMap.STOPPED;
         return (
@@ -135,18 +149,18 @@ const History = () => {
     }
 
     if (error) {
-        return <div className="text-center text-red-400 bg-red-500/10 p-8 rounded-xl"><h2 className="font-bold text-lg">Error</h2><p>{error}</p></div>;
+        return <div className="text-center text-red-400 bg-red-500/10 p-8 rounded-xl"><h2 className="font-bold text-lg">{t.history.error}</h2><p>{error}</p></div>;
     }
 
     return (
         <div className="max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold text-white mb-6">Firing History</h1>
+            <h1 className="text-3xl font-bold text-white mb-6">{t.history.title}</h1>
 
             {history.length === 0 ? (
                 <div className="text-center text-zinc-500 py-20">
                     <Hash size={64} className="mx-auto opacity-10 mb-4" />
-                    <h2 className="text-xl font-bold">No History Found</h2>
-                    <p>Completed, stopped, or failed firing sessions will appear here.</p>
+                    <h2 className="text-xl font-bold">{t.history.noHistory}</h2>
+                    <p>{t.history.emptyState}</p>
                 </div>
             ) : (
                 <div className="bg-kiln-card border border-kiln-border rounded-xl shadow-lg overflow-hidden">
@@ -159,14 +173,14 @@ const History = () => {
                                         <p className="text-xs text-zinc-400">{new Date(item.startTime).toLocaleString()}</p>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-zinc-300"><Clock size={16} className="text-zinc-500" /><span>{formatDuration(item.duration)}</span></div>
-                                    <div className="flex items-center gap-2 text-sm text-zinc-300"><Thermometer size={16} className="text-zinc-500" /><span>{typeof item.peakTemp === 'number' ? `${item.peakTemp.toFixed(0)}°C Peak` : '--'}</span></div>
+                                    <div className="flex items-center gap-2 text-sm text-zinc-300"><Thermometer size={16} className="text-zinc-500" /><span>{typeof item.peakTemp === 'number' ? `${item.peakTemp.toFixed(0)}°C ${t.history.peakTemp}` : '--'}</span></div>
                                     <div className="flex justify-end">
                                         <StatusBadge status={item.status} />
                                     </div>
                                 </div>
                                 <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
                                     <Hash size={14} />
-                                    <span>Steps: {item.completedSteps} / {item.totalSteps}</span>
+                                    <span>{t.history.steps}: {item.completedSteps} / {item.totalSteps}</span>
                                 </div>
                             </li>
                         ))}
@@ -180,13 +194,13 @@ const History = () => {
                     <div className="bg-kiln-card border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                         {isDetailLoading ? (
                             <div className="flex justify-center items-center h-96"><Loader className="animate-spin text-kiln-accent" size={48} /></div>
-                        ) : selectedFiring && (
+                        ) : selectedFiring && selectedFiring.summary ? (
                             <>
                                 <div className="flex justify-between items-center p-4 border-b border-kiln-border shrink-0">
                                     <div>
                                         <h2 className="text-xl font-bold text-white">{selectedFiring.summary.scheduleName}</h2>
                                         <p className="text-sm text-zinc-400">{new Date(selectedFiring.summary.startTime).toLocaleString()}</p>
-                                        <p className="text-xs text-zinc-500 mt-1">Steps: {selectedFiring.summary.completedSteps} / {selectedFiring.summary.totalSteps}</p>
+                                        <p className="text-xs text-zinc-500 mt-1">{t.history.steps}: {selectedFiring.summary.completedSteps} / {selectedFiring.summary.totalSteps}</p>
                                     </div>
                                     <button onClick={() => setSelectedFiring(null)} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-800 hover:text-white"><X size={20} /></button>
                                 </div>
@@ -195,7 +209,7 @@ const History = () => {
                                         <Line options={chartOptions} data={{
                                             datasets: [
                                                 {
-                                                    label: 'Target Temp',
+                                                    label: t.history.targetTemp,
                                                     data: selectedFiring.data.map(p => ({ x: p.timestamp - selectedFiring.summary.startTime, y: p.target })),
                                                     borderColor: '#6366f1',
                                                     borderDash: [5, 5],
@@ -203,7 +217,7 @@ const History = () => {
                                                     tension: 0.1
                                                 },
                                                 {
-                                                    label: 'Actual Temp',
+                                                    label: t.history.currentTemp,
                                                     data: selectedFiring.data.map(p => ({ x: p.timestamp - selectedFiring.summary.startTime, y: p.temp })),
                                                     borderColor: '#10b981',
                                                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -215,11 +229,16 @@ const History = () => {
                                         }} />
                                     ) : (
                                         <div className="flex items-center justify-center h-full text-zinc-500 text-center">
-                                            <p>No detailed data was recorded for this firing session.</p>
+                                            <p>{t.history.noData}</p>
                                         </div>
                                     )}
                                 </div>
                             </>
+                        ) : (
+                             <div className="p-8 text-center text-red-400">
+                                 <p>{t.history.errorDetails}</p>
+                                 <button onClick={() => setSelectedFiring(null)} className="mt-4 px-4 py-2 bg-zinc-800 rounded-md text-white">{t.dashboard.done}</button>
+                             </div>
                         )}
                     </div>
                 </div>

@@ -63,10 +63,6 @@ class FlashString {
     ::memcpy_P(p, s.str_, n);
   }
 
-  bool isStatic() const {
-    return false;
-  }
-
  private:
   const char* str_;
   size_t size_;

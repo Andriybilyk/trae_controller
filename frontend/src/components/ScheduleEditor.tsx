@@ -1,30 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, GripVertical, Fan, Star, Zap } from 'lucide-react';
+import { Plus, Trash2, Save } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useSchedules, Schedule, Step } from '../contexts/SchedulesContext';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import toast from 'react-hot-toast';
-import { API_BASE_URL } from '../config';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
-
-// Backend Types
-interface Step {
-    id: number;
-    type: 'ramp' | 'hold';
-    target: number;
-    rate?: number;
-    holdTime?: number;
-    fan?: boolean;
-}
-
-interface Schedule {
-    id: string;
-    name: string;
-    steps: Step[];
-    favorite?: boolean;
-    type?: string;
-}
 
 // Frontend Editor Type (Merged Segment)
 interface EditorStep {
@@ -37,114 +19,97 @@ interface EditorStep {
 
 const ScheduleEditor = () => {
   const { t } = useLanguage();
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
+  const { schedules, isLoading, saveSchedule, deleteSchedule, getScheduleDetails } = useSchedules();
   
-  // Editor State (Working Copy)
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [editorSteps, setEditorSteps] = useState<EditorStep[]>([]);
   const [scheduleName, setScheduleName] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMobileLibrary, setShowMobileLibrary] = useState(true);
 
-  // Fetch Schedules on Mount
-  useEffect(() => {
-    fetchSchedules();
-  }, []);
+  // Derived selected schedule object from ID
+  const selectedSchedule = schedules.find(s => s.id === selectedScheduleId) || null;
 
-  // When selected schedule changes, load it into editor format
+  // Effect: Handle Selection & Loading
   useEffect(() => {
     if (selectedSchedule) {
         setScheduleName(selectedSchedule.name);
-        loadScheduleIntoEditor(selectedSchedule);
-    } else {
-        setEditorSteps([]);
-        setScheduleName("");
-    }
-  }, [selectedSchedule]);
-
-  const fetchSchedules = async () => {
-    try {
-        const res = await fetch(`${API_BASE_URL}/schedules`);
-        if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-                setSchedules(data);
-                if (!selectedSchedule) setSelectedSchedule(data[0]);
-                return;
-            }
+        
+        // If steps are missing, load them
+        if (!selectedSchedule.steps || selectedSchedule.steps.length === 0) {
+             getScheduleDetails(selectedSchedule);
+             // We don't load into editor yet, wait for update
+        } else {
+             loadScheduleIntoEditor(selectedSchedule);
         }
-    } catch (e) {
-        console.error("Failed to fetch schedules", e);
+    } else {
+        // Auto-select first if available and nothing selected
+        if (schedules.length > 0 && !selectedScheduleId) {
+             setSelectedScheduleId(schedules[0].id);
+        } else {
+            setEditorSteps([]);
+            setScheduleName("");
+        }
     }
-    
-    // Fallback Mock
-    const mock: Schedule[] = [{ 
-        id: '1', name: 'Bisque Fire', steps: [
-            { id: 1, type: 'ramp', rate: 100, target: 1000 },
-            { id: 2, type: 'hold', holdTime: 10, target: 1000 }
-        ]
-    }];
-    setSchedules(mock);
-    if (!selectedSchedule) setSelectedSchedule(mock[0]);
-  };
+  }, [selectedScheduleId, schedules]); // Re-run when schedules list updates (e.g. details loaded)
 
   // Convert Backend Steps -> Editor Segments
   const loadScheduleIntoEditor = (schedule: Schedule) => {
       const newSteps: EditorStep[] = [];
-      let i = 0;
-      while(i < schedule.steps.length) {
-          const step = schedule.steps[i];
-          
-          let rate = step.rate || 0;
-          let target = step.target || 0;
-          let holdTime = 0;
-          let fan = step.fan;
+      if (schedule && schedule.steps) {
+        let i = 0;
+        while(i < schedule.steps.length) {
+            const step = schedule.steps[i];
+            
+            let rate = step.rate || 0;
+            let target = step.target || 0;
+            let holdTime = 0;
+            let fan = step.fan;
 
-          if (step.type === 'hold') {
-              // Standalone hold? Should be merged with previous if possible, but here we treat as segment with 0 rate (jump?) or just hold
-              holdTime = step.holdTime || 0;
-              target = step.target; 
-              // Try to get target from previous step if missing
-          } else {
-              // Ramp
-              rate = step.rate || 100;
-              target = step.target;
-              
-              // Check if next is HOLD with same target
-              if (i + 1 < schedule.steps.length) {
-                  const next = schedule.steps[i+1];
-                  if (next.type === 'hold' && Math.abs(next.target - target) < 1) {
-                      holdTime = next.holdTime || 0;
-                      i++; // Consume next step
-                  }
-              }
-          }
+            if (step.type === 'hold') {
+                holdTime = step.holdTime || 0;
+                target = step.target; 
+            } else {
+                // Ramp
+                rate = step.rate || 100;
+                target = step.target;
+                
+                // Check if next is HOLD with same target
+                if (i + 1 < schedule.steps.length) {
+                    const next = schedule.steps[i+1];
+                    if (next.type === 'hold' && Math.abs(next.target - target) < 1) {
+                        holdTime = next.holdTime || 0;
+                        i++; // Consume next step
+                    }
+                }
+            }
 
-          newSteps.push({
-              id: Date.now() + Math.random(), // New UI ID
-              rate,
-              target,
-              holdTime,
-              fan
-          });
-          i++;
+            newSteps.push({
+                id: Date.now() + Math.random(), // New UI ID
+                rate,
+                target,
+                holdTime,
+                fan
+            });
+            i++;
+        }
       }
       setEditorSteps(newSteps);
   };
 
-  // Convert Editor Segments -> Backend Steps
-  const saveScheduleFromEditor = async () => {
+  // Convert Editor Segments -> Backend Steps & Save
+  const handleSave = async () => {
       if (!selectedSchedule) return;
 
       const backendSteps: Step[] = [];
       editorSteps.forEach(s => {
-          // Validate numbers
           const rate = s.rate === "" ? 0 : Number(s.rate);
           const target = s.target === "" ? 0 : Number(s.target);
           const holdTime = s.holdTime === "" ? 0 : Number(s.holdTime);
 
           // 1. Ramp part
           backendSteps.push({
-              id: Date.now() + Math.random(), // Backend will assign or we assign
+              id: Date.now() + Math.random(),
               type: 'ramp',
               rate: rate,
               target: target,
@@ -163,39 +128,28 @@ const ScheduleEditor = () => {
           }
       });
 
-      const updatedSchedule = {
+      const safeName = scheduleName.replace(/ /g, "_").replace(/\//g, "");
+      
+      const updatedSchedule: Schedule = {
           ...selectedSchedule,
-          name: scheduleName,
-          steps: backendSteps
+          id: safeName, // Ensure ID updates if name changes
+          name: safeName,
+          steps: backendSteps,
+          stepsCount: backendSteps.length
       };
 
-      try {
-          const res = await fetch(`${API_BASE_URL}/schedules`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updatedSchedule)
-          });
-          
-          if (res.ok) {
-              const saved = await res.json();
-              const updatedList = schedules.map(s => s.id === saved.id ? saved : s);
-              // Handle new schedule case
-              if (!schedules.find(s => s.id === saved.id)) {
-                  setSchedules([...schedules, saved]);
-              } else {
-                  setSchedules(updatedList);
-              }
-              // Update selected to reflect saved state (IDs etc)
-              setSelectedSchedule(saved); 
-              toast.success(t.schedules.save + " OK!");
+      const success = await saveSchedule(updatedSchedule);
+      if (success) {
+          toast.success(t.schedules.save + " OK!");
+          // If name changed, the ID changed, so we need to select the new ID
+          if (safeName !== selectedSchedule.id) {
+              setSelectedScheduleId(safeName);
           }
-      } catch (e) {
-          toast.error("Error saving");
       }
   };
 
   const handleSelectSchedule = (s: Schedule) => {
-      setSelectedSchedule(s);
+      setSelectedScheduleId(s.id);
       setShowMobileLibrary(false);
   };
 
@@ -212,27 +166,16 @@ const ScheduleEditor = () => {
   };
 
   const handleUpdateEditorStep = (id: number, field: keyof EditorStep, value: any) => {
-      // Allow empty string for better UX
       if (value === "") {
           setEditorSteps(editorSteps.map(s => s.id === id ? { ...s, [field]: "" } : s));
           return;
       }
-
       let numVal = Number(value);
       
       // Enforce Limits
-      if (field === 'rate') {
-          if (numVal < 0) numVal = 0;
-          if (numVal > 9999) numVal = 9999;
-      }
-      if (field === 'target') {
-          if (numVal < 0) numVal = 0;
-          if (numVal > 1320) numVal = 1320;
-      }
-      if (field === 'holdTime') {
-          if (numVal < 0) numVal = 0;
-          if (numVal > 9999) numVal = 9999;
-      }
+      if (field === 'rate') { if (numVal < 0) numVal = 0; if (numVal > 9999) numVal = 9999; }
+      if (field === 'target') { if (numVal < 0) numVal = 0; if (numVal > 1320) numVal = 1320; }
+      if (field === 'holdTime') { if (numVal < 0) numVal = 0; if (numVal > 9999) numVal = 9999; }
 
       setEditorSteps(editorSteps.map(s => s.id === id ? { ...s, [field]: field === 'fan' ? value : numVal } : s));
   };
@@ -241,28 +184,52 @@ const ScheduleEditor = () => {
       setEditorSteps(editorSteps.filter(s => s.id !== id));
   };
 
-  const handleDeleteSchedule = async () => {
-      if (!selectedSchedule || !confirm("Delete schedule?")) return;
-      try {
-          await fetch(`${API_BASE_URL}/schedules/${selectedSchedule.id}`, { method: 'DELETE' });
-          const newList = schedules.filter(s => s.id !== selectedSchedule.id);
-          setSchedules(newList);
-          setSelectedSchedule(newList.length > 0 ? newList[0] : null);
-          toast.success("Deleted");
-      } catch(e) { toast.error("Error deleting"); }
+  const handleDelete = async () => {
+      if (!selectedSchedule) return;
+      setShowDeleteConfirm(true);
   };
 
-  const handleAddSchedule = () => {
+  const confirmDelete = async () => {
+      if (!selectedSchedule) return;
+      const success = await deleteSchedule(selectedSchedule);
+      if (success) {
+          setSelectedScheduleId(null);
+          toast.success("Deleted");
+      }
+      setShowDeleteConfirm(false);
+  };
+
+  const handleAddSchedule = async () => {
+      const baseName = t.schedules.newSchedule.replace(/ /g, "_"); 
+      let counter = 1;
+      let newName = `${baseName}_${counter}`;
+      
+      while(schedules.find(s => s.name === newName)) {
+          counter++;
+          newName = `${baseName}_${counter}`;
+      }
+
       const newSchedule: Schedule = {
-          id: Date.now().toString(),
-          name: "New Schedule",
+          id: newName,
+          name: newName,
           type: "Custom",
-          steps: []
+          steps: [],
+          stepsCount: 0
       };
-      setSchedules([...schedules, newSchedule]);
-      setSelectedSchedule(newSchedule);
-      setShowMobileLibrary(false);
-      // Editor will update via useEffect
+      
+      // We don't save to backend immediately, just add to local context list?
+    // No, Context is source of truth. We must save to backend to persist.
+    // Or we can add to context state temporarily?
+    // Let's save empty schedule to backend to keep it simple and consistent.
+    // We pass steps: [] explicitly.
+    const success = await saveSchedule(newSchedule);
+    if (success) {
+        setSelectedScheduleId(newSchedule.id);
+        setShowMobileLibrary(false);
+        // Force editor clear if for some reason effect didn't catch it
+        setEditorSteps([]);
+        setScheduleName(newSchedule.name);
+    }
   };
 
   // Chart Data from Editor Steps
@@ -333,10 +300,10 @@ const ScheduleEditor = () => {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar md:scrollbar-default">
-              {schedules.map(s => (
-                  <div key={s.id} onClick={() => handleSelectSchedule(s)} className={`p-4 rounded-xl cursor-pointer border ${selectedSchedule?.id === s.id ? 'bg-zinc-800 border-kiln-accent' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}>
+              {schedules && schedules.map(s => (
+                  <div key={s.id} onClick={() => handleSelectSchedule(s)} className={`p-4 rounded-xl cursor-pointer border ${selectedScheduleId === s.id ? 'bg-zinc-800 border-kiln-accent' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}>
                       <div className="font-bold text-sm text-white truncate">{s.name}</div>
-                      <div className="text-xs text-zinc-500">{s.steps.length} steps</div>
+                      <div className="text-xs text-zinc-500">{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.steps}</div>
                   </div>
               ))}
           </div>
@@ -355,10 +322,10 @@ const ScheduleEditor = () => {
                     </div>
                     
                     <div className="flex gap-2 w-full md:w-auto">
-                        <button onClick={saveScheduleFromEditor} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-kiln-accent hover:bg-emerald-400 text-black px-3 py-2 rounded-lg font-bold text-xs shadow-lg shadow-emerald-900/20 whitespace-nowrap">
+                        <button onClick={handleSave} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-kiln-accent hover:bg-emerald-400 text-black px-3 py-2 rounded-lg font-bold text-xs shadow-lg shadow-emerald-900/20 whitespace-nowrap">
                             <Save size={14} /> {t.schedules.save}
                         </button>
-                        <button onClick={handleDeleteSchedule} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20"><Trash2 size={16}/></button>
+                        <button onClick={handleDelete} className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20"><Trash2 size={16}/></button>
                     </div>
                 </div>
 
@@ -374,7 +341,7 @@ const ScheduleEditor = () => {
                 </div>
 
                 {/* List */}
-                <div className="flex-1 overflow-y-auto space-y-3 pr-2 pb-20 md:pb-0 min-h-0 no-scrollbar md:scrollbar-default">
+                <div className={`flex-1 overflow-y-auto space-y-3 pr-2 pb-20 md:pb-0 min-h-0 no-scrollbar md:scrollbar-default ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
                     {editorSteps.map((step, index) => (
                         <div key={step.id} className="flex flex-col md:flex-row items-center gap-4 md:gap-6 p-4 bg-kiln-card border border-kiln-border rounded-xl hover:border-zinc-700 transition-colors">
                             {/* Mobile Step Header */}
@@ -429,6 +396,36 @@ const ScheduleEditor = () => {
               <div className="flex-1 flex items-center justify-center text-zinc-500">{t.schedules.selectToEdit}</div>
           )}
       </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+          <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-kiln-card border border-red-500/50 rounded-2xl p-8 max-w-md w-full shadow-[0_0_50px_rgba(239,68,68,0.2)] text-center animate-in fade-in zoom-in duration-200">
+                  <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Trash2 size={40} className="text-red-500" />
+                  </div>
+                  
+                  <h3 className="text-2xl font-bold text-white mb-2">{t.schedules.deleteConfirmTitle}</h3>
+                  <p className="text-zinc-400 mb-8">
+                      {t.schedules.deleteConfirmMessage}
+                  </p>
+                  
+                  <div className="flex flex-col gap-3">
+                      <button 
+                          onClick={confirmDelete}
+                          className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-red-900/40"
+                      >
+                          {t.schedules.deleteConfirmButton}
+                      </button>
+                      <button 
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl font-medium transition-colors"
+                      >
+                          {t.schedules.cancel}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

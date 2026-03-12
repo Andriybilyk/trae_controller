@@ -3,9 +3,8 @@ import { Routes, Route, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Calendar, Flame, Settings as SettingsIcon, Globe, ShieldAlert, Activity, History as HistoryIcon } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import ScheduleEditor from './components/ScheduleEditor';
-import GlassWizard from './components/GlassWizard';
 import Settings from './components/Settings';
-import History from './components/History'; // Import History component
+import History from './components/History';
 import ControllerScreen from './components/ControllerScreen';
 import { useLanguage } from './contexts/LanguageContext';
 import toast from 'react-hot-toast';
@@ -74,9 +73,6 @@ const MainLayout = () => {
           <NavLink to="/history" className={navLinkClass}>
             <HistoryIcon size={16} /> <span>{t.nav.history}</span>
           </NavLink>
-          <NavLink to="/glass" className={navLinkClass}>
-             <Flame size={16} /> <span>{t.nav.glassWizard}</span>
-          </NavLink>
           <NavLink to="/settings" className={navLinkClass}>
             <SettingsIcon size={16} /> <span>{t.nav.settings}</span>
           </NavLink>
@@ -120,9 +116,6 @@ const MainLayout = () => {
         <NavLink to="/history" className={mobileNavLinkClass}>
             <HistoryIcon size={20} /> <span className="text-[10px]">{t.nav.history}</span>
         </NavLink>
-        <NavLink to="/glass" className={mobileNavLinkClass}>
-            <Flame size={20} /> <span className="text-[10px]">{t.nav.glassWizard}</span>
-        </NavLink>
         <NavLink to="/settings" className={mobileNavLinkClass}>
             <SettingsIcon size={20} /> <span className="text-[10px]">{t.nav.settings}</span>
         </NavLink>
@@ -138,7 +131,6 @@ function AppContent() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/schedules" element={<ScheduleEditor />} />
         <Route path="/history" element={<History />} />
-        <Route path="/glass" element={<GlassWizard />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="/controller-sim" element={<ControllerScreen />} />

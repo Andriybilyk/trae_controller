@@ -1,0 +1,66 @@
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "${workspaceFolder}/firmware/include",
+                "${workspaceFolder}/firmware/src",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/ArduinoJson/src",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/AsyncTCP/src",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/ESPAsyncWebServer/src",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/MAX6675 library",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/NimBLE-Arduino/src",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/TFT_eSPI",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/WiFiManager",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/PID",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/PubSubClient/src",
+                "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/XPT2046_Touchscreen",
+                "C:/Users/andri/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
+                "C:/Users/andri/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
+                "C:/Users/andri/.platformio/packages/framework-arduinoespressif32/libraries/FS/src",
+                "C:/Users/andri/.platformio/packages/framework-arduinoespressif32/libraries/LittleFS/src",
+                "C:/Users/andri/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
+                "C:/Users/andri/.platformio/packages/framework-arduinoespressif32/cores/esp32",
+                "C:/Users/andri/.platformio/packages/framework-arduinoespressif32/variants/esp32s3"
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "${workspaceFolder}/firmware/include",
+                    "${workspaceFolder}/firmware/src",
+                    "${workspaceFolder}/firmware/.pio/libdeps/esp32s3-n16r8/TFT_eSPI"
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60119",
+                "ARDUINO_ESP32S3_DEV",
+                "ESP32",
+                "ESP32S3",
+                "ARDUINO=10812",
+                "ARDUINO_ARCH_ESP32",
+                "BOARD_HAS_PSRAM",
+                "ARDUINO_USB_MODE=1",
+                "ARDUINO_USB_CDC_ON_BOOT=1",
+                "USER_SETUP_LOADED=1",
+                "ST7796_DRIVER=1",
+                "TFT_WIDTH=320",
+                "TFT_HEIGHT=480",
+                "TFT_MISO=13",
+                "TFT_MOSI=11",
+                "TFT_SCLK=12",
+                "TFT_CS=10",
+                "TFT_DC=9",
+                "TFT_RST=4",
+                "TFT_BL=5",
+                "TOUCH_CS=6"
+            ],
+            "cStandard": "gnu99",
+            "cppStandard": "gnu++11",
+            "compilerPath": "C:/Users/andri/.platformio/packages/toolchain-xtensa-esp32s3/bin/xtensa-esp32s3-elf-gcc.exe",
+            "compilerArgs": [
+                "-mlong-calls"
+            ]
+        }
+    ],
+    "version": 4
+}
