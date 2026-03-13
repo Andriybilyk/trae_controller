@@ -1,46 +1,18 @@
 #include "ui_manager.h"
-#include "LGFX_Setup.hpp"
+#include "display_driver.h"
 #include "esp_log.h"
 #include "esp_timer.h"
-#include <ArduinoJson.h>
+#include "cJSON.h"
 #include <vector>
 
 static const char *TAG = "UI";
 
 UIManager uiManager;
-extern LGFX tft;
 
 // LVGL Buffer
 static lv_disp_draw_buf_t draw_buf;
 static lv_color_t buf[480 * 10]; // 10 lines buffer
 static lv_obj_t* listContainer;
-
-// Flush Callback
-void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color_p) {
-    uint32_t w = (area->x2 - area->x1 + 1);
-    uint32_t h = (area->y2 - area->y1 + 1);
-
-    tft.startWrite();
-    tft.setAddrWindow(area->x1, area->y1, w, h);
-    tft.writePixels((uint16_t *)&color_p->full, w * h, true);
-    tft.endWrite();
-
-    lv_disp_flush_ready(disp);
-}
-
-// Read Touch Callback
-void my_touchpad_read(lv_indev_drv_t *indev_driver, lv_indev_data_t *data) {
-    uint16_t touchX, touchY;
-    bool touched = tft.getTouch(&touchX, &touchY);
-
-    if (!touched) {
-        data->state = LV_INDEV_STATE_REL;
-    } else {
-        data->state = LV_INDEV_STATE_PR;
-        data->point.x = touchX;
-        data->point.y = touchY;
-    }
-}
 
 UIManager::UIManager() {
     lastUpdate = 0;
@@ -49,9 +21,7 @@ UIManager::UIManager() {
 void UIManager::begin() {
     ESP_LOGI(TAG, "UIManager::begin() LVGL");
     
-    // Init LGFX
-    tft.init();
-    tft.setRotation(1); // Landscape
+    display_driver_init();
     
     // Init LVGL
     lv_init();
@@ -64,7 +34,7 @@ void UIManager::begin() {
     lv_disp_drv_init(&disp_drv);
     disp_drv.hor_res = 480;
     disp_drv.ver_res = 320;
-    disp_drv.flush_cb = my_disp_flush;
+    disp_drv.flush_cb = display_driver_lvgl_flush;
     disp_drv.draw_buf = &draw_buf;
     
     lv_disp_drv_register(&disp_drv);
@@ -73,7 +43,7 @@ void UIManager::begin() {
     static lv_indev_drv_t indev_drv;
     lv_indev_drv_init(&indev_drv);
     indev_drv.type = LV_INDEV_TYPE_POINTER;
-    indev_drv.read_cb = my_touchpad_read;
+    indev_drv.read_cb = display_driver_lvgl_touch_read;
     lv_indev_drv_register(&indev_drv);
 
     // Create UI
@@ -134,24 +104,27 @@ static void program_item_handler(lv_event_t * e) {
     fclose(f);
     buffer[fsize] = 0;
     
-    // Parse
-    DynamicJsonDocument doc(4096); 
-    DeserializationError error = deserializeJson(doc, buffer);
+    cJSON *arr = cJSON_Parse(buffer);
     free(buffer);
-    
-    if (error) {
-        ESP_LOGE(TAG, "Failed to parse schedules.json");
+
+    if (!arr || !cJSON_IsArray(arr)) {
+        ESP_LOGE(TAG, "Failed to parse schedules.json (not an array)");
+        if (arr) cJSON_Delete(arr);
         return;
     }
-    
-    JsonArray arr = doc.as<JsonArray>();
-    if (index >= 0 && index < arr.size()) {
-        std::string progJson;
-        serializeJson(arr[index], progJson);
-        thermalCtrl.loadSchedule(progJson);
-        ESP_LOGI(TAG, "Loaded schedule index %d", index);
-        uiManager.showMain();
+
+    cJSON *item = cJSON_GetArrayItem(arr, index);
+    if (item && cJSON_IsObject(item)) {
+        char *rendered = cJSON_PrintUnformatted(item);
+        if (rendered) {
+            thermalCtrl.loadSchedule(rendered);
+            free(rendered);
+            ESP_LOGI(TAG, "Loaded schedule index %d", index);
+            uiManager.showMain();
+        }
     }
+
+    cJSON_Delete(arr);
 }
 
 void UIManager::createScreens() {
@@ -309,16 +282,18 @@ void UIManager::showPrograms() {
                 fread(buffer, 1, fsize, f);
                 buffer[fsize] = 0;
                 
-                DynamicJsonDocument doc(4096);
-                DeserializationError error = deserializeJson(doc, buffer);
+                cJSON *arr = cJSON_Parse(buffer);
                 free(buffer);
-                
-                if (!error) {
-                    JsonArray arr = doc.as<JsonArray>();
+
+                if (arr && cJSON_IsArray(arr)) {
                     int idx = 0;
-                    for (JsonObject obj : arr) {
-                        const char* name = obj["name"] | "Unnamed";
-                        int steps = obj["steps"].size();
+                    cJSON *obj = NULL;
+                    cJSON_ArrayForEach(obj, arr) {
+                        const cJSON *nameItem = cJSON_GetObjectItem(obj, "name");
+                        const char *name = (cJSON_IsString(nameItem) && nameItem->valuestring) ? nameItem->valuestring : "Unnamed";
+
+                        const cJSON *stepsArr = cJSON_GetObjectItem(obj, "steps");
+                        int steps = cJSON_IsArray(stepsArr) ? cJSON_GetArraySize(stepsArr) : 0;
                         
                         lv_obj_t* btn = lv_btn_create(listContainer);
                         lv_obj_set_size(btn, LV_PCT(100), 60);
@@ -334,7 +309,9 @@ void UIManager::showPrograms() {
                         
                         idx++;
                     }
+                    cJSON_Delete(arr);
                 } else {
+                    if (arr) cJSON_Delete(arr);
                     lv_obj_t* lbl = lv_label_create(listContainer);
                     lv_label_set_text(lbl, "Помилка JSON"); // JSON Error
                     lv_obj_set_style_text_color(lbl, lv_color_white(), 0);

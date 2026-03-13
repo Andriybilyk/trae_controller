@@ -4,10 +4,13 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "driver/gpio.h"
-#include <ArduinoJson.h>
+#include "cJSON.h"
 #include <cmath>
 
 static const char *TAG = "THERMAL";
+
+volatile uint16_t g_raw_value = 0;
+
 
 // PID Defaults
 double Kp = 22.2, Ki = 1.06, Kd = 116.55;
@@ -22,6 +25,21 @@ ThermalController::ThermalController() {
     state.currentStep = 0;
     state.totalSteps = 0;
     state.errorMsg = "";
+}
+
+ThermalController::~ThermalController() {
+    if (thermocouple) {
+        delete thermocouple;
+        thermocouple = nullptr;
+    }
+    if (pid) {
+        delete pid;
+        pid = nullptr;
+    }
+    if (mutex) {
+        vSemaphoreDelete(mutex);
+        mutex = nullptr;
+    }
 }
 
 void ThermalController::begin() {
@@ -49,7 +67,7 @@ void ThermalController::begin() {
     gpio_set_level((gpio_num_t)SAFETY_RELAY_PIN, 0);
 
     // Thermocouple
-    thermocouple = new MAX6675((gpio_num_t)MAXCLK, (gpio_num_t)MAXCS, (gpio_num_t)MAXDO);
+    thermocouple = new MAX6675(MAXCS, MAXCLK, MAXDO);
     
     // PID
     pid = new PID(&input, &output, &setpoint, Kp, Ki, Kd, DIRECT);
@@ -62,14 +80,14 @@ void ThermalController::begin() {
 
 void ThermalController::loop() {
     if (!mutex) return;
-    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     
     updateTemperature();
 
     if (!isSensorHealthy()) {
         ESP_LOGE(TAG, "Sensor is not healthy, initiating emergency stop.");
         emergencyStop("Sensor Failure");
-        xSemaphoreGive(mutex);
+        xSemaphoreGiveRecursive(mutex);
         return;
     }
 
@@ -86,7 +104,7 @@ void ThermalController::loop() {
         setpoint = 0;
     }
     
-    xSemaphoreGive(mutex);
+    xSemaphoreGiveRecursive(mutex);
 }
 
 void ThermalController::updateTemperature() {
@@ -95,7 +113,7 @@ void ThermalController::updateTemperature() {
         return;
     }
     float t = thermocouple->readCelsius();
-    ESP_LOGI(TAG, "Raw Thermocouple Reading: %.2f C", t); // Always log raw reading
+    ESP_LOGI(TAG, "Raw Sensor Value: %u, Temperature: %.2f C", g_raw_value, t);
     if (!std::isnan(t)) {
         state.currentTemp = t;
         ESP_LOGI(TAG, "Current Temperature: %.2f C", state.currentTemp);
@@ -182,17 +200,15 @@ void ThermalController::startSchedule(const std::string& scheduleJson) {
 
 void ThermalController::loadSchedule(const std::string& scheduleJson) {
     if (!mutex) return;
-    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     
-    // Parse JSON
-    DynamicJsonDocument doc(2048);
-    DeserializationError error = deserializeJson(doc, scheduleJson);
     ESP_LOGI(TAG, "Received schedule JSON: %s", scheduleJson.c_str());
-    
-    if (error) {
+
+    cJSON *root = cJSON_Parse(scheduleJson.c_str());
+    if (!root) {
         ESP_LOGE(TAG, "Failed to parse schedule JSON");
         state.errorMsg = "Invalid JSON";
-        xSemaphoreGive(mutex);
+        xSemaphoreGiveRecursive(mutex);
         return;
     }
     
@@ -200,23 +216,39 @@ void ThermalController::loadSchedule(const std::string& scheduleJson) {
     activeSchedule.clear();
     
     // Populate new schedule
-    JsonArray steps = doc["steps"];
-    for (JsonObject step : steps) {
+    cJSON *steps = cJSON_GetObjectItem(root, "steps");
+    if (!cJSON_IsArray(steps)) {
+        ESP_LOGE(TAG, "Schedule JSON missing 'steps' array");
+        state.errorMsg = "Invalid Schedule";
+        cJSON_Delete(root);
+        xSemaphoreGiveRecursive(mutex);
+        return;
+    }
+
+    cJSON *step = NULL;
+    cJSON_ArrayForEach(step, steps) {
+        if (!cJSON_IsObject(step)) continue;
+
         ScheduleStep s;
-        std::string type = step["type"] | "ramp";
+        const cJSON *typeItem = cJSON_GetObjectItem(step, "type");
+        std::string type = (cJSON_IsString(typeItem) && typeItem->valuestring) ? typeItem->valuestring : "ramp";
         s.type = (type == "hold") ? 1 : 0;
         
         if (s.type == 0) { // RAMP
-            s.value = step["target"] | 0.0f; 
+            const cJSON *targetItem = cJSON_GetObjectItem(step, "target");
+            s.value = cJSON_IsNumber(targetItem) ? (float)targetItem->valuedouble : 0.0f;
         } else { // HOLD
-            s.value = step["holdTime"] | 0.0f; // Using 'holdTime' for HOLD
+            const cJSON *holdTimeItem = cJSON_GetObjectItem(step, "holdTime");
+            s.value = cJSON_IsNumber(holdTimeItem) ? (float)holdTimeItem->valuedouble : 0.0f; // Using 'holdTime' for HOLD
         }
         activeSchedule.push_back(s);
     }
+
+    cJSON_Delete(root);
     
     if (activeSchedule.empty()) {
         state.errorMsg = "Empty Schedule";
-        xSemaphoreGive(mutex);
+        xSemaphoreGiveRecursive(mutex);
         return;
     }
     
@@ -232,12 +264,12 @@ void ThermalController::loadSchedule(const std::string& scheduleJson) {
     }
     ESP_LOGI(TAG, "Schedule Loaded with %d steps", state.totalSteps);
     
-    xSemaphoreGive(mutex);
+    xSemaphoreGiveRecursive(mutex);
 }
 
 void ThermalController::start() {
     if (!mutex) return;
-    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     
     if (activeSchedule.empty()) {
         state.errorMsg = "No Schedule Loaded";
@@ -264,7 +296,7 @@ void ThermalController::start() {
 
 void ThermalController::stop(const std::string& reason) {
     if (!mutex) return;
-    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     
     state.isFiring = false;
     state.status = KILN_IDLE;
@@ -307,7 +339,7 @@ void ThermalController::emergencyStop(const std::string& reason) {
 
 void ThermalController::skipCurrentStep() {
     // Ensure thread safety
-    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     if (state.isFiring) {
         ESP_LOGI(TAG, "Skipping current step. Current step: %d, Total steps: %d", state.currentStep + 1, state.totalSteps);
@@ -333,11 +365,11 @@ void ThermalController::skipCurrentStep() {
         ESP_LOGW(TAG, "Attempted to skip step but kiln is not firing.");
     }
 
-    xSemaphoreGive(mutex);
+    xSemaphoreGiveRecursive(mutex);
 }
 
 void ThermalController::addTimeToHold(float minutesToAdd) {
-    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     if (state.isFiring && state.status == KILN_HOLD && state.currentStep < activeSchedule.size()) {
         ScheduleStep currentStep = activeSchedule[state.currentStep];
@@ -351,11 +383,11 @@ void ThermalController::addTimeToHold(float minutesToAdd) {
         ESP_LOGW(TAG, "Attempted to add time but kiln is not firing or not in HOLD state.");
     }
 
-    xSemaphoreGive(mutex);
+    xSemaphoreGiveRecursive(mutex);
 }
 
 void ThermalController::addTemperatureToTarget(float tempToAdd) {
-    xSemaphoreTake(mutex, portMAX_DELAY);
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     if (state.isFiring) {
         state.targetTemp += tempToAdd;
@@ -365,7 +397,7 @@ void ThermalController::addTemperatureToTarget(float tempToAdd) {
         ESP_LOGW(TAG, "Attempted to add temperature but kiln is not firing.");
     }
 
-    xSemaphoreGive(mutex);
+    xSemaphoreGiveRecursive(mutex);
 }
 
 

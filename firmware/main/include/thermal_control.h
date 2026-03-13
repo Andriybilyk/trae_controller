@@ -6,7 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "PID.h"
-#include "MAX6675.h"
+#include "max6675.h"
 #include "config.h"
 
 enum KilnStatus {
@@ -35,6 +35,7 @@ struct KilnState {
 class ThermalController {
 public:
     ThermalController();
+    ~ThermalController();
     void begin();
     void loop(); // Call this in a loop or task
 

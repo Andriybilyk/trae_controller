@@ -23,6 +23,7 @@ private:
     static esp_err_t ws_handler(httpd_req_t *req);
     static esp_err_t index_handler(httpd_req_t *req);
     static esp_err_t scan_wifi_handler(httpd_req_t *req);
+    static esp_err_t scan_results_handler(httpd_req_t *req);
     static esp_err_t save_wifi_handler(httpd_req_t *req);
     static esp_err_t api_status_handler(httpd_req_t *req);
     static esp_err_t api_schedules_handler(httpd_req_t *req);

@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -12,7 +13,7 @@
 #include "nvs.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
-#include "ArduinoJson.h"
+#include "cJSON.h"
 
 static const char *TAG = "WIFI_CONN";
 
@@ -20,6 +21,86 @@ static const char *TAG = "WIFI_CONN";
 #define NVS_NAMESPACE "wifi_config"
 #define KEY_SSID      "ssid"
 #define KEY_PASS      "password"
+
+// --- Scan Task ---
+static TaskHandle_t wifi_scan_task_handle = NULL;
+static SemaphoreHandle_t scan_done_sem = NULL;
+static std::string scan_result_json;
+
+static void wifi_scan_task(void *pvParameters) {
+    ESP_LOGI(TAG, "Starting WiFi Scan Task...");
+    
+    wifi_scan_config_t scan_config = {
+        .ssid = NULL,
+        .bssid = NULL,
+        .channel = 0,
+        .show_hidden = false,
+        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+        .scan_time = { .active = { .min = 100, .max = 800 } }
+    };
+
+    if (esp_wifi_scan_start(&scan_config, true) == ESP_OK) {
+        uint16_t ap_num = 0;
+        esp_wifi_scan_get_ap_num(&ap_num);
+        if (ap_num > 0) {
+            wifi_ap_record_t *ap_list = (wifi_ap_record_t *)malloc(ap_num * sizeof(wifi_ap_record_t));
+            if (ap_list && esp_wifi_scan_get_ap_records(&ap_num, ap_list) == ESP_OK) {
+                cJSON *root = cJSON_CreateArray();
+                for (int i = 0; i < ap_num; i++) {
+                    if (strlen((char *)ap_list[i].ssid) == 0) continue;
+
+                    cJSON *obj = cJSON_CreateObject();
+                    cJSON_AddStringToObject(obj, "ssid", (char *)ap_list[i].ssid);
+                    cJSON_AddNumberToObject(obj, "rssi", ap_list[i].rssi);
+                    cJSON_AddNumberToObject(obj, "auth", ap_list[i].authmode);
+                    cJSON_AddItemToArray(root, obj);
+                }
+
+                char *rendered = cJSON_PrintUnformatted(root);
+                scan_result_json.assign(rendered ? rendered : "[]");
+                if (rendered) free(rendered);
+                cJSON_Delete(root);
+            }
+            free(ap_list);
+        } else {
+            scan_result_json = "[]";
+        }
+    } else {
+        scan_result_json = "[]";
+        ESP_LOGE(TAG, "WiFi scan failed to start.");
+    }
+    
+    ESP_LOGI(TAG, "WiFi Scan completed.");
+    xSemaphoreGive(scan_done_sem);
+    vTaskDelete(NULL); // Delete self
+}
+
+void wifi_start_scan(void) {
+    if (scan_done_sem == NULL) {
+        scan_done_sem = xSemaphoreCreateBinary();
+    }
+    // Take semaphore before starting, so we can wait for it
+    xSemaphoreTake(scan_done_sem, 0); 
+    
+    // Ensure APSTA mode for scanning
+    wifi_mode_t mode;
+    esp_wifi_get_mode(&mode);
+    if (mode == WIFI_MODE_AP) {
+        esp_wifi_set_mode(WIFI_MODE_APSTA);
+    }
+    
+    xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 5, &wifi_scan_task_handle);
+}
+
+bool wifi_is_scan_done(void) {
+    if (scan_done_sem == NULL) return false;
+    return xSemaphoreTake(scan_done_sem, 0) == pdTRUE;
+}
+
+std::string wifi_get_scanned_networks(void) {
+    return scan_result_json;
+}
+
 
 void wifi_save_creds(const char* ssid, const char* password) {
     nvs_handle_t my_handle;
@@ -29,15 +110,9 @@ void wifi_save_creds(const char* ssid, const char* password) {
         return;
     }
 
-    err = nvs_set_str(my_handle, KEY_SSID, ssid);
-    if (err != ESP_OK) ESP_LOGE(TAG, "Failed to save SSID");
-
-    err = nvs_set_str(my_handle, KEY_PASS, password);
-    if (err != ESP_OK) ESP_LOGE(TAG, "Failed to save Password");
-
-    err = nvs_commit(my_handle);
-    if (err != ESP_OK) ESP_LOGE(TAG, "Failed to commit NVS");
-
+    nvs_set_str(my_handle, KEY_SSID, ssid);
+    nvs_set_str(my_handle, KEY_PASS, password);
+    nvs_commit(my_handle);
     nvs_close(my_handle);
     ESP_LOGI(TAG, "WiFi credentials saved.");
 }
@@ -59,10 +134,10 @@ bool wifi_is_configured() {
     if (err != ESP_OK) return false;
 
     size_t ssid_len = 0;
-    err = nvs_get_str(my_handle, KEY_SSID, NULL, &ssid_len);
+    nvs_get_str(my_handle, KEY_SSID, NULL, &ssid_len);
     nvs_close(my_handle);
     
-    return (err == ESP_OK && ssid_len > 0);
+    return (err == ESP_OK && ssid_len > 1); // Check if ssid is not empty
 }
 
 // --- STA Mode ---
@@ -94,7 +169,6 @@ static void sta_event_handler(void* arg, esp_event_base_t event_base,
 }
 
 bool wifi_init_sta(void) {
-    // Load credentials
     nvs_handle_t my_handle;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &my_handle) != ESP_OK) return false;
 
@@ -110,61 +184,40 @@ bool wifi_init_sta(void) {
 
     s_wifi_event_group = xEventGroupCreate();
 
-    esp_err_t ret = esp_netif_init();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_ERROR_CHECK(ret);
-    }
-    
-    ret = esp_event_loop_create_default();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_ERROR_CHECK(ret);
-    }
-    
+    esp_netif_init();
+    esp_event_loop_create_default();
     esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_wifi_init(&cfg);
 
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &sta_event_handler,
-                                                        NULL,
-                                                        &instance_any_id));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
-                                                        IP_EVENT_STA_GOT_IP,
-                                                        &sta_event_handler,
-                                                        NULL,
-                                                        &instance_got_ip));
+    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &sta_event_handler, NULL, &instance_any_id);
+    esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &sta_event_handler, NULL, &instance_got_ip);
 
     wifi_config_t wifi_config = {};
     strcpy((char*)wifi_config.sta.ssid, ssid);
     strcpy((char*)wifi_config.sta.password, pass);
-    wifi_config.sta.threshold.rssi = -127;
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    
+    esp_wifi_set_mode(WIFI_MODE_STA);
+    esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    esp_wifi_start();
 
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
-            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-            pdFALSE,
-            pdFALSE,
-            portMAX_DELAY);
+            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+
+    vEventGroupDelete(s_wifi_event_group);
 
     if (bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "connected to ap SSID:%s", ssid);
         return true;
-    } else if (bits & WIFI_FAIL_BIT) {
+    } else {
         ESP_LOGI(TAG, "Failed to connect to SSID:%s", ssid);
-        // Clean up to allow retry or mode switch? 
-        // For now just return false, caller should handle fallback
         esp_wifi_stop();
         esp_wifi_deinit();
         return false;
     }
-    return false;
 }
 
 // --- AP Mode ---
@@ -173,46 +226,23 @@ static void ap_event_handler(void* arg, esp_event_base_t event_base,
 {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
-        ESP_LOGI(TAG, "station " MACSTR " join, AID=%d",
-                 MAC2STR(event->mac), event->aid);
+        ESP_LOGI(TAG, "station " MACSTR " join, AID=%d", MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
-        ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d",
-                 MAC2STR(event->mac), event->aid);
+        ESP_LOGI(TAG, "station " MACSTR " leave, AID=%d", MAC2STR(event->mac), event->aid);
     }
 }
 
 void wifi_init_softap(void)
 {
-    // If we are here, we might need to re-init netif if STA failed and de-inited it.
-    // Ideally we should check if already inited.
-    // Simplified: Assume we call this if STA failed or fresh start.
-    
-    esp_err_t ret = esp_netif_init();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_ERROR_CHECK(ret);
-    }
-    
-    ret = esp_event_loop_create_default();
-    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
-        ESP_ERROR_CHECK(ret);
-    }
-    
-    // Create AP if not exists. 
-    esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
-    
-    // Config AP IP to 192.168.4.1 (default)
+    esp_netif_init();
+    esp_event_loop_create_default();
+    esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    // Check if wifi is already inited?
-    // If we came from failed STA, we de-inited it.
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    esp_wifi_init(&cfg);
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &ap_event_handler,
-                                                        NULL,
-                                                        NULL));
+    esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &ap_event_handler, NULL, NULL);
 
     wifi_config_t wifi_config = {
         .ap = {
@@ -222,70 +252,20 @@ void wifi_init_softap(void)
             .channel = 1,
             .authmode = WIFI_AUTH_OPEN,
             .max_connection = 4,
-            .pmf_cfg = {
-                .required = false,
-            },
+            .pmf_cfg = { .required = false },
         },
     };
 
-    // Set mode to APSTA so we can scan
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA)); 
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    esp_wifi_set_mode(WIFI_MODE_APSTA); 
+    esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
+    esp_wifi_start();
 
-    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s",
-             "TRAE_KILN_SETUP", "");
+    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:TRAE_KILN_SETUP");
 }
 
+// Kept for compatibility, but it's now a blocking wrapper. Avoid using in handlers.
 std::string wifi_scan_networks(void) {
-    // Ensure we are in a mode that supports scanning (STA or APSTA)
-    wifi_mode_t mode;
-    esp_wifi_get_mode(&mode);
-    if (mode == WIFI_MODE_AP) {
-        esp_wifi_set_mode(WIFI_MODE_APSTA);
-    }
-
-    wifi_scan_config_t scan_config = {
-        .ssid = NULL,
-        .bssid = NULL,
-        .channel = 0,
-        .show_hidden = false,
-        .scan_type = WIFI_SCAN_TYPE_ACTIVE,
-        .scan_time = {
-            .active = {
-                .min = 100,
-                .max = 300
-            },
-        }
-    };
-    
-    ESP_LOGI(TAG, "Starting WiFi Scan...");
-    esp_wifi_scan_start(&scan_config, true); // Blocking scan
-    
-    uint16_t ap_num = 0;
-    esp_wifi_scan_get_ap_num(&ap_num);
-    
-    wifi_ap_record_t *ap_list = (wifi_ap_record_t *)malloc(ap_num * sizeof(wifi_ap_record_t));
-    ESP_ERROR_CHECK(esp_wifi_scan_get_ap_records(&ap_num, ap_list));
-    
-    ESP_LOGI(TAG, "Scan done. Found %d APs", ap_num);
-    
-    DynamicJsonDocument doc(2048);
-    JsonArray array = doc.to<JsonArray>();
-
-    for (int i = 0; i < ap_num; i++) {
-        // Filter out empty SSIDs
-        if (strlen((char *)ap_list[i].ssid) > 0) {
-            JsonObject obj = array.createNestedObject();
-            obj["ssid"] = (char *)ap_list[i].ssid;
-            obj["rssi"] = ap_list[i].rssi;
-            obj["auth"] = ap_list[i].authmode;
-        }
-    }
-    
-    free(ap_list);
-    
-    std::string output;
-    serializeJson(doc, output);
-    return output;
+    wifi_start_scan();
+    if(scan_done_sem) xSemaphoreTake(scan_done_sem, portMAX_DELAY); // Block until done
+    return wifi_get_scanned_networks();
 }

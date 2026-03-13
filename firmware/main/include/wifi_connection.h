@@ -36,7 +36,17 @@ void wifi_erase_creds(void);
 /**
  * @brief Scan for available networks and return JSON string.
  */
-std::string wifi_scan_networks(void);
+std::string wifi_get_scanned_networks(void);
+
+/**
+ * @brief Start an asynchronous WiFi scan.
+ */
+void wifi_start_scan(void);
+
+/**
+ * @brief Get the status of the WiFi scan.
+ */
+bool wifi_is_scan_done(void);
 
 #ifdef __cplusplus
 }
