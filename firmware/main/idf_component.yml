@@ -1,4 +1,4 @@
 dependencies:
-  lvgl/lvgl: "^8.3.0"
   joltwallet/littlefs: "^1.20.4"
   espressif/cjson: "^1.7.19~1"
+  atanisoft/esp_lcd_touch_xpt2046: "^1.0.6"

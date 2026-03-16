@@ -3,12 +3,14 @@ import { LanguageProvider } from './contexts/LanguageContext';
 import { SchedulesProvider } from './contexts/SchedulesContext';
 import AppContent from './AppContent';
 import { Toaster } from 'react-hot-toast';
+import { AutotuneNotifications } from './components/AutotuneNotifications';
 
 function App() {
   return (
     <LanguageProvider>
       <SchedulesProvider>
         <AppContent />
+        <AutotuneNotifications />
         <Toaster 
           position="top-center"
           toastOptions={{

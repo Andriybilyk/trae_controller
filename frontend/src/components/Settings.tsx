@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Monitor } from 'lucide-react';
+import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Monitor, Square } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config';
+import { ConfirmModal } from './ConfirmModal';
 
 const Settings = () => {
   const { t } = useLanguage();
@@ -18,11 +19,96 @@ const Settings = () => {
   const [offset, setOffset] = useState(0);
   const [ssrCycles, setSsrCycles] = useState(15420);
   const [autotuneTemp, setAutotuneTemp] = useState(600);
+  const [autotuneInfo, setAutotuneInfo] = useState<any>(null);
+  const [pidInfo, setPidInfo] = useState<any>(null);
+  const [pidLoading, setPidLoading] = useState(false);
+  const [showPidResetConfirm, setShowPidResetConfirm] = useState(false);
+  const [showAutotuneStartConfirm, setShowAutotuneStartConfirm] = useState(false);
+  const [showAutotuneStopConfirm, setShowAutotuneStopConfirm] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState<null | 'pid_reset' | 'autotune_start' | 'autotune_stop'>(null);
 
   useEffect(() => {
     // Load from local storage or API
     const saved = localStorage.getItem('kiln_settings');
     if (saved) setSettings(JSON.parse(saved));
+  }, []);
+  const loadControllerSettings = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/settings`);
+      if (!res.ok) return;
+      const d = await res.json();
+      if (typeof d.temp_offset_c === 'number') setOffset(d.temp_offset_c);
+      if (typeof d.ssrCycles === 'number') setSsrCycles(d.ssrCycles);
+      if (typeof d.wattage === 'number') setSettings((prev:any) => ({...prev, wattage: d.wattage}));
+      if (typeof d.costPerKwh === 'number') setSettings((prev:any) => ({...prev, costPerKwh: d.costPerKwh}));
+      if (typeof d.currency === 'string') setSettings((prev:any) => ({...prev, currency: d.currency}));
+      if (typeof d.zones === 'number') setSettings((prev:any) => ({...prev, zones: d.zones}));
+    } catch (e) {}
+  };
+  const loadPid = async () => {
+    setPidLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/pid`);
+      if (res.ok) {
+        const d = await res.json();
+        setPidInfo(d);
+      }
+    } catch (e) {}
+    setPidLoading(false);
+  };
+
+  const resetPid = async () => {
+    setShowPidResetConfirm(true);
+  };
+
+  const confirmResetPid = async () => {
+    try {
+      setConfirmBusy('pid_reset');
+      const res = await fetch(`${API_BASE_URL}/pid/reset`, { method: 'POST' });
+      if (res.ok) {
+        await loadPid();
+        toast.success("PID reset");
+        setShowPidResetConfirm(false);
+      } else {
+        toast.error("Reset failed");
+      }
+    } catch (e) {
+      toast.error("Connection error to controller.");
+    } finally {
+      setConfirmBusy(null);
+    }
+  };
+
+  useEffect(() => {
+    loadControllerSettings();
+
+    let alive = true;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/status`);
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!alive) return;
+        if (d.autotune) setAutotuneInfo(d.autotune);
+      } catch (e) {}
+    };
+
+    fetchStatus();
+    const id = setInterval(fetchStatus, 1000);
+
+    const onWs = (ev: any) => {
+      const msg = ev?.detail;
+      if (!msg || !msg.event) return;
+      if (msg.event === 'settings_changed') { loadControllerSettings(); loadPid(); }
+      if (msg.event === 'autotune_state' && msg.autotune) setAutotuneInfo(msg.autotune);
+    };
+    window.addEventListener('kiln_ws', onWs as any);
+
+    return () => {
+      alive = false;
+      clearInterval(id);
+      window.removeEventListener('kiln_ws', onWs as any);
+    };
   }, []);
 
   const handleSave = () => {
@@ -37,24 +123,90 @@ const Settings = () => {
   };
 
   const handleAutoTune = async () => {
-      if(confirm(`${t.settings.confirmAutotune} at ${autotuneTemp}°C?`)) {
-          try {
-              const res = await fetch(`${API_BASE_URL}/autotune`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ temp: autotuneTemp })
-              });
-              const data = await res.json();
-              if(res.ok) toast.success(`Autotune started at ${autotuneTemp}°C! Monitor the dashboard.`);
-              else toast.error("Error: " + (data.error || "Unknown error"));
-          } catch (e) {
-              toast.error("Connection error to controller.");
+      setShowAutotuneStartConfirm(true);
+  };
+
+  const confirmAutoTuneStart = async () => {
+      try {
+          setConfirmBusy('autotune_start');
+          const res = await fetch(`${API_BASE_URL}/autotune`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ temp: autotuneTemp })
+          });
+          const data = await res.json();
+          if(res.ok) {
+            toast.success(`Autotune started at ${autotuneTemp}°C! Monitor the dashboard.`);
+            setShowAutotuneStartConfirm(false);
+          } else {
+            toast.error("Error: " + (data.error || "Unknown error"));
           }
+      } catch (e) {
+          toast.error("Connection error to controller.");
+      } finally {
+          setConfirmBusy(null);
+      }
+  };
+
+  const handleAutoTuneStop = async () => {
+      setShowAutotuneStopConfirm(true);
+  };
+
+  const confirmAutoTuneStop = async () => {
+      try {
+          setConfirmBusy('autotune_stop');
+          const res = await fetch(`${API_BASE_URL}/autotune/stop`, { method: 'POST' });
+          if(res.ok) {
+            toast.success("Autotune stopped");
+            setShowAutotuneStopConfirm(false);
+          } else {
+            toast.error("Stop failed");
+          }
+      } catch (e) {
+          toast.error("Connection error to controller.");
+      } finally {
+          setConfirmBusy(null);
       }
   };
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
+      <ConfirmModal
+        open={showAutotuneStopConfirm}
+        title="Stop Autotune?"
+        description="Are you sure you want to stop Autotune now? Heater will turn OFF and results may be incomplete."
+        confirmText="STOP Autotune"
+        cancelText="Cancel"
+        busy={confirmBusy === 'autotune_stop'}
+        icon={<Square size={40} fill="currentColor" />}
+        onConfirm={confirmAutoTuneStop}
+        onCancel={() => setShowAutotuneStopConfirm(false)}
+      />
+
+      <ConfirmModal
+        open={showAutotuneStartConfirm}
+        title="Start Autotune?"
+        description={`Start Autotune at ${autotuneTemp}°C? The heater will cycle automatically.`}
+        confirmText="Start Autotune"
+        cancelText="Cancel"
+        variant="danger"
+        busy={confirmBusy === 'autotune_start'}
+        icon={<Square size={40} fill="currentColor" />}
+        onConfirm={confirmAutoTuneStart}
+        onCancel={() => setShowAutotuneStartConfirm(false)}
+      />
+
+      <ConfirmModal
+        open={showPidResetConfirm}
+        title="Reset PID to defaults?"
+        description="This will overwrite the current PID/offset values. This action cannot be undone."
+        confirmText="Reset PID"
+        cancelText="Cancel"
+        busy={confirmBusy === 'pid_reset'}
+        onConfirm={confirmResetPid}
+        onCancel={() => setShowPidResetConfirm(false)}
+      />
+
       <div className="flex items-center gap-4 mb-2">
         <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
             <SettingsIcon size={32} className="text-blue-500" />
@@ -235,12 +387,44 @@ const Settings = () => {
                     >
                         <Activity size={18} /> {t.settings.initiateCalib}
                     </button>
+                    <button
+                        className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold transition-colors flex items-center justify-center"
+                        onClick={handleAutoTuneStop}
+                    >
+                        STOP
+                    </button>
                 </div>
+                {autotuneInfo && (
+                    <div className="mt-3 text-xs text-zinc-500 font-mono">
+                        {(autotuneInfo.active ? 'ACTIVE' : 'IDLE')} • cycles {(autotuneInfo.cycles ?? 0)}/6 • Ku {(autotuneInfo.ku ?? 0).toFixed(2)} • Pu {(autotuneInfo.pu_s ?? 0).toFixed(0)}s • PID {(autotuneInfo.kp ?? 0).toFixed(2)}/{(autotuneInfo.ki ?? 0).toFixed(3)}/{(autotuneInfo.kd ?? 0).toFixed(2)}
+                    </div>
+                )}
             </div>
         </div>
       </div>
 
-      {/* Safety Systems & Data Logging Section */}
+      
+      {/* PID / Offset */}
+      <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg">
+         <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-3 border-b border-zinc-800 pb-4">
+            <Wrench size={24} className="text-blue-400" />
+            PID / Offset
+        </h2>
+        <div className="text-sm text-zinc-400">
+            {pidLoading && <div>Loading...</div>}
+            {!pidLoading && pidInfo && (
+                <div className="space-y-2">
+                    <div className="font-mono text-zinc-300">Kp {Number(pidInfo.kp).toFixed(2)} • Ki {Number(pidInfo.ki).toFixed(3)} • Kd {Number(pidInfo.kd).toFixed(2)}</div>
+                    <div className="font-mono text-zinc-500">Default: {Number(pidInfo.kp_default).toFixed(2)}/{Number(pidInfo.ki_default).toFixed(3)}/{Number(pidInfo.kd_default).toFixed(2)} • Offset {Number(pidInfo.temp_offset_c).toFixed(1)}°C</div>
+                    <div className="flex gap-3 pt-2">
+                        <button className="px-5 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-bold transition-colors" onClick={loadPid}>Refresh</button>
+                        <button className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold transition-colors" onClick={resetPid}>Reset to defaults</button>
+                    </div>
+                </div>
+            )}
+        </div>
+      </div>
+      
       <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg">
          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-3 border-b border-zinc-800 pb-4">
             <Shield size={24} className="text-red-400" />
@@ -280,7 +464,7 @@ const Settings = () => {
             </div>
             <div className="flex-1">
                 <h3 className="text-white font-bold mb-1">Controller Screen Simulator</h3>
-                <p className="text-zinc-500 text-sm mb-3">Preview the native interface for Waveshare 4.3" ESP32-S3 (800x480)</p>
+                <p className="text-zinc-500 text-sm mb-3">Preview the native interface for the embedded display (480x320)</p>
                 <button 
                     onClick={() => navigate('/controller-sim')}
                     className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors border border-zinc-700"

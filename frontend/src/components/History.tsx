@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -32,6 +32,16 @@ interface FiringDetail {
     data: FiringDataPoint[];
 }
 
+const formatTemp = (t: number | null | undefined) => {
+    if (t === null || t === undefined || isNaN(t)) return '--';
+    return `${t.toFixed(1)}°C`;
+};
+
+const safePct = (num: number, den: number) => {
+    if (!den) return 0;
+    return Math.max(0, Math.min(100, Math.round((num / den) * 100)));
+};
+
 // --- Chart Options ---
 const chartOptions = {
   responsive: true,
@@ -57,7 +67,7 @@ const chartOptions = {
         min: 0, 
         grid: { color: '#27272a' }, 
         ticks: { color: '#71717a' },
-        title: { display: true, text: 'Temperature (??C)', color: '#a1a1aa' }
+        title: { display: true, text: 'Temperature (°C)', color: '#a1a1aa' }
     }
   },
   plugins: {
@@ -129,6 +139,24 @@ const History = () => {
         return `${h > 0 ? `${h}h ` : ''}${m}m`;
     };
 
+    const deriveStats = (detail: FiringDetail | null) => {
+        if (!detail) return null;
+        const data = detail.data || [];
+        const first = data.length ? data[0] : null;
+        const last = data.length ? data[data.length - 1] : null;
+
+        const temps = data.map(p => p.temp).filter(v => typeof v === 'number' && !isNaN(v));
+        const targets = data.map(p => p.target).filter(v => typeof v === 'number' && !isNaN(v));
+
+        const startTemp = first ? first.temp : null;
+        const endTemp = last ? last.temp : null;
+        const peakTemp = temps.length ? Math.max(...temps) : (detail.summary.peakTemp ?? null);
+        const maxTarget = targets.length ? Math.max(...targets) : null;
+        const rise = (peakTemp !== null && startTemp !== null && !isNaN(startTemp)) ? (peakTemp - startTemp) : null;
+
+        return { startTemp, endTemp, peakTemp, maxTarget, rise };
+    };
+
     const StatusBadge = ({ status }: { status: FiringSummary['status'] }) => {
         const statusMap = {
             COMPLETED: { icon: <CheckCircle size={14} />, text: t.history.completed, className: 'bg-green-500/10 text-green-400 border-green-500/20' },
@@ -173,14 +201,14 @@ const History = () => {
                                         <p className="text-xs text-zinc-400">{new Date(item.startTime).toLocaleString()}</p>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-zinc-300"><Clock size={16} className="text-zinc-500" /><span>{formatDuration(item.duration)}</span></div>
-                                    <div className="flex items-center gap-2 text-sm text-zinc-300"><Thermometer size={16} className="text-zinc-500" /><span>{typeof item.peakTemp === 'number' ? `${item.peakTemp.toFixed(0)}??C ${t.history.peakTemp}` : '--'}</span></div>
+                                    <div className="flex items-center gap-2 text-sm text-zinc-300"><Thermometer size={16} className="text-zinc-500" /><span>{typeof item.peakTemp === 'number' ? `${item.peakTemp.toFixed(0)}°C ${t.history.peakTemp}` : '--'}</span></div>
                                     <div className="flex justify-end">
                                         <StatusBadge status={item.status} />
                                     </div>
                                 </div>
                                 <div className="mt-2 flex items-center gap-2 text-xs text-zinc-500">
                                     <Hash size={14} />
-                                    <span>{t.history.steps}: {item.completedSteps} / {item.totalSteps}</span>
+                                    <span>{t.history.steps}: {item.completedSteps} / {item.totalSteps} ({safePct(item.completedSteps, item.totalSteps)}%)</span>
                                 </div>
                             </li>
                         ))}
@@ -205,6 +233,41 @@ const History = () => {
                                     <button onClick={() => setSelectedFiring(null)} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-800 hover:text-white"><X size={20} /></button>
                                 </div>
                                 <div className="p-4 md:p-6 flex-1 overflow-hidden">
+                                    {(() => {
+                                        const s = deriveStats(selectedFiring);
+                                        const pct = safePct(selectedFiring.summary.completedSteps, selectedFiring.summary.totalSteps);
+                                        return (
+                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                                                <div className="bg-black/20 border border-zinc-800 rounded-xl p-3">
+                                                    <div className="text-[10px] uppercase font-bold text-zinc-500">{t.history.duration}</div>
+                                                    <div className="text-white font-mono text-xl">{formatDuration(selectedFiring.summary.duration)}</div>
+                                                </div>
+                                                <div className="bg-black/20 border border-zinc-800 rounded-xl p-3">
+                                                    <div className="text-[10px] uppercase font-bold text-zinc-500">{t.history.completion}</div>
+                                                    <div className="text-white font-mono text-xl">{pct}%</div>
+                                                    <div className="text-zinc-500 text-xs">{selectedFiring.summary.completedSteps}/{selectedFiring.summary.totalSteps}</div>
+                                                </div>
+                                                <div className="bg-black/20 border border-zinc-800 rounded-xl p-3">
+                                                    <div className="text-[10px] uppercase font-bold text-zinc-500">{t.history.peakTemp}</div>
+                                                    <div className="text-white font-mono text-xl">{formatTemp(s?.peakTemp ?? selectedFiring.summary.peakTemp)}</div>
+                                                </div>
+                                                <div className="bg-black/20 border border-zinc-800 rounded-xl p-3">
+                                                    <div className="text-[10px] uppercase font-bold text-zinc-500">{t.history.startTemp}</div>
+                                                    <div className="text-white font-mono text-xl">{formatTemp(s?.startTemp ?? null)}</div>
+                                                </div>
+                                                <div className="bg-black/20 border border-zinc-800 rounded-xl p-3">
+                                                    <div className="text-[10px] uppercase font-bold text-zinc-500">{t.history.endTemp}</div>
+                                                    <div className="text-white font-mono text-xl">{formatTemp(s?.endTemp ?? null)}</div>
+                                                </div>
+                                                <div className="bg-black/20 border border-zinc-800 rounded-xl p-3">
+                                                    <div className="text-[10px] uppercase font-bold text-zinc-500">{t.history.tempRise}</div>
+                                                    <div className="text-white font-mono text-xl">{s?.rise === null || s?.rise === undefined || isNaN(s.rise) ? '--' : `${s.rise.toFixed(1)}°C`}</div>
+                                                    <div className="text-zinc-500 text-xs">{t.history.maxTarget}: {formatTemp(s?.maxTarget ?? null)}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+
                                     {selectedFiring.data && selectedFiring.data.length > 1 ? (
                                         <Line options={chartOptions} data={{
                                             datasets: [

@@ -209,6 +209,73 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         refreshSchedules();
     }, [refreshSchedules]);
 
+    // Cross-device sync: listen for schedules_changed over WS
+    useEffect(() => {
+        let ws: WebSocket | null = null;
+        let stopped = false;
+        let retry = 0;
+        let lastTrigger = 0;
+
+        const connect = () => {
+            if (stopped) return;
+
+            const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            const url = `${proto}://${window.location.host}/ws`;
+
+            try {
+                ws = new WebSocket(url);
+            } catch (e) {
+                scheduleReconnect();
+                return;
+            }
+
+            ws.onopen = () => {
+                retry = 0;
+            };
+
+            ws.onmessage = (ev) => {
+                try {
+                    const msg = JSON.parse(ev.data);
+                    if (msg && msg.event) {
+                        try {
+                            window.dispatchEvent(new CustomEvent('kiln_ws', { detail: msg }));
+                        } catch {}
+                    }
+
+                    if (msg && msg.event === 'schedules_changed') {
+                        const now = Date.now();
+                        if (now - lastTrigger < 250) return;
+                        lastTrigger = now;
+                        refreshSchedules();
+                    }
+                } catch {
+                    // ignore non-JSON / state frames
+                }
+            };
+
+            ws.onclose = () => {
+                scheduleReconnect();
+            };
+
+            ws.onerror = () => {
+                try { ws?.close(); } catch {}
+            };
+        };
+
+        const scheduleReconnect = () => {
+            if (stopped) return;
+            const delay = Math.min(5000, 250 * Math.pow(2, retry));
+            retry = Math.min(6, retry + 1);
+            setTimeout(connect, delay);
+        };
+
+        connect();
+        return () => {
+            stopped = true;
+            try { ws?.close(); } catch {}
+        };
+    }, [refreshSchedules]);
+
     return (
         <SchedulesContext.Provider value={{ schedules, isLoading, refreshSchedules, saveSchedule, deleteSchedule, getScheduleDetails }}>
             {children}

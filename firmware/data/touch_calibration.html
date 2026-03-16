@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TRAE Touch Calibration</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 12px; margin: 12px 0; }
+    button { padding: 10px 12px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; cursor: pointer; }
+    button.primary { background: #111827; color: #fff; border-color: #111827; }
+    button.warn { background: #dc2626; color: #fff; border-color: #dc2626; }
+    code { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+    pre { background: #0b1020; color: #d1d5db; padding: 12px; border-radius: 10px; overflow: auto; }
+    .k { color: #93c5fd; }
+    ol { margin: 0 0 8px 20px; }
+  </style>
+</head>
+<body>
+  <h2>???????????? ????????? (Mirror + Transform + Scale)</h2>
+
+  <div class="card">
+    <div class="row">
+      <button id="load" class="primary">??????? ??????? ????????????</button>
+      <button id="mx">Display mirror_x</button>
+      <button id="my">Display mirror_y</button>
+    </div>
+    <p>?? ????? <code>mirror_x</code>/<code>mirror_y</code> ??? ??????? (?????????? ? NVS).</p>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button id="tload" class="primary">Touch transform</button>
+      <button id="tsx">Touch swap_xy</button>
+      <button id="tmx">Touch mirror_x</button>
+      <button id="tmy">Touch mirror_y</button>
+    </div>
+    <p>?? ????? ????????????? ???? (swap/mirror) ?? ?????????????? ??????.</p>
+  </div>
+
+  <div class="card">
+    <h3>???????????? ???????? (4 ?????)</h3>
+    <ol>
+      <li>??????? ?Start Auto Cal?.</li>
+      <li>?? ????? ????????: TL ? TR ? BR ? BL (??????? ?????? 1 ???).</li>
+      <li>????? 4 ????? ???????????? ?????????????? ???????????.</li>
+    </ol>
+    <div class="row">
+      <button id="start_auto" class="primary">Start Auto Cal</button>
+      <button id="cap_tl">TL</button>
+      <button id="cap_tr">TR</button>
+      <button id="cap_br">BR</button>
+      <button id="cap_bl">BL</button>
+      <button id="apply" class="primary">???????????</button>
+      <button id="reset" class="warn">??????? ????????????</button>
+    </div>
+    <pre id="cal_out">?????????? ?????...</pre>
+  </div>
+
+  <div class="card">
+    <h3>Touch probe</h3>
+    <div class="row">
+      <button id="probe" class="primary">/api/touch/raw</button>
+      <button id="stats">/api/touch/stats</button>
+    </div>
+    <pre id="out">??????? "??????? ??????? ????????????".</pre>
+  </div>
+
+  <script type="module">
+    const out = document.getElementById('out');
+    const calOut = document.getElementById('cal_out');
+
+    async function jget(path) {
+      const r = await fetch(path, { cache: 'no-store' });
+      const t = await r.text();
+      try { return JSON.parse(t); } catch { return { raw: t, status: r.status }; }
+    }
+
+    async function jpost(path, body) {
+      const r = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        cache: 'no-store'
+      });
+      const t = await r.text();
+      try { return JSON.parse(t); } catch { return { raw: t, status: r.status }; }
+    }
+
+    let display = { mirror_x: false, mirror_y: false };
+    let touch = { swap_xy: true, mirror_x: false, mirror_y: true };
+    const points = { tl: null, tr: null, br: null, bl: null };
+
+    function render(obj) {
+      out.textContent = JSON.stringify(obj, null, 2);
+    }
+
+    function renderCal() {
+      calOut.textContent = JSON.stringify(points, null, 2);
+    }
+
+    async function load() {
+      display = await jget('/api/display');
+      touch = await jget('/api/touch/transform');
+      render({ display, touch });
+      renderCal();
+    }
+
+    document.getElementById('load').addEventListener('click', load);
+
+    document.getElementById('mx').addEventListener('click', async () => {
+      display.mirror_x = !display.mirror_x;
+      const res = await jpost('/api/display', { mirror_x: display.mirror_x, mirror_y: display.mirror_y });
+      render({ display, res });
+    });
+
+    document.getElementById('my').addEventListener('click', async () => {
+      display.mirror_y = !display.mirror_y;
+      const res = await jpost('/api/display', { mirror_x: display.mirror_x, mirror_y: display.mirror_y });
+      render({ display, res });
+    });
+
+    document.getElementById('probe').addEventListener('click', async () => {
+      const res = await jget('/api/touch/raw');
+      render({ display, touch, probe: res });
+    });
+
+    document.getElementById('stats').addEventListener('click', async () => {
+      const res = await jget('/api/touch/stats');
+      render({ display, touch, stats: res });
+    });
+
+    document.getElementById('tload').addEventListener('click', async () => {
+      touch = await jget('/api/touch/transform');
+      render({ display, touch });
+    });
+
+    async function setTouch() {
+      const res = await jpost('/api/touch/transform', touch);
+      touch = await jget('/api/touch/transform');
+      render({ display, touch, res });
+    }
+
+    document.getElementById('tsx').addEventListener('click', async () => {
+      touch.swap_xy = !touch.swap_xy;
+      await setTouch();
+    });
+
+    document.getElementById('tmx').addEventListener('click', async () => {
+      touch.mirror_x = !touch.mirror_x;
+      await setTouch();
+    });
+
+    let autoRunning = false;
+    const autoOrder = ['tl','tr','br','bl'];
+    let autoIndex = 0;
+
+    async function waitForPress(timeoutMs=15000) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const res = await jget('/api/touch/raw');
+        if (res.pressed) return res;
+        await new Promise(r => setTimeout(r, 150));
+      }
+      return null;
+    }
+
+    async function waitForRelease(timeoutMs=8000) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        const res = await jget('/api/touch/raw');
+        if (!res.pressed) return true;
+        await new Promise(r => setTimeout(r, 150));
+      }
+      return false;
+    }
+
+    async function autoCalibrate() {
+      if (autoRunning) return;
+      autoRunning = true;
+      autoIndex = 0;
+      calOut.textContent = 'Auto Cal: ???????? TL';
+
+      while (autoIndex < autoOrder.length) {
+        const key = autoOrder[autoIndex];
+        calOut.textContent = `Auto Cal: ???????? ${key.toUpperCase()} ? ???????`;
+        const res = await waitForPress();
+        if (!res) { calOut.textContent = 'Timeout: ???????? ?? ???.'; autoRunning = false; return; }
+        points[key] = { x: res.raw_x, y: res.raw_y };
+        renderCal();
+        await waitForRelease();
+        autoIndex += 1;
+      }
+
+      const left = Math.min(points.tl.x, points.bl.x);
+      const right = Math.max(points.tr.x, points.br.x);
+      const top = Math.min(points.tl.y, points.tr.y);
+      const bottom = Math.max(points.bl.y, points.br.y);
+      const res = await jpost('/api/touch/calibration', { enabled: true, left, right, top, bottom });
+      render({ display, touch, calibration: { left, right, top, bottom }, res });
+      calOut.textContent = 'Auto Cal done.';
+      autoRunning = false;
+    }
+    document.getElementById('start_auto').addEventListener('click', autoCalibrate);
+
+    document.getElementById('tmy').addEventListener('click', async () => {
+      touch.mirror_y = !touch.mirror_y;
+      await setTouch();
+    });
+
+    async function capturePoint(key) {
+      const res = await jget('/api/touch/raw');
+      if (!res.pressed) {
+        calOut.textContent = '??????? ?? ?????? ?????????? ? ??????, ???? ??????? ?????? ' + key.toUpperCase();
+        return;
+      }
+      points[key] = { x: res.raw_x, y: res.raw_y };
+      renderCal();
+    }
+
+    document.getElementById('cap_tl').addEventListener('click', () => capturePoint('tl'));
+    document.getElementById('cap_tr').addEventListener('click', () => capturePoint('tr'));
+    document.getElementById('cap_br').addEventListener('click', () => capturePoint('br'));
+    document.getElementById('cap_bl').addEventListener('click', () => capturePoint('bl'));
+
+    document.getElementById('apply').addEventListener('click', async () => {
+      if (!points.tl || !points.tr || !points.br || !points.bl) {
+        calOut.textContent = '???????? ??? 4 ?????.';
+        return;
+      }
+      const left = Math.min(points.tl.x, points.bl.x);
+      const right = Math.max(points.tr.x, points.br.x);
+      const top = Math.min(points.tl.y, points.tr.y);
+      const bottom = Math.max(points.bl.y, points.br.y);
+      const res = await jpost('/api/touch/calibration', { enabled: true, left, right, top, bottom });
+      render({ display, touch, calibration: { left, right, top, bottom }, res });
+    });
+
+    document.getElementById('reset').addEventListener('click', async () => {
+      const res = await jpost('/api/touch/calibration', { reset: true });
+      render({ display, touch, res });
+    });
+
+    await load();
+  </script>
+</body>
+</html>

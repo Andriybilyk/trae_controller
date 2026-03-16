@@ -1,4 +1,18 @@
 dependencies:
+  atanisoft/esp_lcd_touch_xpt2046:
+    component_hash: 7e6381b67b6e487379118368b8e91624dc87036ef5734818de1db9eb35697998
+    dependencies:
+    - name: espressif/esp_lcd_touch
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0.4'
+    - name: idf
+      require: private
+      version: '>=4.4'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.0.6
   espressif/cjson:
     component_hash: 002c6d1872ee4c97d333938ebe107a29841cc847f9de89e676714bd2844057ea
     dependencies:
@@ -9,6 +23,16 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.7.19~1
+  espressif/esp_lcd_touch:
+    component_hash: 3f85a7d95af876f1a6ecca8eb90a81614890d0f03a038390804e5a77e2caf862
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.4.2'
+    source:
+      registry_url: https://components.espressif.com
+      type: service
+    version: 1.2.1
   idf:
     source:
       type: idf
@@ -23,17 +47,10 @@ dependencies:
       registry_url: https://components.espressif.com/
       type: service
     version: 1.20.4
-  lvgl/lvgl:
-    component_hash: d7c1ac037ae6e85d94897f807d6e7ba0946a83e720074fc95a4f6241da9f9f53
-    dependencies: []
-    source:
-      registry_url: https://components.espressif.com/
-      type: service
-    version: 8.4.0
 direct_dependencies:
+- atanisoft/esp_lcd_touch_xpt2046
 - espressif/cjson
 - joltwallet/littlefs
-- lvgl/lvgl
-manifest_hash: daa1574d09e94c40535be41225a41804905f98a5eb0ba57d35bf6d5409f274d2
+manifest_hash: 3a38aa76577089899eddf1a0365300011943c2122ee6de3a81d6e923fcf22d4d
 target: esp32s3
 version: 2.0.0

@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSchedules, Schedule } from '../contexts/SchedulesContext';
 import { API_BASE_URL } from '../config';
+import toast from 'react-hot-toast';
+import { ConfirmModal } from './ConfirmModal';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -23,7 +25,7 @@ const chartOptions = {
         padding: 10,
         displayColors: false,
         callbacks: {
-            label: (context: any) => `${context.dataset.label}: ${context.raw}??C`
+            label: (context: any) => `${context.dataset.label}: ${context.raw}°C`
         }
     }
   },
@@ -66,6 +68,19 @@ interface StatusData {
     pcbTemp?: number;
     error?: string;
     history?: {x: number, y: number}[];
+    schedules_rev?: number;
+    settings_rev?: number;
+    autotune?: {
+        active: boolean;
+        heater_on?: boolean;
+        setpoint_c?: number;
+        cycles?: number;
+        ku?: number;
+        pu_s?: number;
+        kp?: number;
+        ki?: number;
+        kd?: number;
+    };
 }
 
 const Dashboard = () => {
@@ -170,11 +185,24 @@ const Dashboard = () => {
   };
 
   const [showStopConfirm, setShowStopConfirm] = useState(false);
+  const [showAutotuneStopConfirm, setShowAutotuneStopConfirm] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState<null | 'stop_firing' | 'stop_autotune'>(null);
   const [showAddTimeModal, setShowAddTimeModal] = useState(false);
   const [showAddTempModal, setShowAddTempModal] = useState(false);
 
   const handleStopFiring = async () => {
       setShowStopConfirm(true);
+  };
+
+  const handleAutotuneStop = async () => {
+      setShowAutotuneStopConfirm(true);
+      return;
+      try {
+          const res = await fetch(`${API_BASE_URL}/autotune/stop`, { method: 'POST' });
+          if (!res.ok) alert("Stop failed");
+      } catch (e) {
+          alert("Connection error");
+      }
   };
 
   const handleSkip = async () => {
@@ -213,10 +241,28 @@ const Dashboard = () => {
 
   const confirmStop = async () => {
       try {
-          await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
+          setConfirmBusy('stop_firing');
+          const res = await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
+          if (!res.ok) throw new Error('stop failed');
           setShowStopConfirm(false);
       } catch (e) {
-          alert("Error stopping firing");
+          toast.error("Error stopping firing");
+      } finally {
+          setConfirmBusy(null);
+      }
+  };
+
+  const confirmAutotuneStop = async () => {
+      try {
+          setConfirmBusy('stop_autotune');
+          const res = await fetch(`${API_BASE_URL}/autotune/stop`, { method: 'POST' });
+          if (!res.ok) throw new Error('stop failed');
+          toast.success("Autotune stopped");
+          setShowAutotuneStopConfirm(false);
+      } catch (e) {
+          toast.error("Stop Autotune failed");
+      } finally {
+          setConfirmBusy(null);
       }
   };
 
@@ -292,36 +338,29 @@ const Dashboard = () => {
           </button>
       </div>
 
-      {/* Custom Stop Confirmation Modal */}
-      {showStopConfirm && (
-          <div className="absolute inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-kiln-card border border-red-500/50 rounded-2xl p-8 max-w-md w-full shadow-[0_0_50px_rgba(239,68,68,0.2)] text-center animate-in fade-in zoom-in duration-200">
-                  <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <Square size={40} className="text-red-500" fill="currentColor" />
-                  </div>
-                  
-                  <h3 className="text-2xl font-bold text-white mb-2">{t.dashboard.stopFiring}?</h3>
-                  <p className="text-zinc-400 mb-8">
-                      Are you sure you want to abort the current firing process? This action cannot be undone.
-                  </p>
-                  
-                  <div className="flex flex-col gap-3">
-                      <button 
-                          onClick={confirmStop}
-                          className="w-full py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-red-900/40"
-                      >
-                          {t.dashboard.stopFiring}
-                      </button>
-                      <button 
-                          onClick={() => setShowStopConfirm(false)}
-                          className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl font-medium transition-colors"
-                      >
-                          Cancel
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
+      <ConfirmModal
+          open={showStopConfirm}
+          title={`${t.dashboard.stopFiring}?`}
+          description="Are you sure you want to abort the current firing process? This action cannot be undone."
+          confirmText={t.dashboard.stopFiring}
+          cancelText="Cancel"
+          busy={confirmBusy === 'stop_firing'}
+          icon={<Square size={40} fill="currentColor" />}
+          onConfirm={confirmStop}
+          onCancel={() => setShowStopConfirm(false)}
+      />
+
+      <ConfirmModal
+          open={showAutotuneStopConfirm}
+          title="Stop Autotune?"
+          description="Are you sure you want to stop Autotune now? Heater will turn OFF and results may be incomplete."
+          confirmText="STOP Autotune"
+          cancelText="Cancel"
+          busy={confirmBusy === 'stop_autotune'}
+          icon={<Square size={40} fill="currentColor" />}
+          onConfirm={confirmAutotuneStop}
+          onCancel={() => setShowAutotuneStopConfirm(false)}
+      />
 
       {/* MOBILE CONTROL BAR (Fixed Bottom) */}
       <div className="md:hidden fixed bottom-16 left-0 right-0 bg-zinc-900/95 backdrop-blur-md border-t border-zinc-800 p-3 z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
@@ -428,32 +467,32 @@ const Dashboard = () => {
                               <div key={index} className="flex flex-col gap-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800">
                                   <div className="flex justify-between items-center">
                                       <div className="text-sm font-bold text-zinc-300">{t.dashboard.stepHold} {index + 1} {step.type === 'hold' ? t.dashboard.holdSuffix : t.dashboard.tempSuffix}</div>
-                                      <div className="text-xs text-zinc-500">{t.dashboard.currentTemp}: {step.target}??C</div>
+                                      <div className="text-xs text-zinc-500">{t.dashboard.currentTemp}: {step.target}°C</div>
                                   </div>
                                   <div className="grid grid-cols-4 gap-2">
                                       <button 
                                           onClick={() => submitAddTemp(1, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +1??C
+                                          +1°C
                                       </button>
                                       <button 
                                           onClick={() => submitAddTemp(5, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +5??C
+                                          +5°C
                                       </button>
                                       <button 
                                           onClick={() => submitAddTemp(10, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +10??C
+                                          +10°C
                                       </button>
                                       <button 
                                           onClick={() => submitAddTemp(50, index)}
                                           className="py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-xs font-bold text-white transition-colors border border-zinc-700 active:bg-zinc-600"
                                       >
-                                          +50??C
+                                          +50°C
                                       </button>
                                   </div>
                               </div>
@@ -477,7 +516,7 @@ const Dashboard = () => {
                 <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">{t.dashboard.currentTemp}</div>
                 <div className="text-5xl lg:text-6xl font-bold text-white tracking-tighter tabular-nums leading-none">
                     {(status.temp || 0).toFixed(1)}
-                    <span className="text-2xl lg:text-3xl text-zinc-600 font-normal ml-1 align-top">??C</span>
+                    <span className="text-2xl lg:text-3xl text-zinc-600 font-normal ml-1 align-top">°C</span>
                 </div>
             </div>
             
@@ -487,7 +526,7 @@ const Dashboard = () => {
                 </div>
                 <div className="text-xs font-medium text-zinc-400 bg-zinc-900/50 px-3 py-1.5 rounded-lg border border-zinc-800 inline-flex items-center gap-2">
                     <span className="text-indigo-400 uppercase tracking-wider">{t.dashboard.setpoint}</span>
-                    <span className="text-white font-mono text-lg leading-none">{(status.target || 0).toFixed(0)}??C</span>
+                    <span className="text-white font-mono text-lg leading-none">{(status.target || 0).toFixed(0)}°C</span>
                 </div>
             </div>
             
@@ -508,6 +547,29 @@ const Dashboard = () => {
         />
       </div>
 
+      {/* Autotune status */}
+      {(status.autotune?.active || status.status === 'TUNING') && (
+        <div className="bg-kiln-card border border-kiln-border rounded-xl p-4 shadow-lg shadow-black/20 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+            <div className="text-sm text-zinc-300">
+                <span className="font-bold text-white">Autotune</span>
+                <span className="text-zinc-500"> • </span>
+                <span>Cycles: <span className="font-mono text-white">{status.autotune?.cycles ?? 0}/6</span></span>
+                <span className="text-zinc-500"> • </span>
+                <span>Ku: <span className="font-mono text-white">{(status.autotune?.ku ?? 0).toFixed(2)}</span></span>
+                <span className="text-zinc-500"> • </span>
+                <span>Pu: <span className="font-mono text-white">{(status.autotune?.pu_s ?? 0).toFixed(0)}s</span></span>
+                <span className="text-zinc-500"> • </span>
+                <span>PID: <span className="font-mono text-white">{(status.autotune?.kp ?? 0).toFixed(2)}/{(status.autotune?.ki ?? 0).toFixed(3)}/{(status.autotune?.kd ?? 0).toFixed(2)}</span></span>
+            </div>
+            <button
+                onClick={handleAutotuneStop}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-bold whitespace-nowrap"
+            >
+                STOP Autotune
+            </button>
+        </div>
+      )}
+
       {/* Main Chart Section */}
       <div className="flex-1 bg-kiln-card border border-kiln-border rounded-xl shadow-lg shadow-black/20 flex flex-col overflow-hidden min-h-[400px]">
         {/* Header */}
@@ -518,7 +580,7 @@ const Dashboard = () => {
                 </h2>
                 <div className="flex items-center gap-3">
                     <span className={`text-sm font-bold ${status.pcbTemp && status.pcbTemp > 50 ? 'text-red-500 animate-pulse' : 'text-zinc-500'}`}>
-                        PCB: {status.pcbTemp?.toFixed(1)}??C
+                        PCB: {status.pcbTemp?.toFixed(1)}°C
                     </span>
                     <div className={`px-3 py-1 rounded-full text-xs font-bold ${!isIdle ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-400'}`}>
                         {status.status}
