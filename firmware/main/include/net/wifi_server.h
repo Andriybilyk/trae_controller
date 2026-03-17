@@ -43,6 +43,9 @@ private:
     static esp_err_t api_skip_handler(httpd_req_t *req);
     static esp_err_t api_add_temp_handler(httpd_req_t *req);
     static esp_err_t api_add_time_handler(httpd_req_t *req);
+    static esp_err_t api_fan_get_handler(httpd_req_t *req);
+    static esp_err_t api_fan_set_handler(httpd_req_t *req);
+    static esp_err_t api_ota_update_handler(httpd_req_t *req);
     static esp_err_t api_display_get_handler(httpd_req_t *req);
     static esp_err_t api_display_set_handler(httpd_req_t *req);
     static esp_err_t api_settings_get_handler(httpd_req_t *req);
@@ -58,6 +61,10 @@ private:
     static esp_err_t api_touch_transform_set_handler(httpd_req_t *req);
     static esp_err_t api_touch_calibration_get_handler(httpd_req_t *req);
     static esp_err_t api_touch_calibration_set_handler(httpd_req_t *req);
+    static esp_err_t api_touch_affine_get_handler(httpd_req_t *req);
+    static esp_err_t api_touch_affine_set_handler(httpd_req_t *req);
+    static esp_err_t api_touch_grid_get_handler(httpd_req_t *req);
+    static esp_err_t api_touch_grid_set_handler(httpd_req_t *req);
     static esp_err_t api_touch_pins_get_handler(httpd_req_t *req);
     static esp_err_t api_touch_pins_set_handler(httpd_req_t *req);
     static esp_err_t api_touch_probe_handler(httpd_req_t *req);
@@ -74,6 +81,11 @@ private:
     uint32_t settingsRevision = 0;
     bool lastTuneActive = false;
     int lastTuneCycles = -1;
+    uint64_t lastStartCommandMs = 0;
+    uint64_t lastStopCommandMs = 0;
+    uint64_t lastSkipCommandMs = 0;
+    uint64_t lastAddTempCommandMs = 0;
+    uint64_t lastAddTimeCommandMs = 0;
 };
 
 extern WiFiServerManager wifiServer;

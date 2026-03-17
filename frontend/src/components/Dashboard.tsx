@@ -44,7 +44,7 @@ const chartOptions = {
 };
 
 const StatCard = ({ title, value, unit, colorClass, valueClass, subValue, subValueClass, className }: any) => (
-  <div className={`bg-kiln-card border kiln-border rounded-xl p-5 flex flex-col justify-center shadow-lg shadow-black/20 min-w-0 h-28 relative overflow-hidden ${className || ''}`}>
+  <div className={`bg-kiln-card border kiln-border rounded-xl p-4 flex flex-col justify-center shadow-lg shadow-black/20 min-w-0 h-24 relative overflow-hidden ${className || ''}`}>
     <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2 truncate">{title}</div>
     <div className={`text-xl lg:text-2xl font-bold tracking-tight truncate ${valueClass || 'text-white'}`}>
       {value} <span className="text-sm text-zinc-600 font-normal ml-0.5 align-baseline">{unit}</span>
@@ -81,10 +81,25 @@ interface StatusData {
         ki?: number;
         kd?: number;
     };
+    fan_manual?: boolean;
+    fan_auto?: boolean;
+    fan_power?: number;
+    fan_effective_power?: number;
+}
+
+interface FanControl {
+    manual: boolean;
+    auto: boolean;
+    power: number;
+    temp_min_c: number;
+    temp_max_c: number;
+    power_min: number;
+    power_max: number;
+    effective_power?: number;
 }
 
 const Dashboard = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { schedules, getScheduleDetails, refreshSchedules } = useSchedules();
   
   const [status, setStatus] = useState<StatusData>({ 
@@ -99,6 +114,17 @@ const Dashboard = () => {
   });
   
   const [history, setHistory] = useState<{x: number, y: number}[]>([]);
+  const [fan, setFan] = useState<FanControl>({
+      manual: false,
+      auto: true,
+      power: 0,
+      temp_min_c: 45,
+      temp_max_c: 280,
+      power_min: 20,
+      power_max: 100,
+      effective_power: 0
+  });
+  const [fanBusy, setFanBusy] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
 
@@ -141,6 +167,22 @@ const Dashboard = () => {
       }
   }, [selectedScheduleId, schedules]);
 
+  const loadFan = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/fan`);
+      if (!res.ok) return;
+      const d = await res.json();
+      setFan(prev => ({
+        ...prev,
+        ...d
+      }));
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadFan();
+  }, []);
+
   useEffect(() => {
     // Fetch Status from Backend
     const fetchStatus = async () => {
@@ -149,6 +191,13 @@ const Dashboard = () => {
             if (res.ok) {
                 const d = await res.json();
                 setStatus(d);
+                setFan(prev => ({
+                    ...prev,
+                    manual: d.fan_manual ?? prev.manual,
+                    auto: d.fan_auto ?? prev.auto,
+                    power: d.fan_power ?? prev.power,
+                    effective_power: d.fan_effective_power ?? prev.effective_power
+                }));
                 if (d.history && Array.isArray(d.history)) {
                     setHistory(d.history);
                 }
@@ -159,7 +208,20 @@ const Dashboard = () => {
     };
 
     const interval = setInterval(fetchStatus, 1000);
-    return () => clearInterval(interval);
+
+    const onWs = (ev: any) => {
+      const msg = ev?.detail;
+      if (!msg || !msg.event) return;
+      if (msg.event === 'settings_changed') {
+        loadFan();
+      }
+    };
+    window.addEventListener('kiln_ws', onWs as any);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('kiln_ws', onWs as any);
+    };
   }, []);
 
   const handleStartFiring = async () => {
@@ -192,6 +254,41 @@ const Dashboard = () => {
 
   const handleStopFiring = async () => {
       setShowStopConfirm(true);
+  };
+
+  const saveFan = async (patch: Partial<FanControl>) => {
+      const next: FanControl = { ...fan, ...patch };
+      setFan(next);
+      try {
+          setFanBusy(true);
+          const res = await fetch(`${API_BASE_URL}/fan`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(next)
+          });
+          if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              toast.error(`Fan save failed: ${err.error || res.statusText}`);
+          }
+      } catch {
+          toast.error("Fan control connection error");
+      } finally {
+          setFanBusy(false);
+      }
+  };
+
+  const fanSpeed = Number(fan.effective_power ?? 0);
+  const isFanEnabled = fanSpeed > 0;
+  const toggleFanPower = () => {
+      if (isFanEnabled) {
+          saveFan({ auto: false, manual: true, power: 0 });
+      } else {
+          saveFan({ auto: false, manual: true, power: 60 });
+      }
+  };
+  const nudgeFanManual = (delta: number) => {
+      const next = Math.max(0, Math.min(100, Number(fan.power || 0) + delta));
+      saveFan({ auto: false, manual: true, power: next });
   };
 
   const handleAutotuneStop = async () => {
@@ -291,7 +388,7 @@ const Dashboard = () => {
     <div className="flex h-full gap-6 p-4 md:p-6 max-w-[1600px] mx-auto overflow-hidden flex-col md:flex-row">
       
       {/* LEFT SIDEBAR: SCHEDULE LIBRARY (Desktop Only) */}
-      <div className="hidden md:flex w-80 flex-col gap-4 shrink-0 bg-kiln-card border border-kiln-border rounded-xl p-4 shadow-lg overflow-hidden">
+      <div className="hidden md:flex w-72 flex-col gap-3 shrink-0 bg-kiln-card border border-kiln-border rounded-xl p-3 shadow-lg overflow-hidden">
           <h2 className="text-lg font-bold text-white mb-2 px-2 flex items-center gap-2">
               <Sliders size={20} className="text-kiln-accent" />
               {t.schedules.library}
@@ -305,7 +402,7 @@ const Dashboard = () => {
                   <div 
                       key={s.id}
                       onClick={() => setSelectedScheduleId(s.id)}
-                      className={`p-4 rounded-xl cursor-pointer border transition-all relative group ${selectedScheduleId === s.id 
+                      className={`p-3 rounded-xl cursor-pointer border transition-all relative group ${selectedScheduleId === s.id 
                           ? 'bg-zinc-800 border-kiln-accent shadow-[0_0_0_1px_rgba(16,185,129,1)]' 
                           : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}
                   >
@@ -509,14 +606,16 @@ const Dashboard = () => {
       )}
 
       {/* Stat Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
         {/* MEGA CARD: Temp & Status */}
-        <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg shadow-black/20 relative overflow-hidden lg:col-span-3 flex flex-col md:flex-row items-center justify-between group min-h-32 gap-4 md:gap-0">
+        <div className="bg-kiln-card border border-kiln-border rounded-xl p-5 shadow-lg shadow-black/20 relative overflow-hidden md:col-span-2 lg:col-span-4 flex flex-col md:flex-row items-center justify-between group min-h-28 lg:min-h-[12.75rem] gap-3 md:gap-0">
             <div className="relative z-10 text-center md:text-left">
-                <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">{t.dashboard.currentTemp}</div>
-                <div className="text-5xl lg:text-6xl font-bold text-white tracking-tighter tabular-nums leading-none">
+                <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
+                    {language === 'ua' ? 'Поточна температура' : t.dashboard.currentTemp}
+                </div>
+                <div className="text-6xl lg:text-7xl font-bold text-white tracking-tighter tabular-nums leading-none">
                     {(status.temp || 0).toFixed(1)}
-                    <span className="text-2xl lg:text-3xl text-zinc-600 font-normal ml-1 align-top">°C</span>
+                    <span className="text-3xl lg:text-4xl text-zinc-600 font-normal ml-1 align-top">°C</span>
                 </div>
             </div>
             
@@ -534,17 +633,39 @@ const Dashboard = () => {
             <div className={`absolute -right-10 -top-10 w-64 h-64 bg-kiln-accent/5 rounded-full blur-3xl pointer-events-none transition-opacity duration-700 ${!isIdle ? 'opacity-100' : 'opacity-0'}`} />
         </div>
 
-        <StatCard 
-            title={t.dashboard.timeRemaining} 
-            value={formatTimeRemaining(status)} 
-            unit="" 
-        />
-        <StatCard 
-            title={t.dashboard.segment.toUpperCase()} 
-            value={getSegmentInfo()} 
-            unit="" 
-            valueClass="text-purple-400"
-        />
+        <div className="md:col-span-2 lg:col-span-2 grid grid-cols-2 gap-3 auto-rows-[6rem]">
+          <StatCard 
+              title={t.dashboard.timeRemaining} 
+              value={formatTimeRemaining(status)} 
+              unit="" 
+          />
+          <StatCard 
+              title={t.dashboard.segment.toUpperCase()} 
+              value={getSegmentInfo()} 
+              unit="" 
+              valueClass="text-purple-400"
+          />
+          <div className="bg-kiln-card border kiln-border rounded-xl p-3 shadow-lg shadow-black/20 min-w-0 h-24 relative overflow-hidden col-span-2 flex items-center gap-3">
+            <div className="shrink-0">
+                <button
+                    onClick={toggleFanPower}
+                    disabled={fanBusy}
+                    className="p-2 rounded-md"
+                    title={isFanEnabled ? 'Fan ON' : 'Fan OFF'}
+                >
+                    <Wind size={38} className={isFanEnabled ? 'text-emerald-400' : 'text-zinc-500'} />
+                </button>
+            </div>
+            <div className="flex-1 text-right">
+                <div className="text-xl font-bold text-white tabular-nums leading-none">{fanSpeed}%</div>
+                <div className="text-[10px] text-zinc-500 mt-1">PCB {Number(status.pcbTemp ?? 0).toFixed(1)}°C</div>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+                <button onClick={() => nudgeFanManual(5)} disabled={fanBusy} className="w-6 h-6 rounded bg-zinc-800 text-zinc-300 text-xs leading-none">+</button>
+                <button onClick={() => nudgeFanManual(-5)} disabled={fanBusy} className="w-6 h-6 rounded bg-zinc-800 text-zinc-300 text-xs leading-none">-</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Autotune status */}

@@ -34,8 +34,16 @@
 
 /* Custom Scrollbar for dark theme */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 14px;
+  height: 14px;
+}
+
+@utility scrollbar-default {
+  -ms-overflow-style: auto;
+  scrollbar-width: auto;
+  &::-webkit-scrollbar {
+    display: block;
+  }
 }
 
 ::-webkit-scrollbar-track {
@@ -45,6 +53,7 @@
 ::-webkit-scrollbar-thumb {
   background-color: var(--color-kiln-border);
   border-radius: 9999px;
+  border: 3px solid var(--color-kiln-bg);
 }
 
 ::-webkit-scrollbar-thumb:hover {

@@ -1,11 +1,15 @@
 #include "net/wifi_server.h"
 #include "drivers/display_driver.h"
+#include "drivers/fan_driver.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_http_server.h"
+#include "esp_ota_ops.h"
+#include "freertos/task.h"
 #include "net/wifi_connection.h"
 #include "net/dns_server.h"
 #include "cJSON.h"
+#include "mbedtls/sha256.h"
 #include <string>
 #include <cctype>
 #include <algorithm>
@@ -15,6 +19,11 @@
 #include <unistd.h>
 
 static const char *TAG = "SERVER";
+static constexpr size_t OTA_MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+static constexpr uint32_t START_RATE_LIMIT_MS = 700;
+static constexpr uint32_t STOP_RATE_LIMIT_MS = 400;
+static constexpr uint32_t SKIP_RATE_LIMIT_MS = 400;
+static constexpr uint32_t TUNE_RATE_LIMIT_MS = 150;
 
 WiFiServerManager::WiFiServerManager() {
     server = NULL;
@@ -479,6 +488,15 @@ void WiFiServerManager::setupRoutes() {
     httpd_uri_t api_add_time_uri = make_uri("/api/addTime", HTTP_POST, api_add_time_handler);
     httpd_register_uri_handler(server, &api_add_time_uri);
 
+    httpd_uri_t api_fan_get_uri = make_uri("/api/fan", HTTP_GET, api_fan_get_handler);
+    httpd_register_uri_handler(server, &api_fan_get_uri);
+
+    httpd_uri_t api_fan_set_uri = make_uri("/api/fan", HTTP_POST, api_fan_set_handler);
+    httpd_register_uri_handler(server, &api_fan_set_uri);
+
+    httpd_uri_t api_ota_update_uri = make_uri("/api/ota/update", HTTP_POST, api_ota_update_handler);
+    httpd_register_uri_handler(server, &api_ota_update_uri);
+
     httpd_uri_t api_fault_clear_uri = make_uri("/api/fault/clear", HTTP_POST, api_fault_clear_handler);
     httpd_register_uri_handler(server, &api_fault_clear_uri);
 
@@ -529,6 +547,18 @@ void WiFiServerManager::setupRoutes() {
 
     httpd_uri_t api_touch_cal_set_uri = make_uri("/api/touch/calibration", HTTP_POST, api_touch_calibration_set_handler);
     httpd_register_uri_handler(server, &api_touch_cal_set_uri);
+
+    httpd_uri_t api_touch_affine_get_uri = make_uri("/api/touch/affine", HTTP_GET, api_touch_affine_get_handler);
+    httpd_register_uri_handler(server, &api_touch_affine_get_uri);
+
+    httpd_uri_t api_touch_affine_set_uri = make_uri("/api/touch/affine", HTTP_POST, api_touch_affine_set_handler);
+    httpd_register_uri_handler(server, &api_touch_affine_set_uri);
+
+    httpd_uri_t api_touch_grid_get_uri = make_uri("/api/touch/grid", HTTP_GET, api_touch_grid_get_handler);
+    httpd_register_uri_handler(server, &api_touch_grid_get_uri);
+
+    httpd_uri_t api_touch_grid_set_uri = make_uri("/api/touch/grid", HTTP_POST, api_touch_grid_set_handler);
+    httpd_register_uri_handler(server, &api_touch_grid_set_uri);
 
     httpd_uri_t api_touch_pins_get_uri = make_uri("/api/touch/pins", HTTP_GET, api_touch_pins_get_handler);
     httpd_register_uri_handler(server, &api_touch_pins_get_uri);
@@ -693,6 +723,7 @@ void WiFiServerManager::broadcastState() {
     cJSON_AddNumberToObject(doc, "raw", thermo.raw);
     cJSON_AddNumberToObject(doc, "read_count", (double)thermo.readCount);
     cJSON_AddNumberToObject(doc, "target", state.targetTemp);
+    cJSON_AddNumberToObject(doc, "pcbTemp", (double)fan_driver_get_source_temp_c());
     cJSON_AddNumberToObject(doc, "output", thermalCtrl.getOutput());
     cJSON_AddStringToObject(doc, "status", status_to_str((int)state.status));
     cJSON_AddBoolToObject(doc, "firing", state.isFiring);
@@ -710,6 +741,10 @@ void WiFiServerManager::broadcastState() {
     cJSON_AddStringToObject(doc, "error", state.errorMsg.c_str());
     cJSON_AddNumberToObject(doc, "schedules_rev", (double)wifiServer.getSchedulesRevision());
     cJSON_AddNumberToObject(doc, "settings_rev", (double)wifiServer.getSettingsRevision());
+    cJSON_AddBoolToObject(doc, "fan_manual", fan_driver_get_manual());
+    cJSON_AddBoolToObject(doc, "fan_auto", fan_driver_get_auto_enabled());
+    cJSON_AddNumberToObject(doc, "fan_power", (double)fan_driver_get_power_percent());
+    cJSON_AddNumberToObject(doc, "fan_effective_power", (double)fan_driver_get_effective_power_percent());
 
     const ThermalController::AutoTuneStatus tune = thermalCtrl.getAutotuneStatus();
     cJSON *t = cJSON_CreateObject();
@@ -875,6 +910,7 @@ esp_err_t WiFiServerManager::api_status_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(doc, "raw", thermo.raw);
     cJSON_AddNumberToObject(doc, "read_count", (double)thermo.readCount);
     cJSON_AddNumberToObject(doc, "target", state.targetTemp);
+    cJSON_AddNumberToObject(doc, "pcbTemp", (double)fan_driver_get_source_temp_c());
     cJSON_AddNumberToObject(doc, "output", thermalCtrl.getOutput());
     cJSON_AddStringToObject(doc, "status", status_to_str((int)state.status));
     cJSON_AddBoolToObject(doc, "firing", state.isFiring);
@@ -892,6 +928,10 @@ esp_err_t WiFiServerManager::api_status_handler(httpd_req_t *req) {
     cJSON_AddStringToObject(doc, "error", state.errorMsg.c_str());
     cJSON_AddNumberToObject(doc, "schedules_rev", (double)wifiServer.getSchedulesRevision());
     cJSON_AddNumberToObject(doc, "settings_rev", (double)wifiServer.getSettingsRevision());
+    cJSON_AddBoolToObject(doc, "fan_manual", fan_driver_get_manual());
+    cJSON_AddBoolToObject(doc, "fan_auto", fan_driver_get_auto_enabled());
+    cJSON_AddNumberToObject(doc, "fan_power", (double)fan_driver_get_power_percent());
+    cJSON_AddNumberToObject(doc, "fan_effective_power", (double)fan_driver_get_effective_power_percent());
 
     const ThermalController::AutoTuneStatus tune = thermalCtrl.getAutotuneStatus();
     cJSON *t = cJSON_CreateObject();
@@ -1310,6 +1350,25 @@ esp_err_t WiFiServerManager::api_settings_get_handler(httpd_req_t *req) {
     cJSON_DeleteItemFromObject(root, "offset");
     cJSON_DeleteItemFromObject(root, "temp_offset_c");
     cJSON_AddNumberToObject(root, "temp_offset_c", (double)thermalCtrl.getTemperatureOffset());
+    cJSON_DeleteItemFromObject(root, "fan_manual");
+    cJSON_DeleteItemFromObject(root, "fan_auto");
+    cJSON_DeleteItemFromObject(root, "fan_power");
+    cJSON_DeleteItemFromObject(root, "fan_effective_power");
+    cJSON_AddBoolToObject(root, "fan_manual", fan_driver_get_manual());
+    cJSON_AddBoolToObject(root, "fan_auto", fan_driver_get_auto_enabled());
+    cJSON_AddNumberToObject(root, "fan_power", (double)fan_driver_get_power_percent());
+    cJSON_AddNumberToObject(root, "fan_effective_power", (double)fan_driver_get_effective_power_percent());
+    float tmin = 0.0f, tmax = 0.0f;
+    uint8_t pmin = 0, pmax = 0;
+    fan_driver_get_auto_curve(&tmin, &tmax, &pmin, &pmax);
+    cJSON_DeleteItemFromObject(root, "fan_temp_min_c");
+    cJSON_DeleteItemFromObject(root, "fan_temp_max_c");
+    cJSON_DeleteItemFromObject(root, "fan_power_min");
+    cJSON_DeleteItemFromObject(root, "fan_power_max");
+    cJSON_AddNumberToObject(root, "fan_temp_min_c", (double)tmin);
+    cJSON_AddNumberToObject(root, "fan_temp_max_c", (double)tmax);
+    cJSON_AddNumberToObject(root, "fan_power_min", (double)pmin);
+    cJSON_AddNumberToObject(root, "fan_power_max", (double)pmax);
 
     char *rendered = cJSON_PrintUnformatted(root);
     std::string output = rendered ? rendered : "{}";
@@ -1389,6 +1448,62 @@ esp_err_t WiFiServerManager::api_settings_set_handler(httpd_req_t *req) {
         cJSON_DeleteItemFromObject(root, "zones");
         cJSON_AddNumberToObject(root, "zones", (double)zones->valuedouble);
     }
+
+    bool fan_manual = fan_driver_get_manual();
+    bool fan_auto = fan_driver_get_auto_enabled();
+    uint8_t fan_power = fan_driver_get_power_percent();
+    float fan_tmin = 45.0f, fan_tmax = 280.0f;
+    uint8_t fan_pmin = 20, fan_pmax = 100;
+    fan_driver_get_auto_curve(&fan_tmin, &fan_tmax, &fan_pmin, &fan_pmax);
+
+    const cJSON *fanManual = cJSON_GetObjectItem(incoming, "fan_manual");
+    if (cJSON_IsBool(fanManual)) fan_manual = cJSON_IsTrue(fanManual);
+    const cJSON *fanAuto = cJSON_GetObjectItem(incoming, "fan_auto");
+    if (cJSON_IsBool(fanAuto)) fan_auto = cJSON_IsTrue(fanAuto);
+    const cJSON *fanPower = cJSON_GetObjectItem(incoming, "fan_power");
+    if (cJSON_IsNumber(fanPower)) {
+        int v = (int)fanPower->valuedouble;
+        if (v < 0) v = 0;
+        if (v > 100) v = 100;
+        fan_power = (uint8_t)v;
+    }
+    const cJSON *fanTMin = cJSON_GetObjectItem(incoming, "fan_temp_min_c");
+    if (cJSON_IsNumber(fanTMin)) fan_tmin = (float)fanTMin->valuedouble;
+    const cJSON *fanTMax = cJSON_GetObjectItem(incoming, "fan_temp_max_c");
+    if (cJSON_IsNumber(fanTMax)) fan_tmax = (float)fanTMax->valuedouble;
+    const cJSON *fanPMin = cJSON_GetObjectItem(incoming, "fan_power_min");
+    if (cJSON_IsNumber(fanPMin)) {
+        int v = (int)fanPMin->valuedouble;
+        if (v < 0) v = 0;
+        if (v > 100) v = 100;
+        fan_pmin = (uint8_t)v;
+    }
+    const cJSON *fanPMax = cJSON_GetObjectItem(incoming, "fan_power_max");
+    if (cJSON_IsNumber(fanPMax)) {
+        int v = (int)fanPMax->valuedouble;
+        if (v < 0) v = 0;
+        if (v > 100) v = 100;
+        fan_pmax = (uint8_t)v;
+    }
+
+    fan_driver_set_auto_curve(fan_tmin, fan_tmax, fan_pmin, fan_pmax);
+    fan_driver_set_auto_enabled(fan_auto);
+    fan_driver_set_power_percent(fan_power);
+    fan_driver_set_manual(fan_manual);
+    cJSON_DeleteItemFromObject(root, "fan_manual");
+    cJSON_DeleteItemFromObject(root, "fan_auto");
+    cJSON_DeleteItemFromObject(root, "fan_power");
+    cJSON_DeleteItemFromObject(root, "fan_temp_min_c");
+    cJSON_DeleteItemFromObject(root, "fan_temp_max_c");
+    cJSON_DeleteItemFromObject(root, "fan_power_min");
+    cJSON_DeleteItemFromObject(root, "fan_power_max");
+    cJSON_AddBoolToObject(root, "fan_manual", fan_manual);
+    cJSON_AddBoolToObject(root, "fan_auto", fan_auto);
+    cJSON_AddNumberToObject(root, "fan_power", (double)fan_power);
+    cJSON_AddNumberToObject(root, "fan_temp_min_c", (double)fan_tmin);
+    cJSON_AddNumberToObject(root, "fan_temp_max_c", (double)fan_tmax);
+    cJSON_AddNumberToObject(root, "fan_power_min", (double)fan_pmin);
+    cJSON_AddNumberToObject(root, "fan_power_max", (double)fan_pmax);
 
     // Always persist the offset in a stable key
     cJSON_DeleteItemFromObject(root, "temp_offset_c");
@@ -1765,6 +1880,250 @@ esp_err_t WiFiServerManager::api_touch_calibration_set_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static bool check_rate_limit(uint64_t &last_ms, uint32_t window_ms, const char *error, httpd_req_t *req) {
+    const uint64_t now = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    if (last_ms > 0 && now > last_ms && (now - last_ms) < window_ms) {
+        httpd_resp_set_status(req, "429 Too Many Requests");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, error);
+        return false;
+    }
+    last_ms = now;
+    return true;
+}
+
+static bool is_start_interlock_ok(std::string &reason) {
+    if (!thermalCtrl.isSensorHealthy()) {
+        reason = "sensor_invalid";
+        return false;
+    }
+    if (!display_driver_is_touch_calibrated()) {
+        reason = "touch_not_calibrated";
+        return false;
+    }
+    return true;
+}
+
+static bool normalize_sha256_hex(const std::string &input, std::string &out_lower_hex) {
+    out_lower_hex.clear();
+    out_lower_hex.reserve(64);
+    for (char c : input) {
+        if (c == ' ' || c == '\t' || c == '\r' || c == '\n') continue;
+        if (c == ':') continue;
+        if (!std::isxdigit((unsigned char)c)) return false;
+        out_lower_hex.push_back((char)std::tolower((unsigned char)c));
+    }
+    return out_lower_hex.size() == 64;
+}
+
+static std::string sha256_to_hex(const uint8_t digest[32]) {
+    static const char hex[] = "0123456789abcdef";
+    std::string out;
+    out.resize(64);
+    for (int i = 0; i < 32; ++i) {
+        out[(size_t)i * 2] = hex[(digest[i] >> 4) & 0xF];
+        out[(size_t)i * 2 + 1] = hex[digest[i] & 0xF];
+    }
+    return out;
+}
+
+esp_err_t WiFiServerManager::api_touch_affine_get_handler(httpd_req_t *req) {
+    bool enabled = false;
+    float a = 1.0f, b = 0.0f, c = 0.0f, d = 0.0f, e = 1.0f, f = 0.0f;
+    display_driver_get_touch_affine(&enabled, &a, &b, &c, &d, &e, &f);
+
+    cJSON *doc = cJSON_CreateObject();
+    cJSON_AddBoolToObject(doc, "enabled", enabled);
+    cJSON_AddNumberToObject(doc, "a", (double)a);
+    cJSON_AddNumberToObject(doc, "b", (double)b);
+    cJSON_AddNumberToObject(doc, "c", (double)c);
+    cJSON_AddNumberToObject(doc, "d", (double)d);
+    cJSON_AddNumberToObject(doc, "e", (double)e);
+    cJSON_AddNumberToObject(doc, "f", (double)f);
+
+    char *rendered = cJSON_PrintUnformatted(doc);
+    std::string out = rendered ? rendered : "{}";
+    if (rendered) free(rendered);
+    cJSON_Delete(doc);
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, out.c_str());
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_touch_affine_set_handler(httpd_req_t *req) {
+    std::string body;
+    body.resize(req->content_len);
+    size_t off = 0;
+    while (off < body.size()) {
+        const int r = httpd_req_recv(req, body.data() + off, body.size() - off);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        off += (size_t)r;
+    }
+
+    cJSON *root = cJSON_ParseWithLength(body.c_str(), body.size());
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_payload\"}");
+        return ESP_OK;
+    }
+
+    const cJSON *reset = cJSON_GetObjectItem(root, "reset");
+    if (cJSON_IsBool(reset) && cJSON_IsTrue(reset)) {
+        cJSON_Delete(root);
+        (void)display_driver_set_touch_affine(false, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_set_hdr(req, "Pragma", "no-cache");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"ok\",\"reset\":true}");
+        return ESP_OK;
+    }
+
+    bool enabled = false;
+    float a = 1.0f, b = 0.0f, c = 0.0f, d = 0.0f, e = 1.0f, f = 0.0f;
+    display_driver_get_touch_affine(&enabled, &a, &b, &c, &d, &e, &f);
+
+    const cJSON *en = cJSON_GetObjectItem(root, "enabled");
+    if (cJSON_IsBool(en)) enabled = cJSON_IsTrue(en);
+
+    const cJSON *ja = cJSON_GetObjectItem(root, "a");
+    const cJSON *jb = cJSON_GetObjectItem(root, "b");
+    const cJSON *jc = cJSON_GetObjectItem(root, "c");
+    const cJSON *jd = cJSON_GetObjectItem(root, "d");
+    const cJSON *je = cJSON_GetObjectItem(root, "e");
+    const cJSON *jf = cJSON_GetObjectItem(root, "f");
+    if (cJSON_IsNumber(ja)) a = (float)ja->valuedouble;
+    if (cJSON_IsNumber(jb)) b = (float)jb->valuedouble;
+    if (cJSON_IsNumber(jc)) c = (float)jc->valuedouble;
+    if (cJSON_IsNumber(jd)) d = (float)jd->valuedouble;
+    if (cJSON_IsNumber(je)) e = (float)je->valuedouble;
+    if (cJSON_IsNumber(jf)) f = (float)jf->valuedouble;
+
+    cJSON_Delete(root);
+
+    if (!display_driver_set_touch_affine(enabled, a, b, c, d, e, f)) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_touch_grid_get_handler(httpd_req_t *req) {
+    bool enabled = false;
+    float dx[9]{};
+    float dy[9]{};
+    display_driver_get_touch_grid(&enabled, dx, dy);
+
+    cJSON *doc = cJSON_CreateObject();
+    cJSON_AddBoolToObject(doc, "enabled", enabled);
+    cJSON *dx_arr = cJSON_AddArrayToObject(doc, "dx");
+    cJSON *dy_arr = cJSON_AddArrayToObject(doc, "dy");
+    for (int i = 0; i < 9; ++i) {
+        cJSON_AddItemToArray(dx_arr, cJSON_CreateNumber((double)dx[i]));
+        cJSON_AddItemToArray(dy_arr, cJSON_CreateNumber((double)dy[i]));
+    }
+
+    char *rendered = cJSON_PrintUnformatted(doc);
+    std::string out = rendered ? rendered : "{}";
+    if (rendered) free(rendered);
+    cJSON_Delete(doc);
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, out.c_str());
+    return ESP_OK;
+}
+
+static bool parse_float_array_9(const cJSON *arr, float out[9]) {
+    if (!arr || !cJSON_IsArray(arr)) return false;
+    if (cJSON_GetArraySize(arr) != 9) return false;
+    for (int i = 0; i < 9; ++i) {
+        const cJSON *it = cJSON_GetArrayItem(arr, i);
+        if (!cJSON_IsNumber(it)) return false;
+        const double v = it->valuedouble;
+        if (!std::isfinite(v)) return false;
+        out[i] = (float)v;
+    }
+    return true;
+}
+
+esp_err_t WiFiServerManager::api_touch_grid_set_handler(httpd_req_t *req) {
+    std::string body;
+    body.resize(req->content_len);
+    size_t off = 0;
+    while (off < body.size()) {
+        const int r = httpd_req_recv(req, body.data() + off, body.size() - off);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        off += (size_t)r;
+    }
+
+    cJSON *root = cJSON_ParseWithLength(body.c_str(), body.size());
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_payload\"}");
+        return ESP_OK;
+    }
+
+    const cJSON *reset = cJSON_GetObjectItem(root, "reset");
+    if (cJSON_IsBool(reset) && cJSON_IsTrue(reset)) {
+        cJSON_Delete(root);
+        (void)display_driver_set_touch_grid(false, nullptr, nullptr);
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_set_hdr(req, "Pragma", "no-cache");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"ok\",\"reset\":true}");
+        return ESP_OK;
+    }
+
+    bool enabled = false;
+    const cJSON *en = cJSON_GetObjectItem(root, "enabled");
+    if (cJSON_IsBool(en)) enabled = cJSON_IsTrue(en);
+
+    float dx[9]{};
+    float dy[9]{};
+    if (enabled) {
+        const cJSON *dx_arr = cJSON_GetObjectItem(root, "dx");
+        const cJSON *dy_arr = cJSON_GetObjectItem(root, "dy");
+        if (!parse_float_array_9(dx_arr, dx) || !parse_float_array_9(dy_arr, dy)) {
+            cJSON_Delete(root);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_sendstr(req, "{\"error\":\"invalid_params\"}");
+            return ESP_OK;
+        }
+    }
+
+    cJSON_Delete(root);
+
+    if (!display_driver_set_touch_grid(enabled, dx, dy)) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+    return ESP_OK;
+}
+
 esp_err_t WiFiServerManager::api_touch_pins_get_handler(httpd_req_t *req) {
     int sclk = 0, mosi = 0, miso = 0;
     display_driver_get_touch_pins(&sclk, &mosi, &miso);
@@ -1926,6 +2285,10 @@ esp_err_t WiFiServerManager::manifest_handler(httpd_req_t *req) {
 }
 
 esp_err_t WiFiServerManager::api_start_handler(httpd_req_t *req) {
+    if (!check_rate_limit(wifiServer.lastStartCommandMs, START_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+        return ESP_OK;
+    }
+
     char buf[2048];
     int ret, remaining = req->content_len;
     
@@ -1965,11 +2328,36 @@ esp_err_t WiFiServerManager::api_start_handler(httpd_req_t *req) {
             }
 
             cJSON_Delete(root);
+            std::string reason;
+            if (!is_start_interlock_ok(reason)) {
+                thermalCtrl.stop(std::string("Start blocked: ") + reason);
+                httpd_resp_set_status(req, "409 Conflict");
+                httpd_resp_set_type(req, "application/json");
+                if (reason == "sensor_invalid") {
+                    httpd_resp_sendstr(req, "{\"error\":\"sensor_invalid\"}");
+                } else {
+                    httpd_resp_sendstr(req, "{\"error\":\"touch_not_calibrated\"}");
+                }
+                return ESP_OK;
+            }
+
             thermalCtrl.start();
             httpd_resp_sendstr(req, "{\"status\":\"started\"}");
         } 
     } else {
         if (thermalCtrl.getState().totalSteps > 0) {
+             std::string reason;
+             if (!is_start_interlock_ok(reason)) {
+                 thermalCtrl.stop(std::string("Start blocked: ") + reason);
+                 httpd_resp_set_status(req, "409 Conflict");
+                 httpd_resp_set_type(req, "application/json");
+                 if (reason == "sensor_invalid") {
+                     httpd_resp_sendstr(req, "{\"error\":\"sensor_invalid\"}");
+                 } else {
+                     httpd_resp_sendstr(req, "{\"error\":\"touch_not_calibrated\"}");
+                 }
+                 return ESP_OK;
+             }
              thermalCtrl.start();
              httpd_resp_sendstr(req, "{\"status\":\"started\"}");
         } else {
@@ -1980,18 +2368,27 @@ esp_err_t WiFiServerManager::api_start_handler(httpd_req_t *req) {
 }
 
 esp_err_t WiFiServerManager::api_stop_handler(httpd_req_t *req) {
+    if (!check_rate_limit(wifiServer.lastStopCommandMs, STOP_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+        return ESP_OK;
+    }
     thermalCtrl.stop("API Request");
     httpd_resp_sendstr(req, "{\"status\":\"stopped\"}");
     return ESP_OK;
 }
 
 esp_err_t WiFiServerManager::api_skip_handler(httpd_req_t *req) {
+    if (!check_rate_limit(wifiServer.lastSkipCommandMs, SKIP_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+        return ESP_OK;
+    }
     thermalCtrl.skipCurrentStep();
     httpd_resp_sendstr(req, "{\"status\":\"skip_received\"}");
     return ESP_OK;
 }
 
 esp_err_t WiFiServerManager::api_add_temp_handler(httpd_req_t *req) {
+    if (!check_rate_limit(wifiServer.lastAddTempCommandMs, TUNE_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+        return ESP_OK;
+    }
     char buf[100];
     int ret = httpd_req_recv(req, buf, sizeof(buf));
     if (ret > 0) {
@@ -2005,6 +2402,9 @@ esp_err_t WiFiServerManager::api_add_temp_handler(httpd_req_t *req) {
 }
 
 esp_err_t WiFiServerManager::api_add_time_handler(httpd_req_t *req) {
+    if (!check_rate_limit(wifiServer.lastAddTimeCommandMs, TUNE_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+        return ESP_OK;
+    }
     char buf[100];
     int ret = httpd_req_recv(req, buf, sizeof(buf));
     if (ret > 0) {
@@ -2014,6 +2414,213 @@ esp_err_t WiFiServerManager::api_add_time_handler(httpd_req_t *req) {
     } else {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, NULL);
     }
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_fan_get_handler(httpd_req_t *req) {
+    float tmin = 0.0f, tmax = 0.0f;
+    uint8_t pmin = 0, pmax = 0;
+    fan_driver_get_auto_curve(&tmin, &tmax, &pmin, &pmax);
+
+    cJSON *doc = cJSON_CreateObject();
+    cJSON_AddBoolToObject(doc, "manual", fan_driver_get_manual());
+    cJSON_AddBoolToObject(doc, "auto", fan_driver_get_auto_enabled());
+    cJSON_AddNumberToObject(doc, "power", (double)fan_driver_get_power_percent());
+    cJSON_AddNumberToObject(doc, "effective_power", (double)fan_driver_get_effective_power_percent());
+    cJSON_AddNumberToObject(doc, "temp_min_c", (double)tmin);
+    cJSON_AddNumberToObject(doc, "temp_max_c", (double)tmax);
+    cJSON_AddNumberToObject(doc, "power_min", (double)pmin);
+    cJSON_AddNumberToObject(doc, "power_max", (double)pmax);
+
+    char *rendered = cJSON_PrintUnformatted(doc);
+    std::string output = rendered ? rendered : "{}";
+    if (rendered) free(rendered);
+    cJSON_Delete(doc);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, output.c_str());
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_fan_set_handler(httpd_req_t *req) {
+    std::string body;
+    body.resize(req->content_len);
+    size_t off = 0;
+    while (off < body.size()) {
+        const int r = httpd_req_recv(req, body.data() + off, body.size() - off);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        off += (size_t)r;
+    }
+
+    cJSON *root = cJSON_ParseWithLength(body.c_str(), body.size());
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_json\"}");
+        return ESP_OK;
+    }
+
+    bool manual = fan_driver_get_manual();
+    bool auto_enabled = fan_driver_get_auto_enabled();
+    uint8_t power = fan_driver_get_power_percent();
+    float tmin = 45.0f, tmax = 280.0f;
+    uint8_t pmin = 20, pmax = 100;
+    fan_driver_get_auto_curve(&tmin, &tmax, &pmin, &pmax);
+
+    const cJSON *manual_item = cJSON_GetObjectItem(root, "manual");
+    if (cJSON_IsBool(manual_item)) manual = cJSON_IsTrue(manual_item);
+
+    const cJSON *auto_item = cJSON_GetObjectItem(root, "auto");
+    if (cJSON_IsBool(auto_item)) auto_enabled = cJSON_IsTrue(auto_item);
+
+    const cJSON *power_item = cJSON_GetObjectItem(root, "power");
+    if (cJSON_IsNumber(power_item)) {
+        int v = (int)power_item->valuedouble;
+        if (v < 0) v = 0;
+        if (v > 100) v = 100;
+        power = (uint8_t)v;
+    }
+
+    const cJSON *tmin_item = cJSON_GetObjectItem(root, "temp_min_c");
+    if (cJSON_IsNumber(tmin_item)) tmin = (float)tmin_item->valuedouble;
+    const cJSON *tmax_item = cJSON_GetObjectItem(root, "temp_max_c");
+    if (cJSON_IsNumber(tmax_item)) tmax = (float)tmax_item->valuedouble;
+    const cJSON *pmin_item = cJSON_GetObjectItem(root, "power_min");
+    if (cJSON_IsNumber(pmin_item)) {
+        int v = (int)pmin_item->valuedouble;
+        if (v < 0) v = 0;
+        if (v > 100) v = 100;
+        pmin = (uint8_t)v;
+    }
+    const cJSON *pmax_item = cJSON_GetObjectItem(root, "power_max");
+    if (cJSON_IsNumber(pmax_item)) {
+        int v = (int)pmax_item->valuedouble;
+        if (v < 0) v = 0;
+        if (v > 100) v = 100;
+        pmax = (uint8_t)v;
+    }
+
+    fan_driver_set_auto_curve(tmin, tmax, pmin, pmax);
+    fan_driver_set_auto_enabled(auto_enabled);
+    fan_driver_set_power_percent(power);
+    fan_driver_set_manual(manual);
+
+    wifiServer.notifySettingsChanged("fan");
+
+    cJSON_Delete(root);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_ota_update_handler(httpd_req_t *req) {
+    if (req->content_len <= 0 || req->content_len > (int)OTA_MAX_IMAGE_BYTES) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_size\"}");
+        return ESP_OK;
+    }
+
+    char hash_hdr[96] = {0};
+    bool has_hash = httpd_req_get_hdr_value_str(req, "X-Firmware-Sha256", hash_hdr, sizeof(hash_hdr)) == ESP_OK;
+    if (!has_hash) {
+        has_hash = httpd_req_get_hdr_value_str(req, "X-Checksum-Sha256", hash_hdr, sizeof(hash_hdr)) == ESP_OK;
+    }
+    if (!has_hash) {
+        has_hash = httpd_req_get_hdr_value_str(req, "X-Firmware-Signature", hash_hdr, sizeof(hash_hdr)) == ESP_OK;
+    }
+    if (!has_hash) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"missing_sha256\"}");
+        return ESP_OK;
+    }
+
+    std::string expected_hex;
+    if (!normalize_sha256_hex(hash_hdr, expected_hex)) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"invalid_sha256_header\"}");
+        return ESP_OK;
+    }
+
+    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(nullptr);
+    if (!update_partition) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    esp_ota_handle_t ota_handle = 0;
+    esp_err_t err = esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &ota_handle);
+    if (err != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    mbedtls_sha256_context sha_ctx;
+    mbedtls_sha256_init(&sha_ctx);
+    mbedtls_sha256_starts(&sha_ctx, 0);
+
+    std::string chunk;
+    chunk.resize(4096);
+    int remaining = req->content_len;
+    while (remaining > 0) {
+        const int to_read = std::min(remaining, (int)chunk.size());
+        const int r = httpd_req_recv(req, chunk.data(), to_read);
+        if (r == HTTPD_SOCK_ERR_TIMEOUT) {
+            continue;
+        }
+        if (r <= 0) {
+            (void)esp_ota_abort(ota_handle);
+            mbedtls_sha256_free(&sha_ctx);
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+
+        mbedtls_sha256_update(&sha_ctx, (const unsigned char*)chunk.data(), (size_t)r);
+        err = esp_ota_write(ota_handle, chunk.data(), (size_t)r);
+        if (err != ESP_OK) {
+            (void)esp_ota_abort(ota_handle);
+            mbedtls_sha256_free(&sha_ctx);
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        remaining -= r;
+    }
+
+    uint8_t digest[32] = {0};
+    mbedtls_sha256_finish(&sha_ctx, digest);
+    mbedtls_sha256_free(&sha_ctx);
+    const std::string actual_hex = sha256_to_hex(digest);
+    if (actual_hex != expected_hex) {
+        (void)esp_ota_abort(ota_handle);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"error\":\"sha256_mismatch\"}");
+        return ESP_OK;
+    }
+
+    err = esp_ota_end(ota_handle);
+    if (err != ESP_OK) {
+        (void)esp_ota_abort(ota_handle);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    err = esp_ota_set_boot_partition(update_partition);
+    if (err != ESP_OK) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, "{\"status\":\"ok\",\"rebooting\":true}");
+    vTaskDelay(pdMS_TO_TICKS(150));
+    esp_restart();
     return ESP_OK;
 }
 

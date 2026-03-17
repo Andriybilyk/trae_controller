@@ -13,9 +13,18 @@ num-traits = { version = "0.2.19", default-features = false, features = ["libm"]
 slint = { version = "=1.15.1", default-features = false, features = ["renderer-software", "unsafe-single-threaded", "compat-1-2"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock"], optional = true }
 
 [build-dependencies]
 slint-build = "=1.15.1"
+
+[features]
+preview = ["slint/std", "slint/backend-winit", "slint/renderer-femtovg", "chrono"]
+
+[[bin]]
+name = "preview"
+path = "src/bin/preview.rs"
+required-features = ["preview"]
 
 [profile.release]
 panic = "immediate-abort"

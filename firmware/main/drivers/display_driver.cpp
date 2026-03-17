@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cmath>
+#include <vector>
 
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
@@ -27,6 +29,10 @@ static constexpr spi_host_device_t TOUCH_HOST = SPI3_HOST;
 static spi_device_handle_t s_lcd_spi = nullptr;
 static spi_host_device_t s_touch_host = LCD_HOST;
 
+// ST7796 expects RGB565 pixels MSB-first. Slint's software renderer produces native-endian u16
+// pixels (little-endian on ESP32-S3), so we byte-swap before pushing to the panel.
+static bool s_lcd_swap_bytes = true;
+
 static constexpr int DISPLAY_WIDTH = 480;  // LVGL landscape
 static constexpr int DISPLAY_HEIGHT = 320; // LVGL landscape
 static constexpr int LCD_X_OFFSET = 0;
@@ -38,7 +44,7 @@ static int s_lcd_x_offset = 0;
 static int s_lcd_y_offset = 0;
 
 static int s_touch_spi_mode = 0;
-static int s_touch_spi_hz = 1000 * 1000;
+static int s_touch_spi_hz = TOUCH_SPI_CLOCK_HZ;
 
 static bool s_touch_swap_xy = true;
 static bool s_touch_mirror_x = false;
@@ -49,6 +55,25 @@ static uint16_t s_touch_cal_left = 0;
 static uint16_t s_touch_cal_right = DISPLAY_WIDTH - 1;
 static uint16_t s_touch_cal_top = 0;
 static uint16_t s_touch_cal_bottom = DISPLAY_HEIGHT - 1;
+
+static bool s_touch_affine_enabled = false;
+static float s_touch_affine_a = 1.0f;
+static float s_touch_affine_b = 0.0f;
+static float s_touch_affine_c = 0.0f;
+static float s_touch_affine_d = 0.0f;
+static float s_touch_affine_e = 1.0f;
+static float s_touch_affine_f = 0.0f;
+
+static bool s_touch_grid_enabled = false;
+static std::array<float, 9> s_touch_grid_dx{};
+static std::array<float, 9> s_touch_grid_dy{};
+
+// Optional quadratic correction for Y to compensate nonlinearity.
+// y' = a*y^2 + b*y + c
+static bool s_touch_quad_enabled = false;
+static float s_touch_quad_a = 0.0044125721f;
+static float s_touch_quad_b = -0.65727115f;
+static float s_touch_quad_c = 60.641743f;
 
 static gpio_num_t s_touch_sclk = TOUCH_SCLK;
 static gpio_num_t s_touch_mosi = TOUCH_MOSI;
@@ -117,6 +142,29 @@ static void load_touch_from_nvs() {
     if (nvs_get_u16(h, "cal_t", &v16) == ESP_OK) s_touch_cal_top = v16;
     if (nvs_get_u16(h, "cal_b", &v16) == ESP_OK) s_touch_cal_bottom = v16;
 
+    uint8_t aff_en = 0;
+    if (nvs_get_u8(h, "aff_en", &aff_en) == ESP_OK) s_touch_affine_enabled = (aff_en != 0);
+    float f = 0.0f;
+    size_t sz = sizeof(float);
+    if (nvs_get_blob(h, "aff_a", &f, &sz) == ESP_OK) s_touch_affine_a = f;
+    sz = sizeof(float);
+    if (nvs_get_blob(h, "aff_b", &f, &sz) == ESP_OK) s_touch_affine_b = f;
+    sz = sizeof(float);
+    if (nvs_get_blob(h, "aff_c", &f, &sz) == ESP_OK) s_touch_affine_c = f;
+    sz = sizeof(float);
+    if (nvs_get_blob(h, "aff_d", &f, &sz) == ESP_OK) s_touch_affine_d = f;
+    sz = sizeof(float);
+    if (nvs_get_blob(h, "aff_e", &f, &sz) == ESP_OK) s_touch_affine_e = f;
+    sz = sizeof(float);
+    if (nvs_get_blob(h, "aff_f", &f, &sz) == ESP_OK) s_touch_affine_f = f;
+
+    uint8_t grid_en = 0;
+    if (nvs_get_u8(h, "grid_en", &grid_en) == ESP_OK) s_touch_grid_enabled = (grid_en != 0);
+    size_t grid_sz = sizeof(float) * s_touch_grid_dx.size();
+    (void)nvs_get_blob(h, "grid_dx", s_touch_grid_dx.data(), &grid_sz);
+    grid_sz = sizeof(float) * s_touch_grid_dy.size();
+    (void)nvs_get_blob(h, "grid_dy", s_touch_grid_dy.data(), &grid_sz);
+
     int32_t pin = -1;
     if (nvs_get_i32(h, "sclk", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin)) s_touch_sclk = (gpio_num_t)pin;
     pin = -1;
@@ -139,11 +187,65 @@ static void save_touch_to_nvs() {
     (void)nvs_set_u16(h, "cal_r", s_touch_cal_right);
     (void)nvs_set_u16(h, "cal_t", s_touch_cal_top);
     (void)nvs_set_u16(h, "cal_b", s_touch_cal_bottom);
+    (void)nvs_set_u8(h, "aff_en", (uint8_t)(s_touch_affine_enabled ? 1 : 0));
+    (void)nvs_set_blob(h, "aff_a", &s_touch_affine_a, sizeof(float));
+    (void)nvs_set_blob(h, "aff_b", &s_touch_affine_b, sizeof(float));
+    (void)nvs_set_blob(h, "aff_c", &s_touch_affine_c, sizeof(float));
+    (void)nvs_set_blob(h, "aff_d", &s_touch_affine_d, sizeof(float));
+    (void)nvs_set_blob(h, "aff_e", &s_touch_affine_e, sizeof(float));
+    (void)nvs_set_blob(h, "aff_f", &s_touch_affine_f, sizeof(float));
+    (void)nvs_set_u8(h, "grid_en", (uint8_t)(s_touch_grid_enabled ? 1 : 0));
+    (void)nvs_set_blob(h, "grid_dx", s_touch_grid_dx.data(), sizeof(float) * s_touch_grid_dx.size());
+    (void)nvs_set_blob(h, "grid_dy", s_touch_grid_dy.data(), sizeof(float) * s_touch_grid_dy.size());
     (void)nvs_set_i32(h, "sclk", (int32_t)s_touch_sclk);
     (void)nvs_set_i32(h, "mosi", (int32_t)s_touch_mosi);
     (void)nvs_set_i32(h, "miso", (int32_t)s_touch_miso);
     (void)nvs_commit(h);
     nvs_close(h);
+}
+
+static void apply_touch_grid(int &x, int &y) {
+    if (!s_touch_grid_enabled) return;
+
+    const float fx = (DISPLAY_WIDTH <= 1) ? 0.0f : (float)x / (float)(DISPLAY_WIDTH - 1);
+    const float fy = (DISPLAY_HEIGHT <= 1) ? 0.0f : (float)y / (float)(DISPLAY_HEIGHT - 1);
+
+    int gx = (int)std::floor(fx * 2.0f);
+    int gy = (int)std::floor(fy * 2.0f);
+    gx = std::clamp(gx, 0, 1);
+    gy = std::clamp(gy, 0, 1);
+
+    const float tx = std::clamp(fx * 2.0f - (float)gx, 0.0f, 1.0f);
+    const float ty = std::clamp(fy * 2.0f - (float)gy, 0.0f, 1.0f);
+
+    const auto idx = [](int ix, int iy) -> int { return iy * 3 + ix; };
+
+    const int i00 = idx(gx + 0, gy + 0);
+    const int i10 = idx(gx + 1, gy + 0);
+    const int i01 = idx(gx + 0, gy + 1);
+    const int i11 = idx(gx + 1, gy + 1);
+
+    const float dx00 = s_touch_grid_dx[(size_t)i00];
+    const float dx10 = s_touch_grid_dx[(size_t)i10];
+    const float dx01 = s_touch_grid_dx[(size_t)i01];
+    const float dx11 = s_touch_grid_dx[(size_t)i11];
+    const float dy00 = s_touch_grid_dy[(size_t)i00];
+    const float dy10 = s_touch_grid_dy[(size_t)i10];
+    const float dy01 = s_touch_grid_dy[(size_t)i01];
+    const float dy11 = s_touch_grid_dy[(size_t)i11];
+
+    const auto lerp = [](float a, float b, float t) -> float { return a + (b - a) * t; };
+    const float dx0 = lerp(dx00, dx10, tx);
+    const float dx1 = lerp(dx01, dx11, tx);
+    const float dy0 = lerp(dy00, dy10, tx);
+    const float dy1 = lerp(dy01, dy11, tx);
+    const float dx = lerp(dx0, dx1, ty);
+    const float dy = lerp(dy0, dy1, ty);
+
+    x = (int)std::lround((float)x + dx);
+    y = (int)std::lround((float)y + dy);
+    x = std::clamp(x, 0, DISPLAY_WIDTH - 1);
+    y = std::clamp(y, 0, DISPLAY_HEIGHT - 1);
 }
 
 static void apply_touch_calibration(int &x, int &y) {
@@ -159,6 +261,26 @@ static void apply_touch_calibration(int &x, int &y) {
     y = (y - top) * (DISPLAY_HEIGHT - 1) / (bottom - top);
     x = std::clamp(x, 0, DISPLAY_WIDTH - 1);
     y = std::clamp(y, 0, DISPLAY_HEIGHT - 1);
+
+    if (s_touch_affine_enabled) {
+        const float xf = (float)x;
+        const float yf = (float)y;
+        const float xa = s_touch_affine_a * xf + s_touch_affine_b * yf + s_touch_affine_c;
+        const float ya = s_touch_affine_d * xf + s_touch_affine_e * yf + s_touch_affine_f;
+        x = (int)std::lround(xa);
+        y = (int)std::lround(ya);
+        x = std::clamp(x, 0, DISPLAY_WIDTH - 1);
+        y = std::clamp(y, 0, DISPLAY_HEIGHT - 1);
+    }
+
+    if (s_touch_grid_enabled) {
+        apply_touch_grid(x, y);
+    } else if (s_touch_quad_enabled) {
+        const float yf = (float)y;
+        const float yq = s_touch_quad_a * yf * yf + s_touch_quad_b * yf + s_touch_quad_c;
+        y = (int)std::lround(yq);
+        y = std::clamp(y, 0, DISPLAY_HEIGHT - 1);
+    }
 }
 
 static void lcd_spi_pre_transfer_cb(spi_transaction_t *t) {
@@ -208,7 +330,8 @@ static esp_err_t lcd_set_rotation_landscape_1(void) {
     //
     // For 480x320 landscape we use MV (swap axes) + MH.
     // Mirror flags are persisted in NVS and can be changed via API.
-    const uint8_t madctl_base = 0x24; // MV | MH
+    // Most ST7796 modules are wired as BGR. If colors look "red=blue", keep BGR enabled.
+    const uint8_t madctl_base = 0x2C; // MV | MH | BGR
     uint8_t madctl = madctl_base | (s_mirror_x ? 0x40 : 0) | (s_mirror_y ? 0x80 : 0);
     ESP_RETURN_ON_ERROR(lcd_cmd(0x36), TAG, "MADCTL cmd");
     return lcd_data(&madctl, 1);
@@ -270,6 +393,15 @@ static void display_gpio_init(void) {
     gpio_set_level(TOUCH_CS, 1);
     gpio_set_level(TFT_DC, 0);
     gpio_set_level(TFT_BL, 0);
+
+    if (TOUCH_IRQ != GPIO_NUM_NC && GPIO_IS_VALID_GPIO(TOUCH_IRQ)) {
+        gpio_config_t icfg{};
+        icfg.mode = GPIO_MODE_INPUT;
+        icfg.pin_bit_mask = (1ULL << TOUCH_IRQ);
+        icfg.pull_up_en = GPIO_PULLUP_ENABLE;   // XPT2046 IRQ is active-low (needs pull-up)
+        icfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+        gpio_config(&icfg);
+    }
 }
 
 static esp_err_t display_spi_init(void) {
@@ -284,7 +416,7 @@ static esp_err_t display_spi_init(void) {
     ESP_RETURN_ON_ERROR(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO), TAG, "spi_bus_initialize");
 
     spi_device_interface_config_t devcfg{};
-    devcfg.clock_speed_hz = 20 * 1000 * 1000;
+    devcfg.clock_speed_hz = TFT_SPI_CLOCK_HZ;
     devcfg.mode = 0;
     devcfg.spics_io_num = TFT_CS;
     devcfg.queue_size = 7;
@@ -383,6 +515,31 @@ static esp_err_t touch_init(void) {
     return ESP_OK;
 }
 
+static bool touch_read_once(int &x, int &y, uint16_t &z) {
+    if (!s_touch) return false;
+    (void)esp_lcd_touch_read_data(s_touch);
+    esp_lcd_touch_point_data_t points[1]{};
+    uint8_t point_cnt = 0;
+    (void)esp_lcd_touch_get_data(s_touch, points, &point_cnt, 1);
+    if (point_cnt == 0) {
+        x = 0;
+        y = 0;
+        z = 0;
+        return false;
+    }
+    x = (int)points[0].x;
+    y = (int)points[0].y;
+    z = points[0].strength;
+    return true;
+}
+
+static int median3(int a, int b, int c) {
+    if (a > b) std::swap(a, b);
+    if (b > c) std::swap(b, c);
+    if (a > b) std::swap(a, b);
+    return b;
+}
+
 void display_driver_init(void) {
     load_mirror_from_nvs();
 
@@ -432,16 +589,33 @@ bool display_driver_blit_rgb565(int x, int y, int w, int h, const uint16_t *data
         return false;
     }
 
-    if (crop_left == 0 && crop_right == 0) {
-        const uint8_t *buf = (const uint8_t *)(data + (crop_top * w));
-        const size_t bytes = (size_t)w * (size_t)out_h * 2;
-        (void)lcd_data(buf, bytes);
-    } else {
-        for (int row = 0; row < out_h; ++row) {
-            const int src_row = crop_top + row;
-            const uint8_t *buf = (const uint8_t *)(data + (src_row * w + crop_left));
-            (void)lcd_data(buf, (size_t)out_w * 2);
+    if (!s_lcd_swap_bytes) {
+        if (crop_left == 0 && crop_right == 0) {
+            const uint8_t *buf = (const uint8_t *)(data + (crop_top * w));
+            const size_t bytes = (size_t)w * (size_t)out_h * 2;
+            (void)lcd_data(buf, bytes);
+        } else {
+            for (int row = 0; row < out_h; ++row) {
+                const int src_row = crop_top + row;
+                const uint8_t *buf = (const uint8_t *)(data + (src_row * w + crop_left));
+                (void)lcd_data(buf, (size_t)out_w * 2);
+            }
         }
+        return true;
+    }
+
+    // Byte-swap RGB565 pixels into a scratch row buffer before writing.
+    static std::vector<uint16_t> rowbuf;
+    if ((int)rowbuf.size() < out_w) rowbuf.resize((size_t)out_w);
+
+    for (int row = 0; row < out_h; ++row) {
+        const int src_row = crop_top + row;
+        const uint16_t *src = data + (src_row * w + crop_left);
+        for (int col = 0; col < out_w; ++col) {
+            const uint16_t px = src[col];
+            rowbuf[(size_t)col] = (uint16_t)((px >> 8) | (px << 8));
+        }
+        (void)lcd_data((const uint8_t *)rowbuf.data(), (size_t)out_w * 2);
     }
 
     return true;
@@ -455,22 +629,38 @@ bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) 
         return false;
     }
 
-    (void)esp_lcd_touch_read_data(s_touch);
-
-    esp_lcd_touch_point_data_t points[1]{};
-    uint8_t point_cnt = 0;
-    (void)esp_lcd_touch_get_data(s_touch, points, &point_cnt, 1);
-    const bool pressed = point_cnt > 0;
-
-    int lx = pressed ? (int)points[0].x : 0;
-    int ly = pressed ? (int)points[0].y : 0;
-    const uint16_t lz = pressed ? points[0].strength : 0;
-
-    if (pressed) {
-        lx = std::clamp(lx, 0, DISPLAY_WIDTH - 1);
-        ly = std::clamp(ly, 0, DISPLAY_HEIGHT - 1);
-        apply_touch_calibration(lx, ly);
+    const bool pressed = true;
+    int x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+    uint16_t z0 = 0, z1v = 0, z2 = 0;
+    if (!touch_read_once(x0, y0, z0)) {
+        if (raw_x) *raw_x = 0;
+        if (raw_y) *raw_y = 0;
+        if (z1) *z1 = 0;
+        s_touch_last_pressed = false;
+        return false;
     }
+    // Take a couple of extra samples to reduce noise.
+    if (!touch_read_once(x1, y1, z1v)) {
+        x1 = x0;
+        y1 = y0;
+        z1v = z0;
+    }
+    if (!touch_read_once(x2, y2, z2)) {
+        x2 = x0;
+        y2 = y0;
+        z2 = z0;
+    }
+
+    int lx = median3(x0, x1, x2);
+    int ly = median3(y0, y1, y2);
+    uint16_t lz = (uint16_t)median3((int)z0, (int)z1v, (int)z2);
+
+    // Depending on XPT2046 config, driver may return raw ADC (0..4095) or already-scaled coords.
+    // Clamp broadly, then apply our calibration into display coordinates.
+    static constexpr int RAW_MAX = 4095;
+    lx = std::clamp(lx, 0, RAW_MAX);
+    ly = std::clamp(ly, 0, RAW_MAX);
+    apply_touch_calibration(lx, ly);
 
     s_touch_last_pressed = pressed;
     s_touch_last_raw_x = (uint16_t)lx;
@@ -491,7 +681,7 @@ bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) 
     if (raw_x) *raw_x = (uint16_t)lx;
     if (raw_y) *raw_y = (uint16_t)ly;
     if (z1) *z1 = lz;
-    return pressed;
+    return true;
 }
 
 bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) {
@@ -514,8 +704,9 @@ bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *
     const uint16_t lz = pressed ? points[0].strength : 0;
 
     if (pressed) {
-        lx = std::clamp(lx, 0, DISPLAY_WIDTH - 1);
-        ly = std::clamp(ly, 0, DISPLAY_HEIGHT - 1);
+        static constexpr int RAW_MAX = 4095;
+        lx = std::clamp(lx, 0, RAW_MAX);
+        ly = std::clamp(ly, 0, RAW_MAX);
     }
 
     s_touch_last_pressed = pressed;
@@ -590,7 +781,10 @@ void display_driver_get_touch_calibration(bool *enabled, uint16_t *left, uint16_
 
 bool display_driver_set_touch_calibration(bool enabled, uint16_t left, uint16_t right, uint16_t top, uint16_t bottom) {
     if (right <= left + 10 || bottom <= top + 10) return false;
-    if (right >= DISPLAY_WIDTH || bottom >= DISPLAY_HEIGHT) return false;
+    // Allow calibration bounds larger than screen size to adjust scale.
+    // XPT2046 raw coordinates are 12-bit (0..4095).
+    static constexpr uint16_t RAW_MAX = 4095;
+    if (left > RAW_MAX || right > RAW_MAX || top > RAW_MAX || bottom > RAW_MAX) return false;
     s_touch_cal_enabled = enabled;
     s_touch_cal_left = left;
     s_touch_cal_right = right;
@@ -607,6 +801,54 @@ void display_driver_reset_touch_calibration(void) {
     s_touch_cal_top = 0;
     s_touch_cal_bottom = DISPLAY_HEIGHT - 1;
     save_touch_to_nvs();
+}
+
+bool display_driver_is_touch_calibrated(void) {
+    return s_touch_cal_enabled || s_touch_affine_enabled || s_touch_grid_enabled;
+}
+
+void display_driver_get_touch_affine(bool *enabled, float *a, float *b, float *c, float *d, float *e, float *f) {
+    if (enabled) *enabled = s_touch_affine_enabled;
+    if (a) *a = s_touch_affine_a;
+    if (b) *b = s_touch_affine_b;
+    if (c) *c = s_touch_affine_c;
+    if (d) *d = s_touch_affine_d;
+    if (e) *e = s_touch_affine_e;
+    if (f) *f = s_touch_affine_f;
+}
+
+bool display_driver_set_touch_affine(bool enabled, float a, float b, float c, float d, float e, float f) {
+    s_touch_affine_enabled = enabled;
+    s_touch_affine_a = a;
+    s_touch_affine_b = b;
+    s_touch_affine_c = c;
+    s_touch_affine_d = d;
+    s_touch_affine_e = e;
+    s_touch_affine_f = f;
+    save_touch_to_nvs();
+    return true;
+}
+
+void display_driver_get_touch_grid(bool *enabled, float dx_out[9], float dy_out[9]) {
+    if (enabled) *enabled = s_touch_grid_enabled;
+    if (dx_out) std::copy(s_touch_grid_dx.begin(), s_touch_grid_dx.end(), dx_out);
+    if (dy_out) std::copy(s_touch_grid_dy.begin(), s_touch_grid_dy.end(), dy_out);
+}
+
+bool display_driver_set_touch_grid(bool enabled, const float dx[9], const float dy[9]) {
+    s_touch_grid_enabled = enabled;
+    if (enabled) {
+        if (!dx || !dy) return false;
+        std::copy(dx, dx + s_touch_grid_dx.size(), s_touch_grid_dx.begin());
+        std::copy(dy, dy + s_touch_grid_dy.size(), s_touch_grid_dy.begin());
+    } else {
+        s_touch_grid_dx.fill(0.0f);
+        s_touch_grid_dy.fill(0.0f);
+    }
+    // Grid and quadratic corrections should not stack.
+    if (s_touch_grid_enabled) s_touch_quad_enabled = false;
+    save_touch_to_nvs();
+    return true;
 }
 
 void display_driver_get_touch_pins(int *sclk, int *mosi, int *miso) {

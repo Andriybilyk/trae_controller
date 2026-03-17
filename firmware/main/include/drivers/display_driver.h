@@ -26,6 +26,11 @@ bool display_driver_set_touch_transform(bool swap_xy, bool mirror_x, bool mirror
 void display_driver_get_touch_calibration(bool *enabled, uint16_t *left, uint16_t *right, uint16_t *top, uint16_t *bottom);
 bool display_driver_set_touch_calibration(bool enabled, uint16_t left, uint16_t right, uint16_t top, uint16_t bottom);
 void display_driver_reset_touch_calibration(void);
+bool display_driver_is_touch_calibrated(void);
+void display_driver_get_touch_affine(bool *enabled, float *a, float *b, float *c, float *d, float *e, float *f);
+bool display_driver_set_touch_affine(bool enabled, float a, float b, float c, float d, float e, float f);
+void display_driver_get_touch_grid(bool *enabled, float dx_out[9], float dy_out[9]);
+bool display_driver_set_touch_grid(bool enabled, const float dx[9], const float dy[9]);
 bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1);
 bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1);
 void display_driver_get_touch_stats(uint32_t *read_cb_count);

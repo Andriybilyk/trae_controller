@@ -1,98 +1,587 @@
-import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+﻿import { VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
+// UI layout tweaks for touch usability
+
+
 import "../../data/fonts/sketch_260307b/FontFiles/PTSans-Regular.ttf";
+
+
+
 import "../../data/fonts/sketch_260307b/FontFiles/PTSans-Bold.ttf";
 
+
+
+import "fonts/MaterialIcons-Regular.ttf";
+
+
+
 component PlayIcon {
+
     in property <brush> color: #000000;
-    width: 16px;
+
+    width: 18px;
     height: 16px;
-    Path {
-        x: 2px; y: 2px;
-        width: parent.width - 4px;
-        height: parent.height - 4px;
-        fill: root.color;
-        commands: "M0,0 L12,6 L0,12 Z";
+
+    Text {
+
+        text: "\u{e037}";
+
+        color: root.color;
+
+        font-family: "Material Icons";
+
+        font-size: 20px;
+
+        horizontal-alignment: center;
+
+        vertical-alignment: center;
+
     }
+
 }
+
+
 
 component StopIcon {
+
     in property <brush> color: #FFFFFF;
+
     width: 16px;
+
     height: 16px;
+
+    Text {
+
+        text: "\u{e047}";
+
+        color: root.color;
+
+        font-family: "Material Icons";
+
+        font-size: 20px;
+
+        horizontal-alignment: center;
+
+        vertical-alignment: center;
+
+    }
+
+}
+
+
+
+component ActivityIcon {
+
+    in property <brush> color: #10B981;
+
+    width: 16px;
+
+    height: 16px;
+
+    Text {
+
+        text: "\u{eaa2}";
+
+        color: root.color;
+
+        font-family: "Material Icons";
+
+        font-size: 20px;
+
+        horizontal-alignment: center;
+
+        vertical-alignment: center;
+
+    }
+
+}
+
+
+
+component WifiIcon {
+
+    in property <brush> color: #10B981;
+
+    width: 16px;
+
+    height: 18px;
+    Text {
+
+        text: "\u{e63e}";
+
+        color: root.color;
+
+        font-family: "Material Icons";
+
+        font-size: 20px;
+        horizontal-alignment: center;
+
+        vertical-alignment: center;
+
+    }
+
+}
+
+
+
+component ThermometerIcon {
+
+    in property <brush> color: #FFFFFF;
+
+    width: 16px;
+
+    height: 16px;
+
+    Text {
+
+        text: "\u{e1ff}";
+
+        color: root.color;
+
+        font-family: "Material Icons";
+
+        font-size: 20px;
+
+        horizontal-alignment: center;
+
+        vertical-alignment: center;
+
+    }
+
+}
+
+
+
+component KbKeyButton {
+    in property <string> label;
+    in property <string> value: root.label;
+    in property <brush> background: #27272A;
+    in property <brush> text_color: #FFFFFF;
+    in property <length> font_size: 16px;
+    callback pressed(string);
+
     Rectangle {
-        x: 2px; y: 2px;
-        width: parent.width - 4px;
-        height: parent.height - 4px;
-        background: root.color;
+        background: root.background;
+        border-radius: 10px;
+        Text {
+            text: root.label;
+            color: root.text_color;
+            font-family: "PT Sans";
+            font-size: root.font_size;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            clicked => { root.pressed(root.value); }
+        }
     }
 }
 
-export enum View { Dashboard, Schedules, Editor, Calibration }
+component KbKeyRow {
+    in property <[string]> keys;
+    in property <length> key_width: 44px;
+    in property <length> key_height: 30px;
+    in property <length> gap: 2px;
+    in property <length> start_x: 10px;
+    in property <length> row_y: 0px;
+    in property <length> font_size: 18px;
+    callback key_pressed(string);
+
+    for k[i] in root.keys : KbKeyButton {
+        x: root.start_x + i * (root.key_width + root.gap);
+        y: root.row_y;
+        width: root.key_width;
+        height: root.key_height;
+        label: k;
+        font_size: root.font_size;
+        pressed(v) => { root.key_pressed(v); }
+    }
+}
+
+
+
+export enum View { Dashboard, Schedules, Editor, Settings, Calibration }
+
 
 export struct ScheduleRow {
+
+
+
     name: string,
+
+
+
     steps_count: int,
+
+
+
     selected: bool,
+
+
+
 }
+
+
 
 export struct EditorStepRow {
+
+
+
     step_type: string,
+
+
+
     rate: int,
+
+
+
     target: int,
+
+
+
     hold: int,
+
+
+
 }
 
+export struct WifiNetworkRow {
+    ssid: string,
+    rssi: int,
+}
+
+
+
 export component AppWindow inherits Window {
+
+
+
     width: 480px;
+
+
+
     height: 320px;
+
+
+
     background: #000000;
+
+
+
     default-font-family: "PT Sans";
 
+
+
+    // Theme (keep it explicit; easier to tweak without hunting literals).
+
+
+
+    // Use mostly neutral greys (R=G=B) so the panel looks consistent and doesn't drift "blue/yellow".
+
+
+
+    property <color> c_bg: #000000;
+
+
+
+    property <color> c_panel: #000000;
+
+
+
+    property <color> c_card: #111118;
+
+
+
+    property <color> c_border: #27272A;
+
+
+
+    property <color> c_text: #FFFFFF;
+
+
+
+    property <color> c_muted: #A1A1AA;
+
+
+
+    property <color> c_subtle: #71717A;
+
+
+
+    property <color> c_accent: #00D084;
+
+
+
+    property <color> c_warn: #F59E0B;
+
+
+
+    property <color> c_danger: #FF3B30;
+
+
+
+    // Status styling (based on status_label coming from firmware: IDLE/RAMP/ERROR/...).
+
+
+
+    // Keep RAMP green like in your reference UI; only ERROR is red.
+
+
+
+    property <color> status_fg: root.status_label == "ERROR" ? c_danger : c_accent;
+
+
+
+    property <color> status_bg: root.status_label == "ERROR" ? #2A0B0B : #062016;
+
+
+
     in-out property <View> view: View.Dashboard;
+
+
+
     in-out property <bool> show_stop_confirm: false;
+
+
+
     in-out property <bool> is_ua: false;
+
+
+
     in-out property <string> current_time: "00:00";
 
+
+
     in-out property <float> temp: 24.5;
+
+
+
+    in-out property <string> temp_label: "24.5";
+
+
+
     in-out property <int> target: 0;
+
+
+
     in-out property <string> status_label: "IDLE";
+
+
+
     in-out property <bool> is_idle: true;
+
+
+
     in-out property <int> step_index: 0;
+
+
+
     in-out property <int> total_steps: 0;
+
+
+
     in-out property <string> time_remaining: "--:--";
+
+
+
     in-out property <string> selected_schedule_name: "";
+
+
+
     in-out property <int> selected_steps_count: 0;
+
+
+
     in-out property <bool> wifi_ok: true;
 
+
+
+    in-out property <int> touch_x: 0;
+
+
+
+    in-out property <int> touch_y: 0;
+
+
+
+    in-out property <int> touch_z: 0;
+
+
+
+    in-out property <bool> touch_pressed: false;
+
+
+
     in-out property <[ScheduleRow]> schedules;
+
+
+
     in-out property <[EditorStepRow]> editor_steps;
 
+
+
     in-out property <bool> fault_active: false;
+
+
+
     in-out property <string> fault_reason: "";
 
+
+
     in-out property <int> calib_step: 0;
+
+
+
     in-out property <string> calib_hint: "";
+
+
+
     in-out property <int> calib_target_x: 40;
+
+
+
     in-out property <int> calib_target_y: 60;
 
+    // Bottom numeric keyboard (editor)
+    in-out property <bool> kb_visible: false;
+    in-out property <string> kb_value: "";
+    in-out property <int> kb_step_index: -1;
+    in-out property <string> kb_field: "";
+
+    // Fan (manual override + power %)
+    in-out property <bool> fan_manual: false;
+    in-out property <int> fan_power: 0;
+    in-out property <[WifiNetworkRow]> wifi_networks;
+    in-out property <bool> wifi_picker_visible: false;
+    in-out property <bool> wifi_scan_busy: false;
+    in-out property <string> wifi_selected_ssid: "";
+    in-out property <string> wifi_password: "";
+
     callback toggle_language();
+
+
+
     callback start_firing();
+
+
+
     callback stop_firing();
+
+
+
     callback open_library();
+
+
+
     callback select_schedule(int);
+
+
+
     callback edit_schedule(int);
+
+
+
     callback new_schedule();
+
+
+
     callback editor_back();
+
+
+
     callback editor_save();
+
+
+
     callback editor_add_step();
+
+
+
     callback editor_rate_changed(int, string);
+
+
+
     callback editor_target_changed(int, string);
+
+
+
     callback editor_hold_changed(int, string);
+
+
+
     callback editor_remove(int);
+
+
+
     callback stop_confirm();
+
+
+
     callback stop_cancel();
+
+
+
     callback start_touch_calibration();
+
+
+
     callback cancel_touch_calibration();
+
+    callback fan_manual_changed(bool);
+
+
+
+    callback fan_power_changed(int);
+    callback wifi_open_picker();
+    callback wifi_disconnect();
+
+    callback kb_key(string);
+    callback kb_open(string, int, string);
+
+    // Touch debug dot (shows where the touch is detected)
+
+
+
+    Rectangle {
+
+
+
+        width: 6px;
+
+
+
+        height: 6px;
+
+
+
+        x: (min(max(root.touch_x - 3, 0), 480 - 6)) * 1px;
+
+
+
+        y: (min(max(root.touch_y - 3, 0), 320 - 6)) * 1px;
+
+
+
+        background: #FF3B30;
+
+
+
+        border-radius: 3px;
+
+
+
+        visible: root.touch_pressed;
+
+
+
+        z: 999;
+
+
+
+    }
+
+
 
     // Header bar
     Rectangle {
@@ -103,275 +592,1579 @@ export component AppWindow inherits Window {
         border-width: 1px;
 
         HorizontalBox {
-            x: 10px; y: 8px;
+            x: 10px;
+            y: 2px;
+            height: 24px;
             spacing: 6px;
+
+            ActivityIcon { y: (parent.height - self.height) / 2; width: 20px; height: 20px; color: #10B981; }
+
             Text {
+                height: parent.height;
                 text: "KILN PRO";
                 color: #FFFFFF;
                 font-family: "PT Sans";
                 font-size: 14px;
                 letter-spacing: 1px;
+                vertical-alignment: center;
             }
         }
 
         HorizontalBox {
-            x: 280px; y: 8px;
+            x: parent.width - self.width - 15px;
+            y: 2px;
+            width: 140px;
+            height: 24px;
             spacing: 6px;
+
             Rectangle {
-                width: 34px; height: 22px;
+                width: 38px; height: 24px;
                 background: #27272A;
                 border-radius: 6px;
                 Text {
                     text: root.is_ua ? "UA" : "EN";
                     color: #FFFFFF;
                     font-family: "PT Sans";
-                    font-size: 10px;
+                    font-size: 11px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
-                TouchArea {
-                    clicked => { root.toggle_language(); }
+                TouchArea { width: parent.width; height: parent.height; clicked => { root.toggle_language(); } }
+            }
+
+            Rectangle {
+                width: 58px; height: 24px;
+                background: #00000000;
+                Text {
+                    text: root.current_time;
+                    color: #A1A1AA;
+                    font-family: "PT Sans";
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
             }
-            Text {
-                text: root.current_time;
-                color: #A1A1AA;
-                font-family: "PT Sans";
-                font-size: 12px;
-            }
+
             Rectangle {
-                width: 14px; height: 14px;
-                border-radius: 7px;
-                background: root.wifi_ok ? #10B981 : #52525B;
-                TouchArea { clicked => { root.start_touch_calibration(); } }
+                width: 32px; height: 24px;
+                background: #00000000;
+                WifiIcon {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    width: 24px; height: 24px;
+                    color: root.wifi_ok ? #10B981 : #52525B;
+                }
+                TouchArea {
+                    x: -6px; y: -6px;
+                    width: parent.width + 12px;
+                    height: parent.height + 12px;
+                    clicked => { root.view = View.Settings; }
+                }
             }
         }
     }
+
+
 
     if (root.fault_active) : Rectangle {
+
+
+
         x: 0px; y: 40px;
+
+
+
         width: 480px; height: 28px;
+
+
+
         background: #7F1D1D;
+
+
+
         border-color: #DC2626;
+
+
+
         border-width: 1px;
+
+
+
         Text {
+
+
+
             x: 10px; y: 6px;
+
+
+
             text: root.fault_reason == "" ? "FAULT" : ("FAULT: " + root.fault_reason);
+
+
+
             color: #FFFFFF;
+
+
+
             font-family: "PT Sans";
+
+
+
             font-size: 12px;
+
+
+
         }
+
+
+
     }
 
+
+
     // Main content
+
+
+
     Rectangle {
+
+
+
         x: 0px; y: root.fault_active ? 68px : 40px;
+
+
+
         width: 480px; height: 280px;
-        background: #000000;
 
-        // Dashboard View
-        if (root.view == View.Dashboard) : HorizontalBox {
+
+
+        background: root.c_bg;
+
+
+
+        
+
+
+
+// Dashboard View
+
+
+
+        if (root.view == View.Dashboard) : Rectangle {
+
+
+
+            x: 0px; y: 0px;
+
+
+
+            width: 480px; height: 280px;
+
+
+
+            background: root.c_bg;
+
+
+
+            // Left column
+
+
+
+            Rectangle {
+
+
+
                 x: 0px; y: 0px;
-                width: 480px; height: 280px;
-                spacing: 0px;
 
-                // Left column
+
+
+                width: 240px; height: 280px;
+
+
+
+                background: root.c_bg;
+
+
+
+                border-color: root.c_border;
+
+
+
+                border-width: 1px;
+
+
+
+                Text {
+
+
+
+                    x: 16px; y: 18px;
+
+
+
+                    text: root.is_ua ? "ПОТОЧНА Т-РА" : "CURRENT TEMP";
+
+
+
+                    color: root.c_muted;
+
+
+
+                    font-family: "PT Sans";
+
+
+
+                    font-size: 14px;
+
+
+
+                    letter-spacing: 1px;
+
+
+
+                }
+
+
+
                 Rectangle {
-                    width: 240px; height: 280px;
-                    background: #000000;
-                    border-color: #27272A;
+
+
+
+                    x: 170px; y: 14px;
+
+
+
+                    width: 52px; height: 22px;
+
+
+
+                    background: root.status_bg;
+
+
+
+                    border-color: root.status_fg;
+
+
+
                     border-width: 1px;
 
+
+
+                    border-radius: 11px;
+
+
+
+                    Text {
+
+
+
+                        text: root.status_label;
+
+
+
+                        color: root.status_fg;
+
+
+
+                        font-family: "PT Sans";
+
+
+
+                        font-size: 14px;
+
+
+
+                        horizontal-alignment: center;
+
+
+
+                        vertical-alignment: center;
+
+
+
+                    }
+
+
+
+                }
+
+
+
+                Text {
+
+
+
+                    x: 16px; y: 52px;
+
+
+
+                    text: root.temp_label;
+
+
+
+                    color: #FFFFFF;
+
+
+
+                    font-family: "PT Sans";
+
+
+
+                    font-size: 58px;
+
+
+
+                    font-weight: 700;
+
+
+
+                }
+
+
+
+                Text {
+
+
+
+                    x: 150px; y: 58px;
+
+
+
+                    text: "°C";
+
+
+                    color: root.c_text;
+
+
+
+                    font-family: "PT Sans";
+
+
+
+                    font-size: 26px;
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: 12px; y: 176px;
+
+
+
+                    width: 216px; height: 92px;
+
+
+
+                    background: root.c_card;
+
+
+
+                    border-color: root.c_border;
+
+
+
+                    border-width: 1px;
+
+
+
+                    border-radius: 14px;
+
+
+
+                    Text {
+
+
+
+                        x: 12px; y: 10px;
+
+
+
+                        text: root.is_ua ? "Температура" : "Temperature";
+
+
+
+                        color: root.c_muted;
+
+
+
+                        font-family: "PT Sans";
+
+
+
+                        font-size: 14px;
+
+
+
+                    }
+
+
+
+                    Text {
+
+
+
+                        x: 140px; y: 8px;
+
+
+
+                        text: root.target + "°C";
+
+
+                        color: root.c_text;
+
+
+
+                        font-family: "PT Sans";
+
+
+
+                        font-size: 18px;
+
+
+
+                    }
+
+
+
                     Rectangle {
-                        x: 170px; y: 8px; width: 60px; height: 18px;
-                        background: root.status_label == "ERROR" ? #EF4444 : (root.status_label == "IDLE" ? #27272A : #10B981);
-                        border-radius: 9px;
+
+
+
+                        x: 12px; y: 88px;
+
+
+
+                        width: 192px; height: 4px;
+
+
+
+                        background: root.c_border;
+
+
+
+                        border-radius: 2px;
+
+
+
+                        Rectangle {
+
+
+
+                            width: root.target > 0 ? min((root.temp / root.target) * 192px, 192px) : 0px;
+
+
+
+                            height: 4px;
+
+
+
+                            background: root.status_fg;
+
+
+
+                            border-radius: 2px;
+
+
+
+                        }
+
+
+
+                    }
+
+
+
+                }
+
+
+
+            }
+
+
+
+            // Right column
+
+
+
+            Rectangle {
+
+
+
+                x: 240px; y: 0px;
+
+
+
+                width: 240px; height: 280px;
+
+
+
+                background: root.c_bg;
+
+
+
+                Rectangle {
+
+
+
+                    x: 10px; y: 12px;
+
+
+
+                    width: 220px; height: 150px;
+
+
+
+                    background: root.c_card;
+
+
+
+                    border-color: root.c_border;
+
+
+
+                    border-width: 1px;
+
+
+
+                    border-radius: 16px;
+
+
+
+                    if (root.is_idle && root.selected_schedule_name == "") : Rectangle {
+
+
+
+                        width: 220px; height: 150px;
+
+
+
+                        background: #00000000;
+
+
+
+                        ActivityIcon {
+
+
+
+                            x: (parent.width - self.width) / 2;
+
+
+
+                            y: 50px;
+
+
+
+                            color: #3F3F46;
+
+
+
+                            width: 32px; height: 32px;
+
+
+
+                        }
+
+
+
                         Text {
-                            text: root.status_label;
-                            color: root.status_label == "IDLE" ? #FFFFFF : (root.status_label == "ERROR" ? #FFFFFF : #000000);
+
+
+
+                            x: 0px; y: 92px;
+
+
+
+                            width: 220px;
+
+
+
+                            text: root.is_ua ? "Виберіть програму" : "Select Schedule";
+
+
+
+                            color: root.c_muted;
+
+
+
                             font-family: "PT Sans";
-                            font-size: 10px;
+
+
+
+                            font-size: 18px;
+
+
+                            horizontal-alignment: center;
+
+
+
+                        }
+
+
+
+                    }
+
+
+
+                    if (root.is_idle && root.selected_schedule_name != "") : Rectangle {
+
+
+
+                        width: 220px; height: 150px;
+
+
+
+                        background: #00000000;
+
+
+
+                        Text {
+
+
+
+                            x: 0px; y: 18px;
+
+
+
+                            width: 220px;
+
+
+
+                            text: root.is_ua ? "Вибрана програма" : "Selected Program";
+
+
+
+                            color: root.c_accent;
+
+
+
+                            font-family: "PT Sans";
+
+
+
+                            font-size: 16px;
+                            font-weight: 700;
+
+
+
+                            horizontal-alignment: center;
+
+
+
+                        }
+
+
+
+                        Text {
+
+
+
+                            x: 0px; y: 44px;
+
+
+
+                            width: 220px;
+
+
+
+                            text: root.selected_schedule_name;
+
+
+
+                            color: #FFFFFF;
+
+
+
+                            font-family: "PT Sans";
+
+
+
+                            font-size: 20px;
+                            font-weight: 700;
+
+
+
+                            horizontal-alignment: center;
+
+
+
+                        }
+
+
+
+                        Text {
+
+
+
+                            x: 0px; y: 68px;
+
+
+
+                            width: 220px;
+
+
+
+                            text: root.selected_steps_count + " " + (root.is_ua ? "кроків" : "segments");
+
+
+
+                            color: root.c_subtle;
+
+
+
+                            font-size: 16px;
+
+
+
+                            horizontal-alignment: center;
+
+
+
+                        }
+
+
+
+                    }
+
+
+
+                    if (!root.is_idle) : Rectangle {
+
+
+
+                        width: 220px; height: 150px;
+
+
+
+                        background: #00000000;
+
+
+
+                        Text {
+
+
+
+                            x: 0px; y: 18px;
+
+
+
+                            width: 220px;
+
+
+
+                            text: root.is_ua ? "Крок" : "Step";
+
+
+
+                            color: root.c_muted;
+
+
+
+                            font-size: 14px;
+
+
+
+                            horizontal-alignment: center;
+
+
+
+                        }
+
+
+
+                        Text {
+
+
+
+                            x: 0px; y: 44px;
+
+
+
+                            width: 220px;
+
+
+
+                            text: root.step_index + " / " + root.total_steps;
+
+
+
+                            color: #FFFFFF;
+
+
+
+                            font-family: "PT Sans";
+
+
+
+                            font-size: 28px;
+
+
+
+                            horizontal-alignment: center;
+
+
+
+                        }
+
+
+
+                        Text {
+
+
+
+                            x: 0px; y: 78px;
+
+
+
+                            width: 220px;
+
+
+
+                            text: "Ramp to " + root.target + "oC";
+
+
+
+                            color: #71717A;
+
+
+
+                            font-size: 14px;
+
+
+
+                            horizontal-alignment: center;
+
+
+
+                        }
+
+
+
+                    }
+
+
+
+                    if (root.is_idle) : TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.open_library(); } }
+
+
+
+                }
+
+
+
+                // Bottom action buttons
+
+
+
+                Rectangle {
+
+
+
+                    x: 10px; y: 174px;
+
+
+
+                    width: 220px; height: 94px;
+
+                    // Big STOP button (shown while firing)
+                    Rectangle {
+                        visible: !root.is_idle;
+                        x: 0px; y: 0px;
+                        width: 220px; height: 94px;
+                        background: #FF3B30;
+                        border-radius: 16px;
+
+                        StopIcon { x: (parent.width - self.width) / 2; y: 20px; color: #FFFFFF; width: 18px; height: 18px; }
+
+                        Text {
+                            x: 0px; y: 50px;
+                            width: parent.width;
+                            text: root.is_ua ? "Зупинити" : "Stop";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                            font-weight: 700;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
+
+                        TouchArea { width: parent.width; height: parent.height; clicked => { root.stop_firing(); } }
                     }
 
-                    VerticalBox {
-                        x: 12px; y: 30px;
-                        spacing: 6px;
-                        Text {
-                            text: root.is_ua ? "ПОТОЧНА ТЕМП" : "CURRENT TEMP";
-                            color: #71717A;
-                            font-family: "PT Sans";
-                            font-size: 10px;
-                            letter-spacing: 1px;
-                        }
-                        HorizontalBox {
-                            spacing: 4px;
-                            Text {
-                                text: root.temp;
-                                color: #FFFFFF;
-                                font-family: "PT Sans";
-                                font-size: 46px;
-                            }
-                            Text {
-                                text: "°C";
-                                color: #52525B;
-                                font-family: "PT Sans";
-                                font-size: 18px;
-                                y: 14px;
-                            }
-                        }
-                    }
+
+                    background: #00000000;
+
+
 
                     Rectangle {
-                        x: 12px; y: 120px; width: 216px; height: 92px;
-                        background: #111118;
-                        border-color: #27272A;
-                        border-width: 1px;
-                        border-radius: 14px;
 
-                        VerticalBox {
-                            x: 10px; y: 10px;
-                            spacing: 6px;
 
-                            HorizontalBox {
-                                spacing: 4px;
-                                Text { text: root.is_ua ? "ТЕМПЕРАТУРА" : "TEMPERATURE"; color: #A1A1AA; font-size: 10px; }
-                                Text { text: root.target + "°C"; color: #FFFFFF; font-size: 20px; font-family: "PT Sans"; }
-                            }
 
-                            if (!root.is_idle) : HorizontalBox {
-                                    spacing: 4px;
-                                    Text { text: root.is_ua ? "ЗАЛИШИЛОСЬ ЧАСУ" : "TIME REMAINING"; color: #A1A1AA; font-size: 10px; }
-                                    Text { text: root.time_remaining; color: #FFFFFF; font-size: 20px; font-family: "PT Sans"; }
-                                }
-                            }
+                        x: 0px; y: 0px;
 
-                            Rectangle {
-                                x: 0px; y: 0px;
-                                width: 196px; height: 6px;
-                                background: #27272A;
-                                border-radius: 3px;
-                                Rectangle {
-                                    width: root.target > 0 ? min((root.temp / root.target) * 196px, 196px) : 0px;
-                                    height: 6px;
-                                    background: #10B981;
-                                    border-radius: 3px;
-                                }
-                            }
-                        }
-                    }
-                }
 
-                // Right column
-                Rectangle {
-                    width: 240px; height: 280px;
-                    background: #000000;
 
-                    Rectangle {
-                        x: 10px; y: 12px; width: 220px; height: 150px;
-                        background: #111118;
-                        border-color: #27272A;
-                        border-width: 1px;
+                        visible: root.is_idle;
+
+                        width: 106px; height: 94px;
+
+
+                        background: root.selected_schedule_name == "" ? root.c_border : root.c_accent;
+
+
+
                         border-radius: 16px;
 
-                        if (root.is_idle) : VerticalBox {
-                            x: 0px; y: 28px;
-                            width: 220px;
-                            spacing: 6px;
 
-                            if (root.selected_schedule_name == "") : Text {
-                                text: root.is_ua ? "ВИБЕРІТЬ ПРОГРАМУ..." : "SELECT SCHEDULE...";
-                                color: #A1A1AA;
+
+                        PlayIcon {
+
+
+
+                            x: (parent.width - self.width) / 2;
+
+
+
+                            y: 18px;
+
+
+
+                            color: root.selected_schedule_name == "" ? root.c_muted : #000000;
+
+
+
+                            width: 18px; height: 18px;
+
+
+
+                        }
+
+
+
+                        if (root.selected_schedule_name == "") : Rectangle {
+
+
+
+                            width: parent.width; height: parent.height;
+
+
+
+                            background: #00000000;
+
+
+
+                            Text {
+
+
+
+                                x: 0px; y: 42px;
+
+
+
+                                width: parent.width;
+
+
+
+                                text: root.is_ua ? "Виберіть" : "Select";
+
+
+
+                                color: root.c_muted;
+
+
+
                                 font-family: "PT Sans";
-                                font-size: 12px;
+
+
+
+                                font-size: 15px;
+
+
+
                                 horizontal-alignment: center;
+
+
+
                             }
 
-                            if (root.selected_schedule_name != "") : VerticalBox {
-                                spacing: 4px;
-                                Text {
-                                    text: root.is_ua ? "ОБРАНА ПРОГРАМА" : "SELECTED PROGRAM";
-                                    color: #10B981;
-                                    font-family: "PT Sans";
-                                    font-size: 10px;
-                                    horizontal-alignment: center;
-                                }
-                                Text {
-                                    text: root.selected_schedule_name;
-                                    color: #FFFFFF;
-                                    font-family: "PT Sans";
-                                    font-size: 16px;
-                                    horizontal-alignment: center;
-                                }
-                                Text {
-                                    text: root.selected_steps_count + " " + (root.is_ua ? "кроків" : "segments");
-                                    color: #71717A;
-                                    font-size: 10px;
-                                    horizontal-alignment: center;
-                                }
-                            }
-                        }
-                        if (root.is_idle) : TouchArea { clicked => { root.open_library(); } }
 
-                        if (!root.is_idle) : VerticalBox {
-                            x: 0px; y: 28px;
-                            width: 220px;
-                            spacing: 4px;
-                            Text { text: root.is_ua ? "КРОК" : "STEP"; color: #A1A1AA; font-size: 10px; horizontal-alignment: center; }
-                            Text { text: root.step_index + " / " + root.total_steps; color: #FFFFFF; font-family: "PT Sans"; font-size: 28px; horizontal-alignment: center; }
-                            Text { text: root.is_ua ? "Нагрів до " + root.target + "°C" : "Ramp to " + root.target + "°C"; color: #71717A; font-size: 10px; horizontal-alignment: center; }
+
+                            Text {
+
+
+
+                                x: 0px; y: 58px;
+
+
+
+                                width: parent.width;
+
+
+
+                                text: root.is_ua ? "програму" : "Schedule";
+
+
+
+                                color: root.c_muted;
+
+
+
+                                font-family: "PT Sans";
+
+
+
+                                font-size: 15px;
+
+
+
+                                horizontal-alignment: center;
+
+
+
+                            }
+
+
+
                         }
-                    // Action buttons
-                    HorizontalBox {
-                        x: 10px; y: 174px;
-                        width: 220px; height: 94px;
-                        spacing: 8px;
+
+
+
+                        if (root.selected_schedule_name != "") : Rectangle {
+
+
+
+                            width: parent.width; height: parent.height;
+
+
+
+                            background: #00000000;
+
+
+
+                            Text {
+
+
+
+                                x: 0px; y: 42px;
+
+
+
+                                width: parent.width;
+
+
+
+                                text: root.is_ua ? "Старт" : "Start";
+
+
+
+                                color: #000000;
+
+
+
+                                font-family: "PT Sans";
+
+
+
+                                font-size: 15px;
+
+
+
+                                horizontal-alignment: center;
+
+
+
+                            }
+
+
+
+                            Text {
+
+
+
+                                x: 0px; y: 58px;
+
+
+
+                                width: parent.width;
+
+
+
+                                text: root.is_ua ? "Випал" : "Firing";
+
+
+
+                                color: #000000;
+
+
+
+                                font-family: "PT Sans";
+
+
+
+                                font-size: 15px;
+
+
+
+                                horizontal-alignment: center;
+
+
+
+                            }
+
+
+
+                        }
+
+
+
+                        TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.start_firing(); } }
+
+
+                    }
+
+
+
+                    Rectangle {
+
+
+
+                        x: 114px; y: 0px; visible: root.is_idle;
+
+
+                        width: 106px; height: 94px;
+
+
+
+                        background: root.c_border;
+
+
+
+                        border-radius: 16px;
+
+
+
+                        ThermometerIcon {
+
+
+
+                            x: (parent.width - self.width) / 2;
+
+
+
+                            y: 18px;
+
+
+
+                            color: root.c_text;
+
+
+
+                            width: 18px; height: 18px;
+
+
+
+                        }
+
+
+
+                        Text {
+
+
+
+                            x: 0px; y: 46px;
+
+
+
+                            width: parent.width;
+
+
+
+                            text: root.is_ua ? "Програми" : "Programs";
+
+
+
+                            color: root.c_text;
+
+
+
+                            font-family: "PT Sans";
+
+
+
+                            font-size: 15px;
+
+
+
+                            horizontal-alignment: center;
+
+
+
+                            vertical-alignment: center;
+
+
+
+                        }
+
+
+
+                        TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.open_library(); } }
+
+
+
+                    }
+
+
+
+                }
+
+
+
+            }
+
+
+
+        }
+
+
+
+        // (touch debug bar removed)
+
+
+
+// Schedules View
+
+
+
+        if (root.view == View.Schedules) : Rectangle {
+
+
+
+                x: 0px; y: 0px; width: 480px; height: 280px;
+
+
+
+                background: #000000;
+
+
+
+                HorizontalBox {
+
+
+
+                    x: 14px; y: 10px;
+
+
+
+                    spacing: 6px;
+
+
+
+                    ThermometerIcon { color: #10B981; }
+
+
+
+                    Text {
+
+
+
+                        text: root.is_ua ? "Бібліотека" : "Library";
+
+
+
+                        color: #FFFFFF;
+
+
+
+                        font-family: "PT Sans";
+
+
+
+                        font-size: 18px;
+
+
+
+                    }
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: 420px; y: 8px; width: 40px; height: 28px;
+
+
+
+                    background: #27272A;
+
+
+
+                    border-radius: 10px;
+
+
+
+                    Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                    TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.view = View.Dashboard; } }
+
+
+
+                }
+
+
+
+                ScrollView { // schedules-list
+                    x: 10px; y: 48px; width: 460px; height: parent.height - 58px;
+                    VerticalBox {
+                        spacing: 6px;
+                        for schedule[i] in root.schedules : Rectangle {
+
+
+
+                            width: 440px; height: 80px;
+
+
+                            background: schedule.selected ? #1F2937 : #0F0F0F;
+
+
+
+                            border-color: schedule.selected ? #10B981 : #27272A;
+
+
+
+                            border-width: 1px;
+
+
+
+                            border-radius: 12px;
+
+
+
+                            Text {
+
+
+
+                                x: 12px; y: 12px;
+
+
+                                text: schedule.name;
+
+
+                                color: #FFFFFF;
+
+
+
+                                font-family: "PT Sans";
+
+
+
+                                font-size: 18px;
+                                font-weight: 700;
+
+
+
+                            }
+
+
+
+                            Text {
+
+
+
+                                x: 12px; y: 54px;
+
+
+                                text: schedule.steps_count + " " + (root.is_ua ? "кроків" : "segments");
+
+
+                                color: #A1A1AA;
+
+
+
+                                font-size: 14px;
+
+
+                            }
+
+
+
+                            Text {
+
+
+
+                                x: 210px; y: 54px;
+                                width: parent.width - 210px - 68px;
+
+
+                                text: "• " + (root.is_ua ? "Користувацька" : "Custom");
+
+
+                                color: #A1A1AA;
+
+
+
+                                font-size: 14px;
+
+
+                                horizontal-alignment: right;
+
+
+
+                            }
+
+
+
+                            Rectangle {
+
+                                z: 2;
+
+                                x: parent.width - self.width - 10px;
+                                y: (parent.height - self.height) / 2;
+                                width: 52px; height: 52px;
+
+
+                                background: schedule.selected ? #10B981 : #27272A;
+
+
+
+                                border-radius: 26px;
+
+
+                                PlayIcon {
+
+
+
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+
+
+                                    width: 22px; height: 22px;
+
+
+                                    color: schedule.selected ? #000000 : #FFFFFF;
+
+
+
+                                }
+
+
+
+                                TouchArea {
+
+
+
+                    width: parent.width; height: parent.height; clicked => { root.select_schedule(i); } }
+
+
+
+                            }
+
+
+
+                            TouchArea {
+
+
+
+                                x: 0px; y: 0px;
+                                width: parent.width - 68px; height: parent.height;
+                                z: 1;
+                                clicked => { root.edit_schedule(i); }
+                            }
+
+
+                        }
+
+
 
                         Rectangle {
-                            width: root.is_idle ? 106px : 220px; height: 94px;
-                            background: root.is_idle ? (root.selected_schedule_name == "" ? #27272A : #10B981) : #DC2626;
-                            border-radius: 16px;
-                            Text {
-                                text: root.is_idle ? (root.selected_schedule_name == "" ? (root.is_ua ? "ВИБЕРІТЬ" : "SELECT") : (root.is_ua ? "СТАРТ" : "START")) : (root.is_ua ? "СТОП" : "STOP");
-                                color: root.is_idle ? (root.selected_schedule_name == "" ? #A1A1AA : #000000) : #FFFFFF;
-                                font-family: "PT Sans";
-                                font-size: 14px;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                            TouchArea { clicked => { root.is_idle ? root.start_firing() : root.stop_firing(); } }
+
+
+
+                            width: 440px; height: 80px;
+
+
+                            background: #000000;
+
+
+
+                            border-color: #3F3F46;
+
+
+
+                            border-width: 1px;
+
+
+
+                            border-radius: 12px;
+
+
+
+                            Text { text: root.is_ua ? "Нова програма" : "New Program"; color: #A1A1AA; font-family: "PT Sans"; font-size: 18px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+
+
+                            TouchArea {
+
+
+
+                    width: parent.width; height: parent.height; clicked => { root.new_schedule(); } }
+
+
+
                         }
 
-                        if (root.is_idle) : Rectangle {
-                                width: 106px; height: 94px;
-                                background: #27272A;
-                                border-radius: 16px;
-                                Text {
-                                    text: root.is_ua ? "ПРОГРАМИ" : "SCHEDULES";
-                                    color: #FFFFFF;
-                                    font-family: "PT Sans";
-                                    font-size: 12px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                                TouchArea { clicked => { root.open_library(); } }
-                            }
+
+
                     }
                 }
-            }
-        // Schedules View
-        if (root.view == View.Schedules) : Rectangle {
+
+
+
+        }
+
+
+
+        // Settings View
+        if (root.view == View.Settings) : Rectangle {
                 x: 0px; y: 0px; width: 480px; height: 280px;
                 background: #000000;
 
-                Text {
-                    x: 18px; y: 12px;
-                    text: root.is_ua ? "БІБЛІОТЕКА" : "LIBRARY";
-                    color: #FFFFFF;
-                    font-family: "PT Sans";
-                    font-size: 18px;
+                HorizontalBox {
+                    x: 14px; y: 10px;
+                    spacing: 6px;
+                    WifiIcon { color: root.wifi_ok ? #10B981 : #52525B; }
+                    Text {
+                        text: root.is_ua ? "Налаштування" : "Settings";
+                        color: #FFFFFF;
+                        font-family: "PT Sans";
+                        font-size: 18px;
+                    }
                 }
 
                 Rectangle {
@@ -379,228 +2172,1505 @@ export component AppWindow inherits Window {
                     background: #27272A;
                     border-radius: 10px;
                     Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
-                    TouchArea { clicked => { root.view = View.Dashboard; } }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.view = View.Dashboard; } }
                 }
 
                 VerticalBox {
                     x: 10px; y: 48px;
-                    spacing: 6px;
-                    for schedule[i] in root.schedules : Rectangle {
-                        width: 460px; height: 48px;
-                        background: schedule.selected ? #1F2937 : #0F0F0F;
-                        border-color: schedule.selected ? #10B981 : #27272A;
-                        border-width: 1px;
-                        border-radius: 12px;
-
-                        Text {
-                            x: 12px; y: 6px;
-                            text: schedule.name;
-                            color: #FFFFFF;
-                            font-family: "PT Sans";
-                            font-size: 14px;
-                        }
-                        Text {
-                            x: 12px; y: 26px;
-                            text: schedule.steps_count + " " + (root.is_ua ? "кроків" : "segments");
-                            color: #A1A1AA;
-                            font-size: 10px;
-                        }
-
-                        Rectangle {
-                            x: 410px; y: 6px; width: 36px; height: 36px;
-                            background: schedule.selected ? #10B981 : #27272A;
-                            border-radius: 18px;
-                            Text { text: ">"; color: schedule.selected ? #000000 : #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                            TouchArea { clicked => { root.select_schedule(i); } }
-                        }
-                        TouchArea { clicked => { root.edit_schedule(i); } }
-                    }
+                    spacing: 4px;
 
                     Rectangle {
-                        width: 460px; height: 48px;
-                        background: #000000;
-                        border-color: #3F3F46;
-                        border-width: 1px;
-                        border-radius: 12px;
-                        Text { text: root.is_ua ? "НОВА ПРОГРАМА" : "NEW SCHEDULE"; color: #A1A1AA; horizontal-alignment: center; vertical-alignment: center; }
-                        TouchArea { clicked => { root.new_schedule(); } }
-                    }
-                }
-        }
-
-        // Editor View
-        if (root.view == View.Editor) : Rectangle {
-                x: 0px; y: 0px; width: 480px; height: 280px;
-                background: #000000;
-
-                Rectangle {
-                    x: 10px; y: 8px; width: 360px; height: 28px;
-                    background: #000000;
-                    border-color: #27272A;
-                    border-width: 1px;
-                    Text { text: root.selected_schedule_name; color: #FFFFFF; font-family: "PT Sans"; font-size: 18px; }
-                }
-
-                Rectangle {
-                    x: 378px; y: 6px; width: 44px; height: 28px;
-                    background: #10B981;
-                    border-radius: 10px;
-                    Text { text: root.is_ua ? "ЗБЕР" : "SAVE"; color: #000000; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
-                    TouchArea { clicked => { root.editor_save(); } }
-                }
-
-                Rectangle {
-                    x: 430px; y: 6px; width: 40px; height: 28px;
-                    background: #27272A;
-                    border-radius: 10px;
-                    Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
-                    TouchArea { clicked => { root.editor_back(); } }
-                }
-
-                VerticalBox {
-                    x: 10px; y: 48px;
-                    spacing: 6px;
-                    for step[i] in root.editor_steps : Rectangle {
-                        width: 460px; height: 50px;
+                        width: 460px; height: 98px;
                         background: #0F0F0F;
                         border-color: #27272A;
                         border-width: 1px;
-                        border-radius: 10px;
-
-                        Text { x: 10px; y: 14px; text: (i + 1); color: #A1A1AA; font-size: 12px; }
-                        Rectangle {
-                            x: 40px; y: 10px; width: 70px; height: 30px;
-                            background: #27272A;
-                            border-radius: 6px;
-                            Text { text: step.is_hold ? "HOLD" : "RAMP"; color: #FFFFFF; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
-                            TouchArea { clicked => { root.editor_toggle_step(i); } }
-                        }
+                        border-radius: 12px;
 
                         Text {
-                            x: 130px; y: 12px;
-                            text: step.is_hold ? (step.hold + " min") : (step.target + " °C");
+                            x: 12px; y: 10px;
+                            text: root.is_ua ? "Wi‑Fi" : "Wi‑Fi";
                             color: #FFFFFF;
                             font-family: "PT Sans";
                             font-size: 16px;
                         }
 
-                        Rectangle {
-                            x: 320px; y: 10px; width: 30px; height: 30px;
-                            background: #27272A;
-                            border-radius: 6px;
-                            Text { text: "-"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                            TouchArea { clicked => { step.is_hold ? root.editor_hold_minus(i) : root.editor_target_minus(i); } }
+                        Text {
+                            x: 12px; y: 34px;
+                            text: root.wifi_ok
+                                ? (root.is_ua ? "Підключено" : "Connected")
+                                : (root.is_ua ? "Немає з'єднання" : "Disconnected");
+                            color: #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 12px;
                         }
-                        Rectangle {
-                            x: 360px; y: 10px; width: 30px; height: 30px;
-                            background: #27272A;
-                            border-radius: 6px;
-                            Text { text: "+"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                            TouchArea { clicked => { step.is_hold ? root.editor_hold_plus(i) : root.editor_target_plus(i); } }
+
+                        Text {
+                            x: 12px; y: 50px;
+                            text: root.wifi_selected_ssid == ""
+                                ? (root.is_ua ? "Оберіть мережу зі списку" : "Pick a network from list")
+                                : root.wifi_selected_ssid;
+                            color: #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 12px;
                         }
+
                         Rectangle {
-                            x: 400px; y: 10px; width: 40px; height: 30px;
+                            x: 12px; y: 76px; width: 212px; height: 18px;
+                            background: #27272A;
+                            border-radius: 8px;
+                            Text {
+                                text: root.wifi_ok ? (root.is_ua ? "Змінити мережу" : "Change network")
+                                                  : (root.is_ua ? "Пошук мережі" : "Search networks");
+                                color: #FFFFFF;
+                                font-family: "PT Sans";
+                                font-size: 11px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => { root.wifi_open_picker(); }
+                            }
+                        }
+
+                        Rectangle {
+                            x: 236px; y: 76px; width: 212px; height: 18px;
                             background: #7F1D1D;
-                            border-radius: 6px;
-                            Text { text: "X"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                            TouchArea { clicked => { root.editor_remove(i); } }
+                            border-radius: 8px;
+                            Text {
+                                text: root.is_ua ? "Відключити Wi‑Fi" : "Disconnect Wi‑Fi";
+                                color: #FFFFFF;
+                                font-family: "PT Sans";
+                                font-size: 11px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => { root.wifi_disconnect(); }
+                            }
+                        }
+                    }
+
+                    if (root.wifi_picker_visible) : Rectangle {
+                        x: 0px; y: 0px; width: 480px; height: 280px;
+                        background: #000000CC;
+                        z: 2000;
+
+                        Rectangle {
+                            x: 16px; y: 12px; width: 448px; height: 252px;
+                            background: #0F0F0F;
+                            border-color: #27272A;
+                            border-width: 1px;
+                            border-radius: 12px;
+
+                            Text {
+                                x: 12px; y: 10px;
+                                text: root.is_ua ? "Вибір Wi‑Fi мережі" : "Select Wi‑Fi network";
+                                color: #FFFFFF;
+                                font-family: "PT Sans";
+                                font-size: 16px;
+                            }
+
+                            Rectangle {
+                                x: 404px; y: 8px; width: 32px; height: 24px;
+                                background: #27272A;
+                                border-radius: 8px;
+                                Text { text: "X"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                                TouchArea { width: parent.width; height: parent.height; clicked => { root.wifi_picker_visible = false; } }
+                            }
+
+                            if (root.wifi_scan_busy) : Text {
+                                x: 12px; y: 44px;
+                                text: root.is_ua ? "Пошук мереж..." : "Scanning networks...";
+                                color: #A1A1AA;
+                                font-family: "PT Sans";
+                                font-size: 14px;
+                            }
+
+                            if (!root.wifi_scan_busy && root.wifi_networks.length == 0) : Text {
+                                x: 12px; y: 44px;
+                                text: root.is_ua ? "Мереж не знайдено" : "No networks found";
+                                color: #A1A1AA;
+                                font-family: "PT Sans";
+                                font-size: 14px;
+                            }
+
+                            if (!root.wifi_scan_busy && root.wifi_networks.length > 0) : ScrollView {
+                                x: 8px; y: 40px; width: 432px; height: 204px;
+
+                                VerticalBox {
+                                    spacing: 4px;
+                                    for net in root.wifi_networks : Rectangle {
+                                        width: 430px; height: 30px;
+                                        background: #18181B;
+                                        border-color: #27272A;
+                                        border-width: 1px;
+                                        border-radius: 8px;
+
+                                        Text {
+                                            x: 8px; y: 6px;
+                                            text: net.ssid + " (" + net.rssi + " dBm)";
+                                            color: #FFFFFF;
+                                            font-family: "PT Sans";
+                                            font-size: 13px;
+                                        }
+
+                                        TouchArea {
+                                            width: parent.width; height: parent.height;
+                                            clicked => {
+                                                root.wifi_selected_ssid = net.ssid;
+                                                root.wifi_password = "";
+                                                root.kb_open("wifi_pass", -1, "");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
                     Rectangle {
-                        width: 460px; height: 44px;
+                        width: 460px; height: 66px;
                         background: #0F0F0F;
                         border-color: #27272A;
                         border-width: 1px;
-                        border-radius: 10px;
-                        Text { text: "+ ADD STEP"; color: #A1A1AA; horizontal-alignment: center; vertical-alignment: center; }
-                        TouchArea { clicked => { root.editor_add_step(); } }
+                        border-radius: 12px;
+
+                        Text {
+                            x: 12px; y: 8px;
+                            text: root.is_ua ? "Вентилятор" : "Fan";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                        }
+
+                        Text {
+                            x: 12px; y: 34px;
+                            text: root.fan_manual
+                                ? (root.is_ua ? "Ручний режим" : "Manual mode")
+                                : (root.is_ua ? "Вимкнено" : "Off");
+                            color: #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 12px;
+                        }
+
+                        Rectangle {
+                            x: 356px; y: 8px; width: 92px; height: 24px;
+                            background: root.fan_manual ? #10B981 : #27272A;
+                            border-radius: 10px;
+                            Text {
+                                text: root.fan_manual ? (root.is_ua ? "ВКЛ" : "ON") : (root.is_ua ? "ВИКЛ" : "OFF");
+                                color: root.fan_manual ? #000000 : #FFFFFF;
+                                font-family: "PT Sans";
+                                font-size: 14px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => {
+                                    let new_manual = !root.fan_manual;
+                                    root.fan_manual = new_manual;
+                                    if (new_manual && root.fan_power == 0) { root.fan_power = 100; }
+                                    if (!new_manual) { root.fan_power = 0; }
+                                    root.fan_manual_changed(new_manual);
+                                    root.fan_power_changed(root.fan_power);
+                                }
+                            }
+                        }
+
+                        Rectangle { // -
+                            x: 310px; y: 34px; width: 44px; height: 24px;
+                            background: root.fan_manual ? #27272A : #18181B;
+                            border-radius: 10px;
+                            Text { text: "−"; color: #FFFFFF; font-family: "PT Sans"; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => {
+                                    if (root.fan_manual) {
+                                        root.fan_power = max(root.fan_power - 10, 0);
+                                        root.fan_power_changed(root.fan_power);
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle { // % (tap for keypad)
+                            x: 358px; y: 34px; width: 60px; height: 24px;
+                            background: root.fan_manual ? #27272A : #18181B;
+                            border-radius: 10px;
+                            Text { text: root.fan_power + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => {
+                                    if (root.fan_manual) {
+                                        if (!(root.kb_visible && root.kb_field == "fan" && root.kb_step_index == -1)) {
+                                            root.kb_open("fan", -1, root.fan_power + "");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle { // +
+                            x: 422px; y: 34px; width: 44px; height: 24px;
+                            background: root.fan_manual ? #27272A : #18181B;
+                            border-radius: 10px;
+                            Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => {
+                                    if (root.fan_manual) {
+                                        root.fan_power = min(root.fan_power + 10, 100);
+                                        root.fan_power_changed(root.fan_power);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 460px; height: 46px;
+                        background: #27272A;
+                        border-radius: 12px;
+                        Text {
+                            text: root.is_ua ? "Калібрування тач" : "Touch Calibration";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        TouchArea { width: parent.width; height: parent.height; clicked => { root.start_touch_calibration(); } }
                     }
                 }
-            }
+        }
 
-        // Touch calibration
-        if (root.view == View.Calibration) : Rectangle {
+        // Editor View
+
+
+        if (root.view == View.Editor) : Rectangle {
+
+
+
                 x: 0px; y: 0px; width: 480px; height: 280px;
+
+
+
                 background: #000000;
 
-                Text {
-                    x: 18px; y: 12px;
-                    text: root.is_ua ? "КАЛІБРУВАННЯ ТАЧ" : "TOUCH CALIBRATION";
-                    color: #FFFFFF;
-                    font-family: "PT Sans";
-                    font-size: 18px;
+
+
+                Rectangle {
+
+
+
+                    x: 10px; y: 6px; width: 266px; height: 34px;
+
+
+                    background: #000000;
+
+
+
+                    border-color: #27272A;
+
+
+
+                    border-width: 1px;
+
+
+
+                    border-radius: 8px;
+
+
+
+                    property <string> name_display: (root.kb_visible && root.kb_field == "name") ? root.kb_value : root.selected_schedule_name;
+
+                    TextInput { visible: false;
+
+
+
+                        x: 6px; y: 5px;
+
+
+                        width: parent.width - 12px; height: parent.height - 8px;
+
+
+
+                        text: parent.name_display;
+
+
+
+                        color: #FFFFFF;
+
+
+
+                        font-family: "PT Sans";
+
+
+
+                        font-size: 18px;
+
+
+                        input-type: InputType.text;
+
+
+
+                    }
+
+                    Text {
+                        x: 6px; y: 5px;
+                        width: parent.width - 12px; height: parent.height - 8px;
+                        text: parent.name_display;
+                        color: #FFFFFF;
+                        font-family: "PT Sans";
+                        font-size: 18px;
+                        font-weight: 700;
+                        horizontal-alignment: left;
+                        vertical-alignment: center;
+                    }
+
+                    if (self.name_display == "") : Text {
+
+
+
+                        x: 8px; y: 10px;
+
+
+                        text: root.is_ua ? "Назва програми" : "Program Name";
+
+
+
+                        color: #71717A;
+
+
+
+                        font-family: "PT Sans";
+
+
+
+                        font-size: 14px;
+
+
+                    }
+
+                    TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        clicked => {
+                            if (!(root.kb_visible && root.kb_field == "name")) {
+                                root.kb_open("name", -1, root.selected_schedule_name);
+                            }
+                        }
+                    }
+
+
+
                 }
 
+
+
+                Rectangle {
+
+
+
+                    x: 286px; y: 6px; width: 132px; height: 34px;
+
+
+                    background: #10B981;
+
+
+
+                    border-radius: 10px;
+
+
+
+                    Text { text: root.is_ua ? "Зберегти" : "Save"; color: #000000; font-family: "PT Sans"; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
+
+
+                    TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.editor_save(); } }
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: 426px; y: 6px; width: 44px; height: 34px;
+
+
+                    background: #27272A;
+
+
+
+                    border-radius: 10px;
+
+
+
+                    Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                    TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.editor_back(); } }
+
+
+
+                }
+
+
+
+                ScrollView {
+                    x: 10px; y: 48px; width: 460px; height: parent.height - 58px;
+                    VerticalBox {
+                        spacing: 6px;
+                        if (root.editor_steps.length == 0) : Rectangle {
+
+
+
+                            width: 440px; height: 60px;
+
+
+
+                            background: #000000;
+
+
+
+                            border-color: #27272A;
+
+
+
+                            border-width: 1px;
+
+
+
+                            border-radius: 12px;
+
+
+
+                            Text { text: root.is_ua ? "Ще не додано жодного кроку" : "No steps added yet"; color: #A1A1AA; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                        }
+
+
+
+                        for step[i] in root.editor_steps : Rectangle {
+
+
+
+                            width: 440px; height: 92px;
+
+
+                            background: #0F0F0F;
+
+
+
+                            border-color: #27272A;
+
+
+
+                            border-width: 1px;
+
+
+
+                            border-radius: 10px;
+
+
+
+                            Rectangle {
+
+
+
+                                x: 8px;
+                                y: (parent.height - self.height) / 2;
+                                width: 32px; height: 32px;
+
+
+                                background: #27272A;
+
+
+
+                                border-radius: 16px;
+
+
+                                Text { text: (i + 1); color: #A1A1AA; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+
+
+                            }
+
+
+
+                            // Center the labels+values as a single block inside the segment row.
+                            HorizontalBox {
+
+
+                                x: 44px;
+                                y: (parent.height - self.height) / 2 - 12px;
+                                height: 58px;
+
+
+                                spacing: 6px;
+
+
+
+                                VerticalBox {
+
+
+
+                                    width: 120px;
+
+
+                                    spacing: 4px;
+
+
+                                    Text { text: root.is_ua ? "Швидк. (°C/год)" : "Rate (°C/h)"; color: #71717A; font-size: 14px; }
+
+
+                                    Rectangle {
+
+
+
+                                        width: 120px; height: 42px;
+
+
+                                        background: #000000;
+
+
+
+                                        border-color: #3F3F46;
+
+
+
+                                        border-width: 1px;
+
+
+
+                                        border-radius: 8px;
+
+
+                                        TextInput { visible: false;
+                                            x: 6px; y: 4px;
+
+
+                                            width: parent.width - 12px; height: parent.height - 8px;
+
+
+
+                                            text: step.rate + "";
+
+
+
+                                            color: #FFFFFF;
+
+
+
+                                            font-family: "PT Sans";
+
+
+
+                                            font-size: 14px;
+
+
+
+                                            input-type: InputType.number;
+
+
+
+                                            edited => { root.editor_rate_changed(i, self.text); }
+
+
+                                        }
+
+                                        Text {
+                                            width: parent.width; height: parent.height;
+                                            text: step.rate + "";
+                                            color: #FFFFFF;
+                                            font-family: "PT Sans";
+                                            font-size: 18px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            width: parent.width; height: parent.height;
+                                            clicked => {
+                                                if (!(root.kb_visible && root.kb_field == "rate" && root.kb_step_index == i)) {
+                                                    root.kb_open("rate", i, step.rate + "");
+                                                }
+                                            }
+                                        }
+
+
+                                    }
+
+
+
+                                }
+
+
+
+                                VerticalBox {
+
+
+
+                                    width: 120px;
+
+
+                                    spacing: 4px;
+
+
+                                    Text { text: root.is_ua ? "Темп. (°C)" : "Target (°C)"; color: #71717A; font-size: 14px; }
+
+
+                                    Rectangle {
+
+
+
+                                        width: 120px; height: 42px;
+
+
+                                        background: #000000;
+
+
+
+                                        border-color: #3F3F46;
+
+
+
+                                        border-width: 1px;
+
+
+
+                                        border-radius: 8px;
+
+
+                                        TextInput { visible: false;
+
+
+                                            x: 6px; y: 4px;
+
+
+
+                                            width: parent.width - 12px; height: parent.height - 8px;
+
+
+
+                                            text: step.target + "";
+
+
+
+                                            color: #FFFFFF;
+
+
+
+                                            font-family: "PT Sans";
+
+
+
+                                            font-size: 14px;
+
+
+
+                                            input-type: InputType.number;
+
+
+
+                                            edited => { root.editor_target_changed(i, self.text); }
+
+
+                                        }
+
+                                        Text {
+                                            width: parent.width; height: parent.height;
+                                            text: step.target + "";
+                                            color: #FFFFFF;
+                                            font-family: "PT Sans";
+                                            font-size: 18px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            width: parent.width; height: parent.height;
+                                            clicked => {
+                                                if (!(root.kb_visible && root.kb_field == "target" && root.kb_step_index == i)) {
+                                                    root.kb_open("target", i, step.target + "");
+                                                }
+                                            }
+                                        }
+
+
+                                    }
+
+
+
+                                }
+
+
+
+                                VerticalBox {
+
+
+
+                                    width: 120px;
+
+
+                                    spacing: 4px;
+
+
+                                    Text { text: root.is_ua ? "Витр. (хв)" : "Hold (min)"; color: #71717A; font-size: 14px; }
+
+
+                                    Rectangle {
+
+
+
+                                        width: 120px; height: 42px;
+
+
+                                        background: #000000;
+
+
+
+                                        border-color: #3F3F46;
+
+
+
+                                        border-width: 1px;
+
+
+
+                                        border-radius: 8px;
+
+
+                                        TextInput { visible: false;
+
+
+                                            x: 6px; y: 4px;
+
+
+
+                                            width: parent.width - 12px; height: parent.height - 8px;
+
+
+
+                                            text: step.hold + "";
+
+
+
+                                            color: #FFFFFF;
+
+
+
+                                            font-family: "PT Sans";
+
+
+
+                                            font-size: 14px;
+
+
+
+                                            input-type: InputType.number;
+
+
+
+                                            edited => { root.editor_hold_changed(i, self.text); }
+
+
+                                        }
+
+                                        Text {
+                                            width: parent.width; height: parent.height;
+                                            text: step.hold + "";
+                                            color: #FFFFFF;
+                                            font-family: "PT Sans";
+                                            font-size: 18px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            width: parent.width; height: parent.height;
+                                            clicked => {
+                                                if (!(root.kb_visible && root.kb_field == "hold" && root.kb_step_index == i)) {
+                                                    root.kb_open("hold", i, step.hold + "");
+                                                }
+                                            }
+                                        }
+
+
+                                    }
+
+
+
+                                }
+
+
+
+                            }
+
+
+
+                            Rectangle {
+
+
+
+                                x: parent.width - self.width - 8px;
+                                y: 6px;
+                                width: 30px; height: 30px;
+
+
+                                background: #27272A;
+
+
+
+                                border-radius: 8px;
+
+
+                                Text { text: "X"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                                TouchArea {
+
+
+
+                    width: parent.width; height: parent.height; clicked => { root.editor_remove(i); } }
+
+
+
+                            }
+
+
+
+                        }
+
+
+
+                        Rectangle {
+
+
+
+                        width: 440px; height: 44px;
+
+
+
+                            background: #0F0F0F;
+
+
+
+                            border-color: #27272A;
+
+
+
+                            border-width: 1px;
+
+
+
+                            border-radius: 10px;
+
+
+
+                        Text { text: root.is_ua ? "+ Додати крок" : "+ Add Step"; color: #A1A1AA; font-size: 18px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                            TouchArea {
+
+
+
+                    width: parent.width; height: parent.height; clicked => { root.editor_add_step(); } }
+
+
+
+                        }
+
+
+
+                    }
+                }
+
+
+
+            }
+
+
+
+// Touch calibration
+
+
+
+        if (root.view == View.Calibration) : Rectangle {
+
+
+
+                x: 0px; y: 0px; width: 480px; height: 320px;
+
+
+
+                background: #000000;
+
+
+
                 Text {
+
+
+
+                    x: 18px; y: 12px;
+
+
+
+                    text: root.is_ua ? "КАЛІБРУВАННЯ ТАЧ" : "Touch Calibration";
+
+
+
+                    color: #FFFFFF;
+
+
+
+                    font-family: "PT Sans";
+
+
+
+                    font-size: 18px;
+
+
+
+                }
+
+
+
+                Text {
+
+
+
                     x: 18px; y: 38px; width: 444px;
+
+
+
                     text: root.calib_hint;
+
+
+
+                    color: #A1A1AA;
+
+
+
+                    font-family: "PT Sans";
+
+
+
+                    font-size: 12px;
+
+
+
+                }
+
+
+
+                // target dot
+
+
+
+                Rectangle {
+
+
+
+                    x: root.calib_target_x * 1px - 14px;
+
+
+
+                    y: root.calib_target_y * 1px - 14px;
+
+
+
+                    width: 28px; height: 28px;
+
+
+
+                    background: #00000000;
+
+
+
+                    border-color: #10B981;
+
+
+
+                    border-width: 2px;
+
+
+
+                    border-radius: 14px;
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: root.calib_target_x * 1px - 1px;
+
+
+
+                    y: root.calib_target_y * 1px - 10px;
+
+
+
+                    width: 2px; height: 20px;
+
+
+
+                    background: #10B981;
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: root.calib_target_x * 1px - 10px;
+
+
+
+                    y: root.calib_target_y * 1px - 1px;
+
+
+
+                    width: 20px; height: 2px;
+
+
+
+                    background: #10B981;
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: 360px; y: 10px; width: 100px; height: 28px;
+
+
+
+                    background: #27272A;
+
+
+
+                    border-radius: 10px;
+
+
+
+                    Text { text: root.is_ua ? "Скасувати" : "Cancel"; color: #FFFFFF; font-family: "PT Sans"; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.cancel_touch_calibration(); } }
+
+
+
+                }
+
+
+
+        }
+
+
+
+    }
+
+
+
+    // Stop modal
+
+
+
+    // Full-screen text keyboard (program name)
+    if (root.kb_visible && (root.kb_field == "name" || root.kb_field == "wifi_pass")) : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 480px;
+        height: 320px;
+        z: 5000;
+
+        background: #000000;
+
+        property <[string]> ua_r1: ["Й","Ц","У","К","Е","Н","Г","Ш","Щ","З","Х","Ї"];
+        property <[string]> ua_r2: ["Ф","І","В","А","П","Р","О","Л","Д","Ж","Є"];
+        property <[string]> ua_r3: ["Я","Ч","С","М","И","Т","Ь","Б","Ю","Ґ"];
+
+        property <[string]> en_r1: ["Q","W","E","R","T","Y","U","I","O","P"];
+        property <[string]> en_r2: ["A","S","D","F","G","H","J","K","L"];
+        property <[string]> en_r3: ["Z","X","C","V","B","N","M"];
+
+        Rectangle {
+            x: 0px; y: 0px; width: parent.width; height: 70px;
+            background: #111118;
+            border-color: #27272A;
+            border-width: 1px;
+
+            KbKeyButton { x: 10px; y: 13px; width: 72px; height: 44px; background: #7F1D1D; label: root.is_ua ? "Скас." : "Cancel"; font_size: 14px;
+                pressed(v) => { root.kb_key("CANCEL"); }
+            }
+            KbKeyButton { x: 398px; y: 13px; width: 72px; height: 44px; background: #10B981; text_color: #000000; label: "OK"; font_size: 18px;
+                pressed(v) => { root.kb_key("OK"); }
+            }
+
+            Rectangle {
+                x: 90px; y: 10px; width: 300px; height: 50px;
+                background: #0B0B0B;
+                border-color: #27272A;
+                border-width: 1px;
+                border-radius: 10px;
+                clip: true;
+
+                Text {
+                    x: 10px; y: 6px;
+                    text: root.kb_field == "name"
+                        ? (root.is_ua ? "Назва програми" : "Program Name")
+                        : (root.is_ua ? "Пароль Wi‑Fi" : "Wi‑Fi Password");
                     color: #A1A1AA;
                     font-family: "PT Sans";
                     font-size: 12px;
                 }
 
-                // target dot
-                Rectangle {
-                    x: root.calib_target_x * 1px - 14px;
-                    y: root.calib_target_y * 1px - 14px;
-                    width: 28px; height: 28px;
-                    background: #00000000;
-                    border-color: #10B981;
-                    border-width: 2px;
-                    border-radius: 14px;
-                }
-                Rectangle {
-                    x: root.calib_target_x * 1px - 1px;
-                    y: root.calib_target_y * 1px - 10px;
-                    width: 2px; height: 20px;
-                    background: #10B981;
-                }
-                Rectangle {
-                    x: root.calib_target_x * 1px - 10px;
-                    y: root.calib_target_y * 1px - 1px;
-                    width: 20px; height: 2px;
-                    background: #10B981;
-                }
-
-                Rectangle {
-                    x: 140px; y: 210px; width: 200px; height: 52px;
-                    background: #27272A;
-                    border-radius: 12px;
-                    Text { text: root.is_ua ? "СКАСУВАТИ" : "CANCEL"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
-                    TouchArea { clicked => { root.cancel_touch_calibration(); } }
-                }
-        }
-    }
-    // Stop modal
-    if (root.show_stop_confirm) : Rectangle {
-            x: 0px; y: 0px; width: 480px; height: 320px;
-            background: #000000B3;
-            Rectangle {
-                x: 60px; y: 50px; width: 360px; height: 220px;
-                background: #0B0B0B;
-                border-color: #3F3F46;
-                border-width: 1px;
-                border-radius: 18px;
-
-                Rectangle {
-                    x: 148px; y: 16px; width: 64px; height: 64px;
-                    background: #7F1D1D;
-                    border-radius: 32px;
-                    Text { text: "!"; color: #EF4444; font-size: 28px; horizontal-alignment: center; vertical-alignment: center; }
-                }
-
                 Text {
-                    x: 0px; y: 86px; width: 360px;
-                    text: root.is_ua ? "Зупинити випал?" : "STOP FIRING?";
+                    x: 10px; y: 22px;
+                    width: parent.width - 20px;
+                    text: root.kb_value;
                     color: #FFFFFF;
                     font-family: "PT Sans";
                     font-size: 20px;
-                    horizontal-alignment: center;
+                    font-weight: 700;
+                    wrap: no-wrap;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        KbKeyRow {
+            row_y: -78px;
+            keys: root.is_ua ? parent.ua_r1 : parent.en_r1;
+            key_width: root.is_ua ? 38px : 46px;
+            key_height: 44px;
+            gap: 2px;
+            start_x: -238px;
+            font_size: 20px;
+            key_pressed(v) => { root.kb_key(v); }
+        }
+
+        KbKeyRow {
+            row_y: -30px;
+            keys: root.is_ua ? parent.ua_r2 : parent.en_r2;
+            key_width: root.is_ua ? 40px : 48px;
+            key_height: 44px;
+            gap: 2px;
+            start_x: root.is_ua ? -230px : -222px;
+            font_size: 20px;
+            key_pressed(v) => { root.kb_key(v); }
+        }
+
+        KbKeyRow {
+            row_y: 18px;
+            keys: root.is_ua ? parent.ua_r3 : parent.en_r3;
+            key_width: root.is_ua ? 46px : 66px;
+            key_height: 44px;
+            gap: 2px;
+            start_x: -238px;
+            font_size: 20px;
+            key_pressed(v) => { root.kb_key(v); }
+        }
+
+        KbKeyButton { x: 10px; y: 238px; width: 300px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
+            pressed(v) => { root.kb_key("SPACE"); }
+        }
+        KbKeyButton { x: 318px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: "⌫"; font_size: 22px;
+            pressed(v) => { root.kb_key("BS"); }
+        }
+        KbKeyButton { x: 398px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: root.is_ua ? "Очист." : "Clear"; font_size: 14px;
+            pressed(v) => { root.kb_key("CLR"); }
+        }
+    }
+
+    // Bottom numeric keyboard overlay (Editor)
+    if (root.kb_visible && root.kb_field != "name") : Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 480px;
+        height: 320px;
+        z: 5000;
+
+        background: #000000;
+
+        Text {
+            x: 12px; y: 14px;
+            text: root.kb_field == "rate"
+                ? (root.is_ua ? "Швидкість" : "Rate")
+                : root.kb_field == "target"
+                    ? (root.is_ua ? "Температура" : "Target")
+                    : root.kb_field == "hold"
+                        ? (root.is_ua ? "Витримка" : "Hold")
+                        : (root.is_ua ? "Вентилятор %" : "Fan %");
+            color: #A1A1AA;
+            font-family: "PT Sans";
+            font-size: 14px;
+        }
+
+        Text {
+            x: 12px; y: 38px;
+            text: root.kb_value;
+            color: #FFFFFF;
+            font-family: "PT Sans";
+            font-size: 30px;
+            font-weight: 700;
+        }
+
+        property <length> kx: 25px;
+    property <length> ky: 76px;
+        property <length> kw: 140px;
+        property <length> kh: 42px;
+        property <length> kg: 10px;
+
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "1"; font_size: 22px; pressed(v) => { root.kb_key("1"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "2"; font_size: 22px; pressed(v) => { root.kb_key("2"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "3"; font_size: 22px; pressed(v) => { root.kb_key("3"); } }
+
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "4"; font_size: 22px; pressed(v) => { root.kb_key("4"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "5"; font_size: 22px; pressed(v) => { root.kb_key("5"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "6"; font_size: 22px; pressed(v) => { root.kb_key("6"); } }
+
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "7"; font_size: 22px; pressed(v) => { root.kb_key("7"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "8"; font_size: 22px; pressed(v) => { root.kb_key("8"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "9"; font_size: 22px; pressed(v) => { root.kb_key("9"); } }
+
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #3F3F46; label: root.is_ua ? "Очист." : "Clear"; font_size: 14px; pressed(v) => { root.kb_key("CLR"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "0"; font_size: 22px; pressed(v) => { root.kb_key("0"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #3F3F46; label: "⌫"; font_size: 22px; pressed(v) => { root.kb_key("BS"); } }
+
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 4 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #7F1D1D; label: root.is_ua ? "Скас." : "Cancel"; font_size: 14px; pressed(v) => { root.kb_key("CANCEL"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 4 * (parent.kh + 6px); width: parent.kw + parent.kg + parent.kw; height: parent.kh; background: #10B981; text_color: #000000; label: "OK"; font_size: 20px; pressed(v) => { root.kb_key("OK"); } }
+    }
+
+    if (root.show_stop_confirm) : Rectangle {
+
+
+            x: 0px; y: 0px; width: 480px; height: 320px;
+
+
+
+            background: #000000B3;
+
+
+
+            Rectangle {
+
+
+
+                x: 60px; y: 50px; width: 360px; height: 220px;
+
+
+
+                background: #0B0B0B;
+
+
+
+                border-color: #3F3F46;
+
+
+
+                border-width: 1px;
+
+
+
+                border-radius: 18px;
+
+
+
+                Rectangle {
+
+
+
+                    x: 148px; y: 16px; width: 64px; height: 64px;
+
+
+
+                    background: #7F1D1D;
+
+
+
+                    border-radius: 32px;
+
+
+
+                    Text { text: "!"; color: #EF4444; font-size: 28px; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
                 }
 
+
+
                 Text {
+
+
+
+                    x: 0px; y: 86px; width: 360px;
+
+
+
+                    text: root.is_ua ? "Зупинити?" : "Stop Firing?";
+
+
+
+                    color: #FFFFFF;
+
+
+
+                    font-family: "PT Sans";
+
+
+
+                    font-size: 20px;
+
+
+
+                    horizontal-alignment: center;
+
+
+
+                }
+
+
+
+                Text {
+
+
+
                     x: 0px; y: 120px; width: 360px;
-                    text: root.is_ua ? "Ви впевнені, що хочете зупинити процес?" : "Are you sure you want to abort the process?";
+
+
+
+                    text: "Are you sure you want to abort the process?";
+
+
+
                     color: #A1A1AA;
-                    font-size: 1
+
+
+
+                    font-size: 12px;
+
+
+
+                    horizontal-alignment: center;
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: 20px; y: 156px; width: 150px; height: 52px;
+
+
+
+                    background: #27272A;
+
+
+
+                    border-radius: 12px;
+
+
+
+                    Text { text: "Cancel"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                    TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.stop_cancel(); } }
+
+
+
+                }
+
+
+
+                Rectangle {
+
+
+
+                    x: 190px; y: 156px; width: 150px; height: 52px;
+
+
+
+                    background: #DC2626;
+
+
+
+                    border-radius: 12px;
+
+
+
+                    Text { text: "STOP"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+
+
+
+                    TouchArea {
+
+
+
+                width: parent.width; height: parent.height; clicked => { root.stop_confirm(); } }
+
+
+
+                }
+
+
+
+            }
+
+
+
+    }
+
+
+
+}
+
+
+

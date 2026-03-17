@@ -59,6 +59,21 @@
   </div>
 
   <div class="card">
+    <h3>???????????? ???????? (9 ?????, 3x3)</h3>
+    <ol>
+      <li>??????? <code>Start 9-Point Auto Cal</code>.</li>
+      <li>?? ????? ??????? 9 ????? ?? ???????: ??? ?????? ??? ?????? ??? ??????</li>
+      <li>????????? ???????? ?????? ?? ????????????? ?????? ????????? (grid-warp).</li>
+    </ol>
+    <div class="row">
+      <button id="start_auto9" class="primary">Start 9-Point Auto Cal</button>
+      <button id="reset_affine" class="warn">Reset Affine</button>
+      <button id="reset_grid" class="warn">Reset Grid</button>
+    </div>
+    <pre id="cal9_out">?????????? ?????...</pre>
+  </div>
+
+  <div class="card">
     <h3>Touch probe</h3>
     <div class="row">
       <button id="probe" class="primary">/api/touch/raw</button>
@@ -70,6 +85,7 @@
   <script type="module">
     const out = document.getElementById('out');
     const calOut = document.getElementById('cal_out');
+    const cal9Out = document.getElementById('cal9_out');
 
     async function jget(path) {
       const r = await fetch(path, { cache: 'no-store' });
@@ -91,6 +107,7 @@
     let display = { mirror_x: false, mirror_y: false };
     let touch = { swap_xy: true, mirror_x: false, mirror_y: true };
     const points = { tl: null, tr: null, br: null, bl: null };
+    const gridPts = Array.from({ length: 9 }, () => null);
 
     function render(obj) {
       out.textContent = JSON.stringify(obj, null, 2);
@@ -99,12 +116,16 @@
     function renderCal() {
       calOut.textContent = JSON.stringify(points, null, 2);
     }
+    function renderCal9() {
+      cal9Out.textContent = JSON.stringify(gridPts, null, 2);
+    }
 
     async function load() {
       display = await jget('/api/display');
       touch = await jget('/api/touch/transform');
       render({ display, touch });
       renderCal();
+      renderCal9();
     }
 
     document.getElementById('load').addEventListener('click', load);
@@ -203,6 +224,200 @@
       autoRunning = false;
     }
     document.getElementById('start_auto').addEventListener('click', autoCalibrate);
+
+    function target9(i) {
+      // Must match firmware/slint_ui/src/lib.rs calib_target_for_step()
+      switch (i) {
+        case 0: return [40, 60];
+        case 1: return [240, 60];
+        case 2: return [439, 60];
+        case 3: return [40, 160];
+        case 4: return [240, 160];
+        case 5: return [439, 160];
+        case 6: return [40, 259];
+        case 7: return [240, 259];
+        case 8: return [439, 259];
+        default: return [240, 160];
+      }
+    }
+
+    function computeBox9() {
+      const tl = gridPts[0], tr = gridPts[2], br = gridPts[8], bl = gridPts[6];
+      if (!tl || !tr || !br || !bl) return null;
+
+      const x_l = Math.round((tl.x + bl.x) / 2);
+      const x_r = Math.round((tr.x + br.x) / 2);
+      const y_t = Math.round((tl.y + tr.y) / 2);
+      const y_b = Math.round((br.y + bl.y) / 2);
+
+      const W = 480, H = 320;
+      // Keep targets close to edges to avoid large extrapolation (dead borders).
+      const X_MARGIN = 20, Y_MARGIN = 20;
+      const X_SPAN_PIX = (W - 1) - 2 * X_MARGIN;
+      const Y_SPAN_PIX = (H - 1) - 2 * Y_MARGIN;
+      if (X_SPAN_PIX <= 0 || Y_SPAN_PIX <= 0) return null;
+
+      const x_span_raw = x_r - x_l;
+      const y_span_raw = y_b - y_t;
+      if (Math.abs(x_span_raw) < 20 || Math.abs(y_span_raw) < 20) return null;
+
+      const right_minus_left = Math.round((x_span_raw * (W - 1)) / X_SPAN_PIX);
+      const bottom_minus_top = Math.round((y_span_raw * (H - 1)) / Y_SPAN_PIX);
+      const left = Math.round(x_l - (X_MARGIN * right_minus_left) / (W - 1));
+      const top = Math.round(y_t - (Y_MARGIN * bottom_minus_top) / (H - 1));
+      const right = left + right_minus_left;
+      const bottom = top + bottom_minus_top;
+
+      const RAW_MIN = 50;
+      const RAW_MAX = 4095 - 50;
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      return {
+        left: clamp(left, RAW_MIN, RAW_MAX),
+        right: clamp(right, RAW_MIN, RAW_MAX),
+        top: clamp(top, RAW_MIN, RAW_MAX),
+        bottom: clamp(bottom, RAW_MIN, RAW_MAX),
+      };
+    }
+
+    function solveAffine(p1, p2, p3, t1, t2, t3) {
+      const [x1, y1] = p1, [x2, y2] = p2, [x3, y3] = p3;
+      const d = x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2);
+      if (Math.abs(d) < 1e-6) return null;
+      const a = (t1 * (y2 - y3) + t2 * (y3 - y1) + t3 * (y1 - y2)) / d;
+      const b = (t1 * (x3 - x2) + t2 * (x1 - x3) + t3 * (x2 - x1)) / d;
+      const c = (t1 * (x2 * y3 - x3 * y2) + t2 * (x3 * y1 - x1 * y3) + t3 * (x1 * y2 - x2 * y1)) / d;
+      return [a, b, c];
+    }
+
+    function solveAffineLS(points, targets) {
+      if (points.length !== targets.length || points.length < 3) return null;
+
+      let s_xx = 0, s_xy = 0, s_x1 = 0, s_yy = 0, s_y1 = 0, s_11 = 0;
+      let s_xt = 0, s_yt = 0, s_1t = 0;
+      for (let i = 0; i < points.length; i++) {
+        const [x, y] = points[i];
+        const t = targets[i];
+        s_xx += x * x;
+        s_xy += x * y;
+        s_x1 += x;
+        s_yy += y * y;
+        s_y1 += y;
+        s_11 += 1;
+        s_xt += x * t;
+        s_yt += y * t;
+        s_1t += t;
+      }
+
+      const m00 = s_xx, m01 = s_xy, m02 = s_x1;
+      const m10 = s_xy, m11 = s_yy, m12 = s_y1;
+      const m20 = s_x1, m21 = s_y1, m22 = s_11;
+      const det = m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20) + m02 * (m10 * m21 - m11 * m20);
+      if (Math.abs(det) < 1e-6) return null;
+      const invDet = 1 / det;
+
+      const detA = s_xt * (m11 * m22 - m12 * m21) - m01 * (s_yt * m22 - m12 * s_1t) + m02 * (s_yt * m21 - m11 * s_1t);
+      const detB = m00 * (s_yt * m22 - m12 * s_1t) - s_xt * (m10 * m22 - m12 * m20) + m02 * (m10 * s_1t - s_yt * m20);
+      const detC = m00 * (m11 * s_1t - s_yt * m21) - m01 * (m10 * s_1t - s_yt * m20) + s_xt * (m10 * m21 - m11 * m20);
+
+      return [detA * invDet, detB * invDet, detC * invDet];
+    }
+
+    function computeAffine9(box) {
+      // IMPORTANT: firmware applies affine AFTER the box scaling, so solve in that space.
+      const pts = [];
+      const tx = [];
+      const ty = [];
+      for (let i = 0; i < 9; i++) {
+        const p = gridPts[i];
+        if (!p) return null;
+        const m = mapPoint(p, box, null);
+        const [tix, tiy] = target9(i);
+        pts.push([m.x, m.y]);
+        tx.push(tix);
+        ty.push(tiy);
+      }
+      const ax = solveAffineLS(pts, tx);
+      const ay = solveAffineLS(pts, ty);
+      if (!ax || !ay) return null;
+      const [a, b, c] = ax;
+      const [d, e, f] = ay;
+      return { a, b, c, d, e, f };
+    }
+
+    function mapPoint(p, box, aff) {
+      const W = 480, H = 320;
+      const denomX = Math.max(1, (box.right - box.left));
+      const denomY = Math.max(1, (box.bottom - box.top));
+      let x = (p.x - box.left) * (W - 1) / denomX;
+      let y = (p.y - box.top) * (H - 1) / denomY;
+      x = Math.max(0, Math.min(W - 1, x));
+      y = Math.max(0, Math.min(H - 1, y));
+      if (aff) {
+        const xa = aff.a * x + aff.b * y + aff.c;
+        const ya = aff.d * x + aff.e * y + aff.f;
+        x = Math.max(0, Math.min(W - 1, xa));
+        y = Math.max(0, Math.min(H - 1, ya));
+      }
+      return { x, y };
+    }
+
+    function computeGridResiduals(box, aff) {
+      const dx = new Array(9).fill(0);
+      const dy = new Array(9).fill(0);
+      for (let i = 0; i < 9; i++) {
+        const p = gridPts[i];
+        if (!p) return null;
+        const [tx, ty] = target9(i);
+        const m = mapPoint(p, box, aff);
+        dx[i] = tx - m.x;
+        dy[i] = ty - m.y;
+      }
+      return { dx, dy };
+    }
+
+    async function autoCalibrate9() {
+      cal9Out.textContent = '9-Point Auto Cal: ???????? 1/9';
+      for (let i = 0; i < 9; i++) gridPts[i] = null;
+      renderCal9();
+
+      for (let i = 0; i < 9; i++) {
+        const [tx, ty] = target9(i);
+        cal9Out.textContent = `9-Point Auto Cal: ??????? ${i + 1}/9 (x=${tx}, y=${ty})`;
+        const res = await waitForPress();
+        if (!res) { cal9Out.textContent = 'Timeout: ???????? ?? ???.'; return; }
+        gridPts[i] = { x: res.raw_x, y: res.raw_y };
+        renderCal9();
+        await waitForRelease();
+      }
+
+      const box = computeBox9();
+      if (!box) { cal9Out.textContent = 'Error: invalid box.'; return; }
+      const aff = computeAffine9(box);
+      const grid = computeGridResiduals(box, aff);
+      if (!grid) { cal9Out.textContent = 'Error: grid residuals.'; return; }
+
+      const resCal = await jpost('/api/touch/calibration', { enabled: true, ...box });
+      let resAff = { status: 'skipped' };
+      if (aff) {
+        resAff = await jpost('/api/touch/affine', { enabled: true, ...aff });
+      } else {
+        resAff = await jpost('/api/touch/affine', { reset: true });
+      }
+      const resGrid = await jpost('/api/touch/grid', { enabled: true, dx: grid.dx, dy: grid.dy });
+
+      render({ display, touch, cal: box, affine: aff, grid, res: { calibration: resCal, affine: resAff, grid: resGrid } });
+      cal9Out.textContent = '9-Point Auto Cal done.';
+    }
+
+    document.getElementById('start_auto9').addEventListener('click', autoCalibrate9);
+    document.getElementById('reset_affine').addEventListener('click', async () => {
+      const res = await jpost('/api/touch/affine', { reset: true });
+      render({ res });
+    });
+    document.getElementById('reset_grid').addEventListener('click', async () => {
+      const res = await jpost('/api/touch/grid', { reset: true });
+      render({ res });
+    });
 
     document.getElementById('tmy').addEventListener('click', async () => {
       touch.mirror_y = !touch.mirror_y;

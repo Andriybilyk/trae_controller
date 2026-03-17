@@ -48,6 +48,21 @@ void wifi_start_scan(void);
  */
 bool wifi_is_scan_done(void);
 
+/**
+ * @brief Check current STA link status.
+ */
+bool wifi_is_connected(void);
+
+/**
+ * @brief Save credentials for manual connect flow.
+ */
+bool wifi_connect_with_credentials(const char* ssid, const char* password);
+
+/**
+ * @brief Disconnect current STA and erase saved credentials.
+ */
+void wifi_disconnect_and_forget(void);
+
 #ifdef __cplusplus
 }
 #endif

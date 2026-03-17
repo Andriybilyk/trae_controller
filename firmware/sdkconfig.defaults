@@ -15,3 +15,5 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=12288
 # Use custom partition table (includes littlefs storage)
 CONFIG_PARTITION_TABLE_CUSTOM=y
 CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+# XPT2046: keep raw ADC coordinates (0..4095) so we can apply our own calibration / grid warp.
+CONFIG_XPT2046_CONVERT_ADC_TO_COORDS=n

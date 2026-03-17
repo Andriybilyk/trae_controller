@@ -5,7 +5,6 @@ import Dashboard from './components/Dashboard';
 import ScheduleEditor from './components/ScheduleEditor';
 import Settings from './components/Settings';
 import History from './components/History';
-import ControllerScreen from './components/ControllerScreen';
 import { useLanguage } from './contexts/LanguageContext';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from './config';
@@ -133,7 +132,6 @@ function AppContent() {
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
-      <Route path="/controller-sim" element={<ControllerScreen />} />
     </Routes>
   );
 }

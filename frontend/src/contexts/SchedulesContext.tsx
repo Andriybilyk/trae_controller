@@ -215,6 +215,7 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         let stopped = false;
         let retry = 0;
         let lastTrigger = 0;
+        let lastSchedulesRev = -1;
 
         const connect = () => {
             if (stopped) return;
@@ -247,6 +248,24 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                         if (now - lastTrigger < 250) return;
                         lastTrigger = now;
                         refreshSchedules();
+                    }
+
+                    // Fallback sync path: status frames carry schedules_rev.
+                    // If explicit schedules_changed event was missed, revision change still triggers refresh.
+                    if (msg && typeof msg.schedules_rev === 'number') {
+                        const rev = Number(msg.schedules_rev);
+                        if (Number.isFinite(rev) && rev >= 0) {
+                            if (lastSchedulesRev < 0) {
+                                lastSchedulesRev = rev;
+                            } else if (rev !== lastSchedulesRev) {
+                                lastSchedulesRev = rev;
+                                const now = Date.now();
+                                if (now - lastTrigger >= 250) {
+                                    lastTrigger = now;
+                                    refreshSchedules();
+                                }
+                            }
+                        }
                     }
                 } catch {
                     // ignore non-JSON / state frames

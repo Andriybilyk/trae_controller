@@ -1,6 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Monitor, Square } from 'lucide-react';
+import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Square } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../config';
@@ -8,7 +7,6 @@ import { ConfirmModal } from './ConfirmModal';
 
 const Settings = () => {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const [settings, setSettings] = useState({
     wattage: 3.0, // kW
     costPerKwh: 0.15, // $
@@ -26,6 +24,9 @@ const Settings = () => {
   const [showAutotuneStartConfirm, setShowAutotuneStartConfirm] = useState(false);
   const [showAutotuneStopConfirm, setShowAutotuneStopConfirm] = useState(false);
   const [confirmBusy, setConfirmBusy] = useState<null | 'pid_reset' | 'autotune_start' | 'autotune_stop'>(null);
+  const [otaFile, setOtaFile] = useState<File | null>(null);
+  const [otaSha256, setOtaSha256] = useState('');
+  const [otaBusy, setOtaBusy] = useState(false);
 
   useEffect(() => {
     // Load from local storage or API
@@ -150,6 +151,51 @@ const Settings = () => {
 
   const handleAutoTuneStop = async () => {
       setShowAutotuneStopConfirm(true);
+  };
+
+  const onOtaFilePicked = async (file: File | null) => {
+    setOtaFile(file);
+    setOtaSha256('');
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest('SHA-256', buf);
+      const hash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      setOtaSha256(hash);
+    } catch {
+      toast.error('Failed to compute SHA-256');
+    }
+  };
+
+  const uploadFirmware = async () => {
+    if (!otaFile || !otaSha256) {
+      toast.error('Pick firmware file first');
+      return;
+    }
+    try {
+      setOtaBusy(true);
+      const bin = await otaFile.arrayBuffer();
+      const res = await fetch(`${API_BASE_URL}/ota/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'X-Firmware-Sha256': otaSha256
+        },
+        body: bin
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(`OTA failed: ${data?.error || res.statusText}`);
+        return;
+      }
+      toast.success('Firmware uploaded. Controller rebooting...');
+    } catch {
+      toast.error('OTA upload error');
+    } finally {
+      setOtaBusy(false);
+    }
   };
 
   const confirmAutoTuneStop = async () => {
@@ -444,37 +490,28 @@ const Settings = () => {
             {/* Firmware Update */}
             <div className="bg-black/20 border border-zinc-800 rounded-xl p-5">
                 <h3 className="text-white font-bold mb-2">{t.settings.firmware}</h3>
-                <p className="text-zinc-500 text-sm mb-4 h-10">{t.settings.firmwareDesc}</p>
-                <button className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20">
-                    <Upload size={18} /> {t.settings.uploadBin}
-                </button>
-            </div>
-        </div>
-      </div>
-      {/* Developer Section */}
-      <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg mb-8">
-         <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-3 border-b border-zinc-800 pb-4">
-            <Monitor size={24} className="text-emerald-400" />
-            Developer Tools
-        </h2>
-        
-        <div className="flex gap-4 items-center">
-            <div className="p-3 h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0 border border-emerald-500/20">
-                <Monitor className="text-emerald-400" size={24} />
-            </div>
-            <div className="flex-1">
-                <h3 className="text-white font-bold mb-1">Controller Screen Simulator</h3>
-                <p className="text-zinc-500 text-sm mb-3">Preview the native interface for the embedded display (480x320)</p>
-                <button 
-                    onClick={() => navigate('/controller-sim')}
-                    className="px-6 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg font-medium transition-colors border border-zinc-700"
+                <p className="text-zinc-500 text-sm mb-3">{t.settings.firmwareDesc}</p>
+                <input
+                  type="file"
+                  accept=".bin,application/octet-stream"
+                  onChange={(e) => onOtaFilePicked(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-zinc-300 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-3 file:py-2 file:text-zinc-100 hover:file:bg-zinc-700"
+                />
+                {otaSha256 && (
+                  <div className="mt-2 text-[11px] font-mono text-zinc-500 break-all">
+                    SHA-256: {otaSha256}
+                  </div>
+                )}
+                <button
+                  onClick={uploadFirmware}
+                  disabled={!otaFile || !otaSha256 || otaBusy}
+                  className="mt-3 w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 disabled:text-zinc-400 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20"
                 >
-                    Launch Simulator
+                    <Upload size={18} /> {otaBusy ? 'Uploading...' : t.settings.uploadBin}
                 </button>
             </div>
         </div>
       </div>
-
     </div>
   );
 };

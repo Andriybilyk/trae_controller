@@ -31,11 +31,17 @@
 #define TFT_BL          GPIO_NUM_18
 #endif
 
+// Display SPI frequency. Typical stable range for ST7796S is ~20-40 MHz.
+// If you see artifacts/tearing, try 26 MHz or 20 MHz.
+#ifndef TFT_SPI_CLOCK_HZ
+#define TFT_SPI_CLOCK_HZ (40 * 1000 * 1000)
+#endif
+
 #ifndef TOUCH_CS
 #define TOUCH_CS        GPIO_NUM_4
 #endif
 #ifndef TOUCH_IRQ
-#define TOUCH_IRQ       GPIO_NUM_NC
+#define TOUCH_IRQ       GPIO_NUM_5
 #endif
 
 // Touch controller (XPT2046) SPI pins.
@@ -49,6 +55,11 @@
 #endif
 #ifndef TOUCH_MISO
 #define TOUCH_MISO      TFT_MISO
+#endif
+
+// Touch SPI frequency. XPT2046 is typically reliable at 1-2 MHz.
+#ifndef TOUCH_SPI_CLOCK_HZ
+#define TOUCH_SPI_CLOCK_HZ (1 * 1000 * 1000)
 #endif
 
 // 2. THERMOCOUPLE (MAX6675) - Software SPI

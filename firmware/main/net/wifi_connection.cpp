@@ -266,3 +266,19 @@ std::string wifi_scan_networks(void) {
     if(scan_done_sem) xSemaphoreTake(scan_done_sem, portMAX_DELAY); // Block until done
     return wifi_get_scanned_networks();
 }
+
+bool wifi_is_connected(void) {
+    wifi_ap_record_t ap_info = {};
+    return esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK;
+}
+
+bool wifi_connect_with_credentials(const char* ssid, const char* password) {
+    if (!ssid || !ssid[0]) return false;
+    wifi_save_creds(ssid, password ? password : "");
+    return true;
+}
+
+void wifi_disconnect_and_forget(void) {
+    (void)esp_wifi_disconnect();
+    wifi_erase_creds();
+}
