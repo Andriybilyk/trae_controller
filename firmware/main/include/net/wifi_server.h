@@ -3,7 +3,20 @@
 
 #include "esp_http_server.h"
 #include <string>
+#include <mutex>
 #include "kiln_control/thermal_control.h"
+#include "app/device_commands.h"
+
+struct command_result_snapshot_t {
+    bool valid = false;
+    bool ok = false;
+    uint32_t rev = 0;
+    uint64_t ts_ms = 0;
+    char action[24]{};
+    char source[16]{};
+    char code[32]{};
+    char message[96]{};
+};
 
 class WiFiServerManager {
 public:
@@ -21,7 +34,13 @@ public:
     // Settings/autotune sync helpers
     void notifySettingsChanged(const char *action);
     void notifyAutotuneState(const char *action);
+    void notifyCommandResult(const char *action,
+                             const device_commands::CommandResult &result,
+                             const char *ok_message,
+                             const char *source);
     uint32_t getSettingsRevision() const { return settingsRevision; }
+    uint32_t getCommandResultRevision() const { return commandResultRevision; }
+    bool copyLastCommandResult(command_result_snapshot_t *out) const;
     
     bool isAPMode; 
 
@@ -79,6 +98,9 @@ private:
     uint64_t lastBroadcast;
     uint32_t schedulesRevision = 0;
     uint32_t settingsRevision = 0;
+    uint32_t commandResultRevision = 0;
+    mutable std::mutex commandResultMutex;
+    command_result_snapshot_t lastCommandResult{};
     bool lastTuneActive = false;
     int lastTuneCycles = -1;
     uint64_t lastStartCommandMs = 0;

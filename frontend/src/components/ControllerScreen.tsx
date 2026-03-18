@@ -1,7 +1,10 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Play, Square, Thermometer, Clock, Activity, Wifi, Settings, AlertTriangle, ArrowRight, X, Trash2 } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import toast from 'react-hot-toast';
+import { getJson, postJson } from '../api/http';
+import { postCommand } from '../api/commands';
+import { toastApiError } from '../api/notify';
 
 // Types
 interface StatusData {
@@ -294,7 +297,7 @@ const SchedulesView = React.memo(({
                         <div className="text-base font-bold text-white truncate">{s.name}</div>
                         <div className="flex gap-2 text-zinc-500 text-[10px]">
                             <span>{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.segments}</span>
-                            <span>??? {t.schedules.custom}</span>
+                            <span>| {t.schedules.custom}</span>
                         </div>
                     </div>
                     
@@ -345,6 +348,17 @@ const ControllerScreen = () => {
     
     const [showStopConfirm, setShowStopConfirm] = useState(false);
 
+    const loadScheduleList = async () => {
+        const res = await getJson<any[]>('/schedules');
+        if (!res.ok || !Array.isArray(res.data)) return;
+        const processed = res.data.map((s: any) => ({
+            ...s,
+            steps: s.steps || [],
+            stepsCount: s.stepsCount || (s.steps ? s.steps.length : 0)
+        }));
+        setSchedules(processed);
+    };
+
     // Fetch Status Loop
     useEffect(() => {
         const interval = setInterval(async () => {
@@ -353,11 +367,8 @@ const ControllerScreen = () => {
                 setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
                 // Fetch Status
-                const res = await fetch(`${API_BASE_URL}/status`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setStatus(data);
-                }
+                const res = await getJson<StatusData>('/status');
+                if (res.ok && res.data) setStatus(res.data);
             } catch (e) {
                 // console.error("Sim connection error");
             }
@@ -368,18 +379,7 @@ const ControllerScreen = () => {
     // Fetch Schedules when entering schedule view
     useEffect(() => {
         if (view === 'SCHEDULES') {
-            fetch(`${API_BASE_URL}/schedules`)
-                .then(res => res.json())
-                .then(data => {
-                    // Ensure steps array exists or use stepsCount
-                    const processed = data.map((s: any) => ({
-                        ...s,
-                        steps: s.steps || [],
-                        stepsCount: s.stepsCount || (s.steps ? s.steps.length : 0)
-                    }));
-                    setSchedules(processed);
-                })
-                .catch(e => console.error(e));
+            loadScheduleList().catch(() => {});
         }
     }, [view]);
 
@@ -390,11 +390,11 @@ const ControllerScreen = () => {
         }
         try {
             // Ensure we send the full object structure expected by backend
-            await fetch(`${API_BASE_URL}/start`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ schedule: selectedSchedule })
-            });
+            const res = await postCommand('/start', { schedule: selectedSchedule });
+            if (!res.ok) {
+                toast.error(res.message || "Error starting");
+                return;
+            }
             setView('DASHBOARD');
         } catch (e) {
             alert("Error starting");
@@ -413,22 +413,13 @@ const ControllerScreen = () => {
         };
 
         try {
-            await fetch(`${API_BASE_URL}/schedules`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(scheduleToSave)
-            });
+            const saveRes = await postJson<any>('/schedules', scheduleToSave);
+            if (!saveRes.ok) {
+                toastApiError(saveRes, "Failed to save");
+                return;
+            }
             // Reload list
-            const res = await fetch(`${API_BASE_URL}/schedules`);
-            const data = await res.json();
-            
-            // Process data same as initial load
-            const processed = data.map((s: any) => ({
-                ...s,
-                steps: s.steps || [],
-                stepsCount: s.stepsCount || (s.steps ? s.steps.length : 0)
-            }));
-            setSchedules(processed);
+            await loadScheduleList();
             
             // If this was a new schedule, select it
             if (!selectedSchedule || selectedSchedule.id === editingSchedule.id) {
@@ -472,7 +463,11 @@ const ControllerScreen = () => {
 
     const confirmStop = async () => {
         try {
-            await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
+            const res = await postCommand('/stop');
+            if (!res.ok) {
+                toast.error(res.message || "Error stopping");
+                return;
+            }
             setShowStopConfirm(false);
         } catch (e) {
             console.error("Error stopping");
@@ -501,9 +496,9 @@ const ControllerScreen = () => {
         // Fetch full details if steps are missing
         if (!s.steps || s.steps.length === 0) {
             try {
-                const res = await fetch(`${API_BASE_URL}/schedules?name=${encodeURIComponent(s.name)}`);
-                if (res.ok) {
-                    const detailed = await res.json();
+                const res = await getJson<any>(`/schedules?name=${encodeURIComponent(s.name)}`);
+                if (res.ok && res.data) {
+                    const detailed = res.data;
                     setEditingSchedule({ ...s, steps: detailed.steps || [] });
                 } else {
                     setEditingSchedule({ ...s, steps: [] });

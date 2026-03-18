@@ -462,6 +462,9 @@ export component AppWindow inherits Window {
     in-out property <bool> wifi_qr_visible: false;
     in-out property <image> wifi_qr_image;
     in-out property <string> wifi_qr_hint: "";
+    in-out property <string> command_feedback: "";
+    in-out property <bool> command_feedback_ok: true;
+    in-out property <bool> command_feedback_visible: false;
 
     callback toggle_language();
 
@@ -727,6 +730,27 @@ export component AppWindow inherits Window {
     }
 
 
+
+    
+    if (root.command_feedback_visible) : Rectangle {
+        x: 0px;
+        y: root.fault_active ? 68px : 40px;
+        width: 480px;
+        height: 24px;
+        background: root.command_feedback_ok ? #064E3B : #7F1D1D;
+        border-color: root.command_feedback_ok ? #10B981 : #DC2626;
+        border-width: 1px;
+        Text {
+            x: 10px;
+            y: 5px;
+            width: parent.width - 20px;
+            text: root.command_feedback;
+            color: #FFFFFF;
+            font-family: "PT Sans";
+            font-size: 12px;
+            overflow: elide;
+        }
+    }
 
     // Main content
 
@@ -3784,6 +3808,4 @@ export component AppWindow inherits Window {
 
 
 }
-
-
 

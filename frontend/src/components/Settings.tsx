@@ -1,14 +1,17 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Square } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useDeviceState } from '../contexts/DeviceStateContext';
 import toast from 'react-hot-toast';
-import { API_BASE_URL } from '../config';
+import { getJson, postJson, requestJson } from '../api/http';
+import { toastApiError } from '../api/notify';
 import { ConfirmModal } from './ConfirmModal';
 
 const Settings = () => {
   const { t } = useLanguage();
   const [settings, setSettings] = useState({
     wattage: 3.0, // kW
+    maxC: 1300,
     costPerKwh: 0.15, // $
     currency: '₴',
     zones: 1
@@ -17,7 +20,6 @@ const Settings = () => {
   const [offset, setOffset] = useState(0);
   const [ssrCycles, setSsrCycles] = useState(15420);
   const [autotuneTemp, setAutotuneTemp] = useState(600);
-  const [autotuneInfo, setAutotuneInfo] = useState<any>(null);
   const [pidInfo, setPidInfo] = useState<any>(null);
   const [pidLoading, setPidLoading] = useState(false);
   const [showPidResetConfirm, setShowPidResetConfirm] = useState(false);
@@ -27,20 +29,28 @@ const Settings = () => {
   const [otaFile, setOtaFile] = useState<File | null>(null);
   const [otaSha256, setOtaSha256] = useState('');
   const [otaBusy, setOtaBusy] = useState(false);
+  const { state: deviceState, connected } = useDeviceState();
+  const autotuneInfo = deviceState.autotune || null;
 
   useEffect(() => {
     // Load from local storage or API
     const saved = localStorage.getItem('kiln_settings');
-    if (saved) setSettings(JSON.parse(saved));
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSettings((prev) => ({ ...prev, ...parsed }));
+      } catch {}
+    }
   }, []);
   const loadControllerSettings = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/settings`);
-      if (!res.ok) return;
-      const d = await res.json();
+      const res = await getJson<any>('/settings');
+      if (!res.ok || !res.data) return;
+      const d = res.data;
       if (typeof d.temp_offset_c === 'number') setOffset(d.temp_offset_c);
       if (typeof d.ssrCycles === 'number') setSsrCycles(d.ssrCycles);
       if (typeof d.wattage === 'number') setSettings((prev:any) => ({...prev, wattage: d.wattage}));
+      if (typeof d.maxC === 'number') setSettings((prev:any) => ({...prev, maxC: d.maxC}));
       if (typeof d.costPerKwh === 'number') setSettings((prev:any) => ({...prev, costPerKwh: d.costPerKwh}));
       if (typeof d.currency === 'string') setSettings((prev:any) => ({...prev, currency: d.currency}));
       if (typeof d.zones === 'number') setSettings((prev:any) => ({...prev, zones: d.zones}));
@@ -49,11 +59,8 @@ const Settings = () => {
   const loadPid = async () => {
     setPidLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/pid`);
-      if (res.ok) {
-        const d = await res.json();
-        setPidInfo(d);
-      }
+      const res = await getJson<any>('/pid');
+      if (res.ok) setPidInfo(res.data);
     } catch (e) {}
     setPidLoading(false);
   };
@@ -65,13 +72,13 @@ const Settings = () => {
   const confirmResetPid = async () => {
     try {
       setConfirmBusy('pid_reset');
-      const res = await fetch(`${API_BASE_URL}/pid/reset`, { method: 'POST' });
+      const res = await postJson<any>('/pid/reset');
       if (res.ok) {
         await loadPid();
         toast.success("PID reset");
         setShowPidResetConfirm(false);
       } else {
-        toast.error("Reset failed");
+        toastApiError(res, "Reset failed");
       }
     } catch (e) {
       toast.error("Connection error to controller.");
@@ -83,43 +90,23 @@ const Settings = () => {
   useEffect(() => {
     loadControllerSettings();
 
-    let alive = true;
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/status`);
-        if (!res.ok) return;
-        const d = await res.json();
-        if (!alive) return;
-        if (d.autotune) setAutotuneInfo(d.autotune);
-      } catch (e) {}
-    };
-
-    fetchStatus();
-    const id = setInterval(fetchStatus, 1000);
-
     const onWs = (ev: any) => {
       const msg = ev?.detail;
       if (!msg || !msg.event) return;
       if (msg.event === 'settings_changed') { loadControllerSettings(); loadPid(); }
-      if (msg.event === 'autotune_state' && msg.autotune) setAutotuneInfo(msg.autotune);
     };
     window.addEventListener('kiln_ws', onWs as any);
 
     return () => {
-      alive = false;
-      clearInterval(id);
       window.removeEventListener('kiln_ws', onWs as any);
     };
   }, []);
 
   const handleSave = () => {
     localStorage.setItem('kiln_settings', JSON.stringify(settings));
-    fetch(`${API_BASE_URL}/settings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...settings, offset, ssrCycles })
-    }).then(() => {
-        toast.success(t.settings.saved);
+    postJson<any>('/settings', { ...settings, offset, ssrCycles }).then((res) => {
+        if (res.ok) toast.success(t.settings.saved);
+        else toastApiError(res, "Save failed");
     });
   };
 
@@ -130,17 +117,12 @@ const Settings = () => {
   const confirmAutoTuneStart = async () => {
       try {
           setConfirmBusy('autotune_start');
-          const res = await fetch(`${API_BASE_URL}/autotune`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ temp: autotuneTemp })
-          });
-          const data = await res.json();
+          const res = await postJson<any>('/autotune', { temp: autotuneTemp });
           if(res.ok) {
             toast.success(`Autotune started at ${autotuneTemp}°C! Monitor the dashboard.`);
             setShowAutotuneStartConfirm(false);
           } else {
-            toast.error("Error: " + (data.error || "Unknown error"));
+            toastApiError(res, "Unknown error", "Error");
           }
       } catch (e) {
           toast.error("Connection error to controller.");
@@ -177,7 +159,7 @@ const Settings = () => {
     try {
       setOtaBusy(true);
       const bin = await otaFile.arrayBuffer();
-      const res = await fetch(`${API_BASE_URL}/ota/update`, {
+      const res = await requestJson<any>('/ota/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/octet-stream',
@@ -185,9 +167,8 @@ const Settings = () => {
         },
         body: bin
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(`OTA failed: ${data?.error || res.statusText}`);
+        toastApiError(res, "OTA upload error", "OTA failed");
         return;
       }
       toast.success('Firmware uploaded. Controller rebooting...');
@@ -201,12 +182,12 @@ const Settings = () => {
   const confirmAutoTuneStop = async () => {
       try {
           setConfirmBusy('autotune_stop');
-          const res = await fetch(`${API_BASE_URL}/autotune/stop`, { method: 'POST' });
+          const res = await postJson<any>('/autotune/stop');
           if(res.ok) {
             toast.success("Autotune stopped");
             setShowAutotuneStopConfirm(false);
           } else {
-            toast.error("Stop failed");
+            toastApiError(res, "Stop failed");
           }
       } catch (e) {
           toast.error("Connection error to controller.");
@@ -273,7 +254,7 @@ const Settings = () => {
         </h2>
         
         <div className="space-y-6">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">{t.settings.kilnPower}</label>
                     <input 
@@ -285,6 +266,21 @@ const Settings = () => {
                     />
                 </div>
                 <div>
+                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">Max Allowed Temp (°C)</label>
+                    <input
+                        className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none transition-colors"
+                        type="number"
+                        min="100"
+                        max="1300"
+                        step="1"
+                        value={settings.maxC}
+                        onChange={e => setSettings({...settings, maxC: Math.max(100, Math.min(1300, Number(e.target.value) || 1300))})}
+                    />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div>
                     <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">{t.settings.costPerKwh}</label>
                     <input 
                         className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-blue-500 focus:outline-none transition-colors"
@@ -476,6 +472,25 @@ const Settings = () => {
             <Shield size={24} className="text-red-400" />
             {t.settings.safety}
         </h2>
+
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-black/20 border border-zinc-800 rounded-lg p-3">
+                <div className="text-[11px] uppercase text-zinc-500 font-bold">Link</div>
+                <div className="text-sm font-mono text-zinc-200 break-all">{deviceState.server_url || '-'}</div>
+            </div>
+            <div className="bg-black/20 border border-zinc-800 rounded-lg p-3">
+                <div className="text-[11px] uppercase text-zinc-500 font-bold">Fault</div>
+                <div className={`text-sm font-mono ${deviceState.fault_active ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {deviceState.fault_active ? `ACTIVE (${deviceState.fault_code ?? '-'})` : `NONE (${deviceState.fault_code ?? 0})`}
+                </div>
+            </div>
+            <div className="bg-black/20 border border-zinc-800 rounded-lg p-3">
+                <div className="text-[11px] uppercase text-zinc-500 font-bold">Uptime</div>
+                <div className="text-sm font-mono text-zinc-200">
+                    {typeof deviceState.uptime_ms === 'number' ? `${Math.floor(deviceState.uptime_ms / 1000)}s` : '-'} {connected ? '• online' : '• offline'}
+                </div>
+            </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Data Logging */}

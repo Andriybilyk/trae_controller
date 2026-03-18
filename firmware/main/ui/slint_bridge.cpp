@@ -1,7 +1,7 @@
 #include "ui/slint_bridge.h"
 
+#include "app/device_commands.h"
 #include "drivers/display_driver.h"
-#include "drivers/fan_driver.h"
 #include "kiln_control/thermal_control.h"
 #include "net/wifi_connection.h"
 #include "net/wifi_server.h"
@@ -17,6 +17,13 @@
 #include <string>
 
 static std::atomic<uint64_t> s_ui_heartbeat_ms{0};
+
+static bool notify_slint_command(const char *action,
+                                 const device_commands::CommandResult &res,
+                                 const char *ok_message) {
+    wifiServer.notifyCommandResult(action, res, ok_message, "slint");
+    return res.ok();
+}
 
 extern "C" void slint_bridge_display_init(void) {
     display_driver_init();
@@ -50,39 +57,30 @@ extern "C" void slint_bridge_get_state(slint_kiln_state_t *out) {
 
 extern "C" bool slint_bridge_start_schedule_json(const char *json) {
     if (!json || !json[0]) return false;
-
-    if (!thermalCtrl.isSensorHealthy()) {
-        thermalCtrl.stop("Start blocked: sensor invalid");
-        return false;
-    }
-    if (!display_driver_is_touch_calibrated()) {
-        thermalCtrl.stop("Start blocked: touch calibration required");
-        return false;
-    }
-
-    thermalCtrl.loadSchedule(std::string(json));
-    thermalCtrl.start();
-    return true;
+    return notify_slint_command("start",
+                                device_commands::start_from_schedule_json(std::string(json)),
+                                "started");
 }
 
 extern "C" bool slint_bridge_load_schedule_json(const char *json) {
     if (!json || !json[0]) return false;
-    thermalCtrl.loadSchedule(std::string(json));
-    return true;
+    return notify_slint_command("load_schedule",
+                                device_commands::load_schedule_json(std::string(json)),
+                                "loaded");
 }
 
 extern "C" void slint_bridge_stop(void) {
-    thermalCtrl.stop("User Button");
+    (void)notify_slint_command("stop", device_commands::stop("User Button"), "stopped");
 }
 
 extern "C" void slint_bridge_set_fan_manual(bool enabled) {
-    fan_driver_set_manual(enabled);
+    device_commands::set_fan_manual(enabled);
+    (void)notify_slint_command("fan_manual", {device_commands::ResultCode::Ok}, "ok");
 }
 
 extern "C" void slint_bridge_set_fan_power(int32_t percent) {
-    if (percent < 0) percent = 0;
-    if (percent > 100) percent = 100;
-    fan_driver_set_power_percent((uint8_t)percent);
+    device_commands::set_fan_power(percent);
+    (void)notify_slint_command("fan_power", {device_commands::ResultCode::Ok}, "ok");
 }
 
 extern "C" bool slint_bridge_wifi_is_connected(void) {
@@ -131,6 +129,29 @@ extern "C" bool slint_bridge_wifi_server_url_copy(char *out, int32_t out_len) {
 
 extern "C" uint32_t slint_bridge_get_schedules_revision(void) {
     return wifiServer.getSchedulesRevision();
+}
+
+extern "C" uint32_t slint_bridge_get_command_result_revision(void) {
+    return wifiServer.getCommandResultRevision();
+}
+
+extern "C" bool slint_bridge_copy_command_result(slint_command_result_t *out) {
+    if (!out) return false;
+    command_result_snapshot_t snap{};
+    if (!wifiServer.copyLastCommandResult(&snap) || !snap.valid) return false;
+
+    out->rev = snap.rev;
+    out->ts_ms = snap.ts_ms;
+    out->ok = snap.ok;
+    std::memset(out->action, 0, sizeof(out->action));
+    std::memset(out->source, 0, sizeof(out->source));
+    std::memset(out->code, 0, sizeof(out->code));
+    std::memset(out->message, 0, sizeof(out->message));
+    std::strncpy(out->action, snap.action, sizeof(out->action) - 1);
+    std::strncpy(out->source, snap.source, sizeof(out->source) - 1);
+    std::strncpy(out->code, snap.code, sizeof(out->code) - 1);
+    std::strncpy(out->message, snap.message, sizeof(out->message) - 1);
+    return true;
 }
 
 extern "C" void slint_bridge_notify_schedules_changed(void) {

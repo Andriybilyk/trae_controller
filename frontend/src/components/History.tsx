@@ -1,10 +1,11 @@
 ﻿
 import React, { useState, useEffect } from 'react';
-import { API_BASE_URL } from '../config';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Clock, Thermometer, Hash, AlertTriangle, CheckCircle, XCircle, Loader, X } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
+import toast from 'react-hot-toast';
+import { getJson } from '../api/http';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -88,11 +89,14 @@ const History = () => {
 
     const fetchHistory = async () => {
         setLoading(true);
+        setError(null);
         try {
-            const response = await fetch(`${API_BASE_URL}/history`);
-            if (!response.ok) throw new Error('Failed to fetch history data.');
-            const data = await response.json();
-            setHistory(data);
+            const res = await getJson<FiringSummary[]>('/history');
+            if (!res.ok || !Array.isArray(res.data)) {
+                setError(res.message || 'Failed to fetch history data.');
+                return;
+            }
+            setHistory(res.data);
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err));
         } finally {
@@ -107,9 +111,9 @@ const History = () => {
     const handleSelectFiring = async (id: string) => {
         setIsDetailLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/history/${id}`);
-            if (!response.ok) throw new Error('Failed to load firing details.');
-            const data: FiringDetail = await response.json();
+            const res = await getJson<FiringDetail>(`/history/${id}`);
+            if (!res.ok || !res.data) throw new Error(res.message || 'Failed to load firing details.');
+            const data: FiringDetail = res.data;
             
             // Validate data
             if (!data || !data.summary) {
@@ -126,8 +130,7 @@ const History = () => {
             }
         } catch (err) {
             console.error(err);
-            // Don't show full error UI, just log and maybe show toast
-            // Or set a partial state if possible
+            toast.error(err instanceof Error ? err.message : 'Failed to load firing details');
         } finally {
             setIsDetailLoading(false);
         }

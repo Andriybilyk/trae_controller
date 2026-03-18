@@ -19,6 +19,17 @@
   body {
     @apply bg-kiln-bg text-kiln-text antialiased;
   }
+
+  /* Hide number input spinners for cleaner touch-first editing UI */
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 }
 
 @utility no-scrollbar {

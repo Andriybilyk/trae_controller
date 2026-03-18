@@ -7,7 +7,7 @@ import Settings from './components/Settings';
 import History from './components/History';
 import { useLanguage } from './contexts/LanguageContext';
 import toast from 'react-hot-toast';
-import { API_BASE_URL } from './config';
+import { postCommand } from './api/commands';
 
 // Layout Component
 const MainLayout = () => {
@@ -32,8 +32,8 @@ const MainLayout = () => {
   };
 
   const handleEmergencyStop = async () => {
-      try {
-          await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
+      const res = await postCommand('/stop');
+      if (res.ok) {
           toast.error("EMERGENCY STOP TRIGGERED!", {
               duration: 5000,
               style: {
@@ -42,9 +42,9 @@ const MainLayout = () => {
                   fontWeight: 'bold',
                   fontSize: '1.2rem'
               },
-              icon: '🛑'
+              icon: '!'
           });
-      } catch (e) {
+      } else {
           toast.error("Failed to send stop command!");
       }
   };

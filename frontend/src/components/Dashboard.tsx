@@ -1,12 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSchedules, Schedule } from '../contexts/SchedulesContext';
-import { API_BASE_URL } from '../config';
+import { useDeviceState } from '../contexts/DeviceStateContext';
 import toast from 'react-hot-toast';
 import { ConfirmModal } from './ConfirmModal';
+import { postCommand } from '../api/commands';
+import { getJson, postJson } from '../api/http';
+import { toastApiError } from '../api/notify';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -101,6 +104,7 @@ interface FanControl {
 const Dashboard = () => {
   const { t, language } = useLanguage();
   const { schedules, getScheduleDetails, refreshSchedules } = useSchedules();
+  const { state: deviceState } = useDeviceState();
   
   const [status, setStatus] = useState<StatusData>({ 
       temp: 25, 
@@ -200,15 +204,14 @@ const Dashboard = () => {
   }, [selectedScheduleId, schedules]);
 
   const loadFan = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/fan`);
-      if (!res.ok) return;
-      const d = await res.json();
+    const res = await getJson<any>('/fan');
+    if (res.ok && res.data) {
+      const d = res.data;
       setFan(prev => ({
         ...prev,
         ...d
       }));
-    } catch {}
+    }
   };
 
   useEffect(() => {
@@ -216,21 +219,10 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    // Fetch Status from Backend
-    const fetchStatus = async () => {
-        try {
-            const res = await fetch(`${API_BASE_URL}/status`);
-            if (res.ok) {
-                const d = await res.json();
-                applyStatusFrame(d);
-            }
-        } catch (e) {
-            console.error("Connection error");
-        }
-    };
+    applyStatusFrame(deviceState);
+  }, [deviceState, applyStatusFrame]);
 
-    const interval = setInterval(fetchStatus, 1000);
-
+  useEffect(() => {
     const onWs = (ev: any) => {
       const msg = ev?.detail;
       if (!msg || !msg.event) return;
@@ -238,20 +230,12 @@ const Dashboard = () => {
         loadFan();
       }
     };
-    const onWsMessage = (ev: any) => {
-      const msg = ev?.detail;
-      if (!msg || typeof msg !== 'object') return;
-      applyStatusFrame(msg);
-    };
     window.addEventListener('kiln_ws', onWs as any);
-    window.addEventListener('kiln_ws_message', onWsMessage as any);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('kiln_ws', onWs as any);
-      window.removeEventListener('kiln_ws_message', onWsMessage as any);
     };
-  }, [applyStatusFrame]);
+  }, []);
 
   const handleStartFiring = async () => {
       if (!activeSchedule) {
@@ -259,19 +243,9 @@ const Dashboard = () => {
           return;
       }
 
-      try {
-          const res = await fetch(`${API_BASE_URL}/start`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ schedule: activeSchedule })
-          });
-          
-          if (!res.ok) {
-              const err = await res.json();
-              alert("Error: " + (err.error || "Start Failed"));
-          }
-      } catch (e) {
-          alert("Error starting firing");
+      const res = await postCommand('/start', { schedule: activeSchedule });
+      if (!res.ok) {
+          alert("Error: " + (res.message || "Start Failed"));
       }
   };
 
@@ -290,14 +264,9 @@ const Dashboard = () => {
       setFan(next);
       try {
           setFanBusy(true);
-          const res = await fetch(`${API_BASE_URL}/fan`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(next)
-          });
+          const res = await postJson<any>('/fan', next);
           if (!res.ok) {
-              const err = await res.json().catch(() => ({}));
-              toast.error(`Fan save failed: ${err.error || res.statusText}`);
+              toastApiError(res, "Fan save failed");
           }
       } catch {
           toast.error("Fan control connection error");
@@ -316,7 +285,8 @@ const Dashboard = () => {
       }
   };
   const nudgeFanManual = (delta: number) => {
-      const next = Math.max(0, Math.min(100, Number(fan.power || 0) + delta));
+      const nextRaw = Math.max(0, Math.min(100, Number(fan.power || 0) + delta));
+      const next = nextRaw > 0 ? Math.max(60, nextRaw) : 0;
       saveFan({ auto: false, manual: true, power: next });
   };
 
@@ -332,19 +302,11 @@ const Dashboard = () => {
   };
 
   const handleSkip = async () => {
-      try {
-          await fetch(`${API_BASE_URL}/skip`, { method: 'POST' });
-      } catch (e) {}
+      await postCommand('/skip');
   };
 
   const submitAddTime = async (minutes: number, stepIndex: number) => {
-      try {
-          await fetch(`${API_BASE_URL}/addTime`, { 
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ minutes, stepIndex })
-          });
-      } catch (e) {}
+      await postCommand('/addTime', { minutes, stepIndex });
   };
 
   const handleAddTimeClick = () => {
@@ -352,13 +314,7 @@ const Dashboard = () => {
   };
 
   const submitAddTemp = async (degrees: number, stepIndex: number) => {
-      try {
-          await fetch(`${API_BASE_URL}/addTemp`, { 
-              method: 'POST',
-              headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify({ degrees, stepIndex })
-          });
-      } catch (e) {}
+      await postCommand('/addTemp', { degrees, stepIndex });
   };
 
   const handleAddTempClick = () => {
@@ -368,8 +324,8 @@ const Dashboard = () => {
   const confirmStop = async () => {
       try {
           setConfirmBusy('stop_firing');
-          const res = await fetch(`${API_BASE_URL}/stop`, { method: 'POST' });
-          if (!res.ok) throw new Error('stop failed');
+          const res = await postCommand('/stop');
+          if (!res.ok) throw new Error(res.message || 'stop failed');
           setShowStopConfirm(false);
       } catch (e) {
           toast.error("Error stopping firing");
@@ -381,8 +337,8 @@ const Dashboard = () => {
   const confirmAutotuneStop = async () => {
       try {
           setConfirmBusy('stop_autotune');
-          const res = await fetch(`${API_BASE_URL}/autotune/stop`, { method: 'POST' });
-          if (!res.ok) throw new Error('stop failed');
+          const res = await postJson<any>('/autotune/stop');
+          if (!res.ok) throw new Error(res.message || 'stop failed');
           toast.success("Autotune stopped");
           setShowAutotuneStopConfirm(false);
       } catch (e) {
@@ -436,7 +392,7 @@ const Dashboard = () => {
                           : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}
                   >
                       <div className="font-bold text-white text-sm mb-1 pr-6 truncate">{s.name}</div>
-                      <div className="text-xs text-zinc-500">{getScheduleStepCount(s)} {t.schedules.steps} ??? {s.type || t.schedules.custom}</div>
+                      <div className="text-xs text-zinc-500">{getScheduleStepCount(s)} {t.schedules.steps} | {s.type || t.schedules.custom}</div>
                       {selectedScheduleId === s.id && (
                           <div className="absolute top-4 right-4 text-kiln-accent">
                               <Check size={16} />
@@ -640,7 +596,7 @@ const Dashboard = () => {
         <div className="bg-kiln-card border border-kiln-border rounded-xl p-5 shadow-lg shadow-black/20 relative overflow-hidden md:col-span-2 lg:col-span-4 flex flex-col md:flex-row items-center justify-between group min-h-28 lg:min-h-[12.75rem] gap-3 md:gap-0">
             <div className="relative z-10 text-center md:text-left">
                 <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
-                    {language === 'ua' ? 'Поточна температура' : t.dashboard.currentTemp}
+                    {language === 'ua' ? 'РџРѕС‚РѕС‡РЅР° С‚РµРјРїРµСЂР°С‚СѓСЂР°' : t.dashboard.currentTemp}
                 </div>
                 <div className="text-6xl lg:text-7xl font-bold text-white tracking-tighter tabular-nums leading-none">
                     {(status.temp || 0).toFixed(1)}
@@ -689,15 +645,7 @@ const Dashboard = () => {
                 <div className="text-xl font-bold text-white tabular-nums leading-none">{fanSpeed}%</div>
                 <div className="text-[10px] text-zinc-500 mt-1">PCB {Number(status.pcbTemp ?? 0).toFixed(1)}°C</div>
             </div>
-            <div className="flex flex-col items-center gap-2">
-                <button
-                    onClick={() => nudgeFanManual(5)}
-                    disabled={fanBusy}
-                    className="w-10 h-10 rounded-md bg-zinc-800 text-zinc-200 text-2xl leading-none active:scale-95"
-                    title="Increase fan power"
-                >
-                    +
-                </button>
+            <div className="flex flex-row items-center gap-2">
                 <button
                     onClick={() => nudgeFanManual(-5)}
                     disabled={fanBusy}
@@ -705,6 +653,14 @@ const Dashboard = () => {
                     title="Decrease fan power"
                 >
                     -
+                </button>
+                <button
+                    onClick={() => nudgeFanManual(5)}
+                    disabled={fanBusy}
+                    className="w-10 h-10 rounded-md bg-zinc-800 text-zinc-200 text-2xl leading-none active:scale-95"
+                    title="Increase fan power"
+                >
+                    +
                 </button>
             </div>
           </div>
@@ -877,5 +833,6 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
 
 

@@ -27,6 +27,32 @@ struct SlintKilnState {
     fault_reason: [u8; 96],
 }
 
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SlintCommandResult {
+    rev: u32,
+    ts_ms: u64,
+    ok: bool,
+    action: [u8; 24],
+    source: [u8; 16],
+    code: [u8; 32],
+    message: [u8; 96],
+}
+
+impl Default for SlintCommandResult {
+    fn default() -> Self {
+        Self {
+            rev: 0,
+            ts_ms: 0,
+            ok: false,
+            action: [0; 24],
+            source: [0; 16],
+            code: [0; 32],
+            message: [0; 96],
+        }
+    }
+}
+
 impl Default for SlintKilnState {
     fn default() -> Self {
         Self {
@@ -61,6 +87,8 @@ extern "C" {
     fn slint_bridge_wifi_scan_copy_results(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_wifi_server_url_copy(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_get_schedules_revision() -> u32;
+    fn slint_bridge_get_command_result_revision() -> u32;
+    fn slint_bridge_copy_command_result(out: *mut SlintCommandResult) -> bool;
     fn slint_bridge_notify_schedules_changed();
     fn slint_bridge_ui_heartbeat();
 
@@ -397,6 +425,23 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState) {
         "http://192.168.4.1".to_string()
     };
     ui.set_wifi_server_url(server_url.into());
+}
+
+fn apply_command_result_to_ui(ui: &AppWindow, cmd: SlintCommandResult, is_ua: bool) {
+    let mut message = c_buf_to_string(&cmd.message);
+    if message.is_empty() {
+        message = if cmd.ok { "ok".to_string() } else { "error".to_string() };
+    }
+    let action = c_buf_to_string(&cmd.action);
+    let prefix = if is_ua { "Команда" } else { "Command" };
+    let label = if action.is_empty() {
+        format!("{}: {}", prefix, message)
+    } else {
+        format!("{} {}: {}", prefix, action, message)
+    };
+    ui.set_command_feedback(label.into());
+    ui.set_command_feedback_ok(cmd.ok);
+    ui.set_command_feedback_visible(true);
 }
 
 fn state_poll() -> SlintKilnState {
@@ -1230,6 +1275,8 @@ pub extern "C" fn slint_ui_run() {
     let mut last_state_update = Instant::now();
     let mut last_ui_heartbeat = Instant::now();
     let mut last_schedules_revision = unsafe { slint_bridge_get_schedules_revision() };
+    let mut last_command_result_revision = unsafe { slint_bridge_get_command_result_revision() };
+    let mut command_feedback_until = Instant::now();
     let mut last_qr_payload = String::new();
 
     loop {
@@ -1238,6 +1285,25 @@ pub extern "C" fn slint_ui_run() {
         if last_ui_heartbeat.elapsed() >= Duration::from_millis(200) {
             last_ui_heartbeat = Instant::now();
             unsafe { slint_bridge_ui_heartbeat() };
+        }
+
+        let command_revision = unsafe { slint_bridge_get_command_result_revision() };
+        if command_revision != 0 && command_revision != last_command_result_revision {
+            let mut cmd = SlintCommandResult::default();
+            if unsafe { slint_bridge_copy_command_result(&mut cmd as *mut SlintCommandResult) } {
+                if let Some(ui) = ui_weak.upgrade() {
+                    apply_command_result_to_ui(&ui, cmd, ui.get_is_ua());
+                }
+                command_feedback_until = Instant::now() + Duration::from_millis(2600);
+            }
+            last_command_result_revision = command_revision;
+        }
+        if Instant::now() > command_feedback_until {
+            if let Some(ui) = ui_weak.upgrade() {
+                if ui.get_command_feedback_visible() {
+                    ui.set_command_feedback_visible(false);
+                }
+            }
         }
 
         // Touch input

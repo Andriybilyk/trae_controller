@@ -316,7 +316,7 @@ const ScheduleEditor = () => {
                 <div className="mb-4 flex flex-col md:flex-row justify-between items-center gap-2 shrink-0 px-1">
                     <div className="w-full flex items-center gap-2">
                         <button onClick={() => setShowMobileLibrary(true)} className="md:hidden p-2 -ml-2 text-zinc-400 hover:text-white">
-                            ???
+                            Back
                         </button>
                         <input className="text-xl md:text-3xl font-bold text-white bg-transparent border-none p-0 w-full focus:ring-0 truncate" value={scheduleName} onChange={e => setScheduleName(e.target.value)} />
                     </div>

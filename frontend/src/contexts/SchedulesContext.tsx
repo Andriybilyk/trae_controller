@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { API_BASE_URL } from '../config';
+import { deleteJson, getJson, postJson } from '../api/http';
+import { toastApiError } from '../api/notify';
 
 // --- Types ---
 export interface Step {
@@ -39,9 +40,9 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // 1. Fetch List
     const refreshSchedules = useCallback(async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/schedules?t=${Date.now()}`);
-            if (res.ok) {
-                const data = await res.json();
+            const res = await getJson<any[]>(`/schedules?t=${Date.now()}`);
+            if (res.ok && Array.isArray(res.data)) {
+                const data = res.data;
                 if (Array.isArray(data)) {
                     setSchedules(prev => {
                         // Create a map of existing schedules to preserve full details if already loaded
@@ -77,6 +78,8 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                         return processed;
                     });
                 }
+            } else if (!res.ok) {
+                toastApiError(res, "Connection Error");
             }
         } catch (e) {
             console.error("Fetch Error:", e);
@@ -90,9 +93,9 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             // ALWAYS fetch details to ensure we have the latest data
             // removing the "if steps exist" optimization because it causes stale data issues
             
-            const res = await fetch(`${API_BASE_URL}/schedules?name=${encodeURIComponent(schedule.name)}&t=${Date.now()}`);
-            if (res.ok) {
-                const fullData = await res.json();
+            const res = await getJson<any>(`/schedules?name=${encodeURIComponent(schedule.name)}&t=${Date.now()}`);
+            if (res.ok && res.data) {
+                const fullData = res.data;
                 const fullSchedule = { 
                     ...schedule, 
                     ...fullData,
@@ -122,11 +125,7 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 stepsCount: schedule.steps ? schedule.steps.length : 0 // Ensure count is updated
             };
 
-            const res = await fetch(`${API_BASE_URL}/schedules`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(scheduleToSave)
-            });
+            const res = await postJson<any>('/schedules', scheduleToSave);
             
             if (res.ok) {
                 // Optimistically update local state immediately
@@ -163,8 +162,7 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 toast.success("Saved");
                 return true;
             } else {
-                const err = await res.json();
-                toast.error(err.error || "Save Failed");
+                toastApiError(res, "Save Failed");
             }
         } catch (e) {
             console.error("Save Error:", e);
@@ -185,17 +183,14 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 return false;
             }
 
-            const res = await fetch(`${API_BASE_URL}/schedules?name=${encodeURIComponent(targetName)}`, {
-                method: 'DELETE'
-            });
+            const res = await deleteJson<any>(`/schedules?name=${encodeURIComponent(targetName)}`);
             
             if (res.ok || res.status === 404) {
                 setSchedules(prev => prev.filter(s => (s.name || s.id) !== targetName));
                 toast.success("Deleted");
                 return true;
             } else {
-                const err = await res.json();
-                toast.error(err.error || "Delete Failed");
+                toastApiError(res, "Delete Failed");
             }
         } catch (e) {
             console.error("Delete Error:", e);

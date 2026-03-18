@@ -52,6 +52,21 @@
 - Web Dashboard fan card is now the primary fan control (double-width card, icon tap toggles ON/OFF, manual +/- speed, PCB temperature readout); fan controls and simulator route were removed from web Settings.
 - Fan runtime policy: during firing, automatic fan output has a minimum floor of 60% (board sensor driven) to protect SSR area cooling.
 - Unified model initiative started: plan for a shared Slint/Web/iOS state-command contract is documented in `docs/UNIFIED_CONTROL_MODEL_PLAN.md`.
+- Phase 0 progress: added canonical command dispatcher `firmware/main/app/device_commands.cpp` + `firmware/main/include/app/device_commands.h`; REST (`/api/start|stop|skip|addTemp|addTime|fan`) and Slint bridge start/stop/fan paths now use it.
+- WebSocket control path now also routes schedule load/stop through `device_commands` to reduce behavior drift between UI channels.
+- Canonical state payload now includes compatibility metadata: `schema_version`, `fw_version`, `wifi_connected`, `server_url`; `/api/status` and WS broadcast use the same serializer.
+- Command API envelope standardized for primary control endpoints (`/api/start|stop|skip|addTemp|addTime`): responses now use `{ok, code, message}` (including rate-limit and validation errors) to keep web/mobile handling consistent.
+- Unified command event contract added: WS now emits `{"event":"command_result", "action", "ok", "code", "message", "source", "rev", "ts_ms"}` for API/WS/Slint command paths; web consumes it for instant toasts, Slint consumes via bridge revision/copy and shows transient feedback banner.
+- Canonical state payload now also includes `uptime_ms` for client diagnostics/telemetry alignment.
+- Frontend command calls (`Dashboard` + top-level emergency stop) now use shared `frontend/src/api/commands.ts` parser with backward-compatible handling of legacy `{error|status}` payloads.
+- Frontend runtime state unified with `frontend/src/contexts/DeviceStateContext.tsx`: single source for `/api/status` + WS frames (`kiln_ws_message`) consumed by both Dashboard and Settings, reducing mobile/desktop drift.
+- Frontend API layer unified: added `frontend/src/api/http.ts` (normalized `{ok, code, message, data}`) and `frontend/src/api/notify.ts` (single toast error mapper); `Settings` and `SchedulesContext` now use this path.
+- Unified API path extended to `History` and remaining `Dashboard` controls (fan + autotune stop), reducing ad-hoc `fetch`/error parsing differences across views.
+- Legacy simulator view `frontend/src/components/ControllerScreen.tsx` migrated to unified API helpers (`http.ts`, `commands.ts`, `notify.ts`) to eliminate direct `fetch` usage and keep behavior aligned with main web UI.
+- LittleFS web assets cleanup: `firmware/data/assets` is now mirrored to current `frontend/dist/assets` only (removed stale hashed bundles), reducing storage image churn and flash time.
+- Web UX cleanup: fixed broken `°C` rendering and stray `???` separators in schedule/library views; numeric input spinners are hidden for touch-first editing.
+- Settings/Web + firmware config now include `maxC` (max allowed temperature) persistence in `/littlefs/config.json` for hardware configuration.
+- Fan command policy unified through `device_commands`: when fan power is non-zero it is clamped to a minimum of 60% across API/Web/Slint paths.
 
 ## TODO
 - P0: Verify Slint embedded build for `xtensa-esp32s3-espidf` and confirm Slint software renderer + touch input on hardware.
@@ -66,14 +81,14 @@
 - P1: FreeRTOS tasks: split `control/ui/net` loops with defined rates + watchdog strategy. (DONE: moved loops to dedicated tasks; main task deletes itself)
 - P1: Config hygiene: remove WiFi credentials from headers; defaults via Kconfig, runtime via NVS.
 - P1: Sync: add WS events for history changes + "active schedule loaded" so multiple web clients/LVGL stay aligned.
-- P1: Implement `docs/UNIFIED_CONTROL_MODEL_PLAN.md` phases 0-2 (canonical firmware state/command adapter + Slint/Web alignment).
+- P1: Complete remaining `docs/UNIFIED_CONTROL_MODEL_PLAN.md` phases 0-2 items (canonical web store, UI action map generator).
 - P1: Prepare iOS bootstrap spec from `docs/UNIFIED_CONTROL_MODEL_PLAN.md` phase 4 (BLE discovery + Wi-Fi API handoff).
 - P1: Autotune UX: show progress/result in Settings/Dashboard (cycles, Ku/Pu, final PID) + add STOP button calling `/api/autotune/stop`.
 - P1: PID controls: `GET /api/pid` + `POST /api/pid/reset` in UI with clear "default vs tuned" indicator.
 - P1: UI polish: consistent typography sizes/contrast on the 480x320 panel; unify icon set (glyph-font based) across target + simulator; remove any debug-only overlays from release UI.
 - P1: Re-test editor input on hardware after UI changes: numeric keypad open/close, long program names, UA/EN keyboard rows, and touch-release edge cases.
 - P1: Persist fan curve + mode at boot explicitly (load config before fan init or defer fan init until LittleFS config is applied).
-- P2: API schema: add `schema_version`, `fw_version`, `fault_code`, `uptime_ms` to endpoints for compatibility.
+- P2: API schema: extend compatibility fields with `fault_code` and `uptime_ms` across endpoints (DONE: `schema_version` + `fw_version` already added to canonical state).
 - P2: Persistent event log: ring-buffer faults/start/stop/overtemp into `/littlefs/logs`.
 - P2: OTA updates: add signed manifest validation (cryptographic signature) and rollback-status reporting endpoint.
 

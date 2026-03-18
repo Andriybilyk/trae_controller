@@ -1,10 +1,12 @@
 #include "net/wifi_server.h"
+#include "app/device_commands.h"
 #include "drivers/display_driver.h"
 #include "drivers/fan_driver.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_http_server.h"
 #include "esp_ota_ops.h"
+#include "esp_app_desc.h"
 #include "freertos/task.h"
 #include "net/wifi_connection.h"
 #include "net/dns_server.h"
@@ -16,14 +18,25 @@
 #include <cmath>
 #include <cstring> // For strlen, strstr
 #include <cstdio>  // For FILE, fopen, snprintf
+#include <cstdlib>
 #include <unistd.h>
 
 static const char *TAG = "SERVER";
 static constexpr size_t OTA_MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+static constexpr uint32_t STATE_SCHEMA_VERSION = 1;
 static constexpr uint32_t START_RATE_LIMIT_MS = 700;
 static constexpr uint32_t STOP_RATE_LIMIT_MS = 400;
 static constexpr uint32_t SKIP_RATE_LIMIT_MS = 400;
 static constexpr uint32_t TUNE_RATE_LIMIT_MS = 150;
+
+static const char *result_code_to_str(device_commands::ResultCode code);
+static const char *result_message(device_commands::ResultCode code);
+static void copy_text_field(char *dst, size_t dst_len, const char *src) {
+    if (!dst || dst_len == 0) return;
+    dst[0] = '\0';
+    if (!src) return;
+    std::snprintf(dst, dst_len, "%s", src);
+}
 
 WiFiServerManager::WiFiServerManager() {
     server = NULL;
@@ -401,15 +414,18 @@ esp_err_t WiFiServerManager::ws_handler(httpd_req_t *req) {
             const cJSON *action = cJSON_GetObjectItem(root, "action");
 
             if (steps) {
-                thermalCtrl.loadSchedule(msg);
+                const auto res = device_commands::load_schedule_json(msg);
+                wifiServer.notifyCommandResult("load_schedule", res, "loaded", "ws");
             } else if ((cJSON_IsString(command) && command->valuestring && strcmp(command->valuestring, "stop") == 0) ||
                        (cJSON_IsString(action) && action->valuestring && strcmp(action->valuestring, "stop") == 0)) {
-                thermalCtrl.stop("Web Request");
+                const auto res = device_commands::stop("Web Request");
+                wifiServer.notifyCommandResult("stop", res, "stopped", "ws");
             }
 
             cJSON_Delete(root);
         } else if (msg == "stop" || msg == "STOP") {
-            thermalCtrl.stop("Web Request");
+            const auto res = device_commands::stop("Web Request");
+            wifiServer.notifyCommandResult("stop", res, "stopped", "ws");
         }
     }
 
@@ -711,14 +727,20 @@ static const char* status_to_str(int s) {
     }
 }
 
-void WiFiServerManager::broadcastState() {
-    if (!server) return;
-
+static cJSON *build_device_state_doc() {
     KilnState state = thermalCtrl.getState();
     const ThermoStats thermo = thermalCtrl.getThermoStats();
     const SafetyStats safety = thermalCtrl.getSafetyStats();
+    const ThermalController::AutoTuneStatus tune = thermalCtrl.getAutotuneStatus();
+    const esp_app_desc_t *app = esp_app_get_description();
+    const std::string server_url = wifi_get_server_url();
+
     cJSON *doc = cJSON_CreateObject();
     cJSON_AddNumberToObject(doc, "ts_ms", (double)(esp_timer_get_time() / 1000ULL));
+    cJSON_AddNumberToObject(doc, "uptime_ms", (double)(esp_timer_get_time() / 1000ULL));
+    cJSON_AddNumberToObject(doc, "schema_version", (double)STATE_SCHEMA_VERSION);
+    cJSON_AddStringToObject(doc, "fw_version", (app && app->version[0]) ? app->version : "unknown");
+
     cJSON_AddNumberToObject(doc, "temp", state.currentTemp);
     cJSON_AddNumberToObject(doc, "raw", thermo.raw);
     cJSON_AddNumberToObject(doc, "read_count", (double)thermo.readCount);
@@ -745,8 +767,9 @@ void WiFiServerManager::broadcastState() {
     cJSON_AddBoolToObject(doc, "fan_auto", fan_driver_get_auto_enabled());
     cJSON_AddNumberToObject(doc, "fan_power", (double)fan_driver_get_power_percent());
     cJSON_AddNumberToObject(doc, "fan_effective_power", (double)fan_driver_get_effective_power_percent());
+    cJSON_AddBoolToObject(doc, "wifi_connected", wifi_is_connected());
+    cJSON_AddStringToObject(doc, "server_url", server_url.c_str());
 
-    const ThermalController::AutoTuneStatus tune = thermalCtrl.getAutotuneStatus();
     cJSON *t = cJSON_CreateObject();
     cJSON_AddBoolToObject(t, "active", tune.active);
     cJSON_AddBoolToObject(t, "heater_on", tune.heaterOn);
@@ -758,15 +781,90 @@ void WiFiServerManager::broadcastState() {
     cJSON_AddNumberToObject(t, "ki", (double)tune.ki);
     cJSON_AddNumberToObject(t, "kd", (double)tune.kd);
     cJSON_AddItemToObject(doc, "autotune", t);
+    return doc;
+}
 
+static std::string render_json_and_delete(cJSON *doc) {
+    if (!doc) return "{}";
     char *rendered = cJSON_PrintUnformatted(doc);
-    std::string output = rendered ? rendered : "{}";
+    std::string out = rendered ? rendered : "{}";
     if (rendered) free(rendered);
     cJSON_Delete(doc);
+    return out;
+}
+
+void WiFiServerManager::broadcastState() {
+    if (!server) return;
+    std::string output = render_json_and_delete(build_device_state_doc());
 
     httpd_ws_frame_t ws_pkt;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.payload = (uint8_t*)output.c_str();
+    ws_pkt.len = output.length();
+    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+
+    size_t clients = 10;
+    int client_fds[10];
+    if (httpd_get_client_list(server, &clients, client_fds) == ESP_OK) {
+        for (size_t i = 0; i < clients; i++) {
+            if (httpd_ws_get_fd_info(server, client_fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
+                httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
+                taskYIELD();
+            }
+        }
+    }
+}
+
+bool WiFiServerManager::copyLastCommandResult(command_result_snapshot_t *out) const {
+    if (!out) return false;
+    std::lock_guard<std::mutex> guard(commandResultMutex);
+    *out = lastCommandResult;
+    return true;
+}
+
+void WiFiServerManager::notifyCommandResult(const char *action,
+                                            const device_commands::CommandResult &result,
+                                            const char *ok_message,
+                                            const char *source) {
+    const uint64_t ts_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    const bool ok = result.ok();
+    const char *code = result_code_to_str(result.code);
+    const char *message = ok ? (ok_message ? ok_message : "ok") : result_message(result.code);
+
+    uint32_t rev = 0;
+    {
+        std::lock_guard<std::mutex> guard(commandResultMutex);
+        commandResultRevision++;
+        if (commandResultRevision == 0) commandResultRevision = 1;
+        rev = commandResultRevision;
+
+        lastCommandResult.valid = true;
+        lastCommandResult.ok = ok;
+        lastCommandResult.rev = rev;
+        lastCommandResult.ts_ms = ts_ms;
+        copy_text_field(lastCommandResult.action, sizeof(lastCommandResult.action), action ? action : "unknown");
+        copy_text_field(lastCommandResult.source, sizeof(lastCommandResult.source), source ? source : "unknown");
+        copy_text_field(lastCommandResult.code, sizeof(lastCommandResult.code), code);
+        copy_text_field(lastCommandResult.message, sizeof(lastCommandResult.message), message);
+    }
+
+    if (!server) return;
+
+    cJSON *doc = cJSON_CreateObject();
+    cJSON_AddStringToObject(doc, "event", "command_result");
+    cJSON_AddNumberToObject(doc, "rev", (double)rev);
+    cJSON_AddNumberToObject(doc, "ts_ms", (double)ts_ms);
+    cJSON_AddStringToObject(doc, "action", action && action[0] ? action : "unknown");
+    cJSON_AddStringToObject(doc, "source", source && source[0] ? source : "unknown");
+    cJSON_AddBoolToObject(doc, "ok", ok);
+    cJSON_AddStringToObject(doc, "code", code ? code : (ok ? "ok" : "internal"));
+    cJSON_AddStringToObject(doc, "message", message ? message : "");
+
+    std::string output = render_json_and_delete(doc);
+
+    httpd_ws_frame_t ws_pkt;
+    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_pkt.payload = (uint8_t *)output.c_str();
     ws_pkt.len = output.length();
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
@@ -901,55 +999,7 @@ void WiFiServerManager::notifyAutotuneState(const char *action) {
 }
 
 esp_err_t WiFiServerManager::api_status_handler(httpd_req_t *req) {
-    KilnState state = thermalCtrl.getState();
-    const ThermoStats thermo = thermalCtrl.getThermoStats();
-    const SafetyStats safety = thermalCtrl.getSafetyStats();
-    cJSON *doc = cJSON_CreateObject();
-    cJSON_AddNumberToObject(doc, "ts_ms", (double)(esp_timer_get_time() / 1000ULL));
-    cJSON_AddNumberToObject(doc, "temp", state.currentTemp);
-    cJSON_AddNumberToObject(doc, "raw", thermo.raw);
-    cJSON_AddNumberToObject(doc, "read_count", (double)thermo.readCount);
-    cJSON_AddNumberToObject(doc, "target", state.targetTemp);
-    cJSON_AddNumberToObject(doc, "pcbTemp", (double)fan_driver_get_source_temp_c());
-    cJSON_AddNumberToObject(doc, "output", thermalCtrl.getOutput());
-    cJSON_AddStringToObject(doc, "status", status_to_str((int)state.status));
-    cJSON_AddBoolToObject(doc, "firing", state.isFiring);
-    cJSON_AddBoolToObject(doc, "sensor_ok", thermalCtrl.isSensorHealthy());
-    cJSON_AddBoolToObject(doc, "fault_active", safety.faultActive);
-    cJSON_AddNumberToObject(doc, "fault_code", (double)safety.faultCode);
-    if (safety.faultActive) {
-        cJSON_AddNumberToObject(doc, "fault_since_ms", (double)safety.faultSinceMs);
-        cJSON_AddStringToObject(doc, "fault_reason", safety.faultReason);
-    }
-    if (state.timeRemaining >= 0) cJSON_AddNumberToObject(doc, "timeRemaining", state.timeRemaining);
-    cJSON_AddNumberToObject(doc, "step", state.currentStep);
-    cJSON_AddNumberToObject(doc, "total", state.totalSteps);
-    cJSON_AddNumberToObject(doc, "totalSteps", state.totalSteps);
-    cJSON_AddStringToObject(doc, "error", state.errorMsg.c_str());
-    cJSON_AddNumberToObject(doc, "schedules_rev", (double)wifiServer.getSchedulesRevision());
-    cJSON_AddNumberToObject(doc, "settings_rev", (double)wifiServer.getSettingsRevision());
-    cJSON_AddBoolToObject(doc, "fan_manual", fan_driver_get_manual());
-    cJSON_AddBoolToObject(doc, "fan_auto", fan_driver_get_auto_enabled());
-    cJSON_AddNumberToObject(doc, "fan_power", (double)fan_driver_get_power_percent());
-    cJSON_AddNumberToObject(doc, "fan_effective_power", (double)fan_driver_get_effective_power_percent());
-
-    const ThermalController::AutoTuneStatus tune = thermalCtrl.getAutotuneStatus();
-    cJSON *t = cJSON_CreateObject();
-    cJSON_AddBoolToObject(t, "active", tune.active);
-    cJSON_AddBoolToObject(t, "heater_on", tune.heaterOn);
-    cJSON_AddNumberToObject(t, "setpoint_c", (double)tune.setpointC);
-    cJSON_AddNumberToObject(t, "cycles", (double)tune.cycles);
-    cJSON_AddNumberToObject(t, "ku", (double)tune.ku);
-    cJSON_AddNumberToObject(t, "pu_s", (double)tune.pu_s);
-    cJSON_AddNumberToObject(t, "kp", (double)tune.kp);
-    cJSON_AddNumberToObject(t, "ki", (double)tune.ki);
-    cJSON_AddNumberToObject(t, "kd", (double)tune.kd);
-    cJSON_AddItemToObject(doc, "autotune", t);
-
-    char *rendered = cJSON_PrintUnformatted(doc);
-    std::string output = rendered ? rendered : "{}";
-    if (rendered) free(rendered);
-    cJSON_Delete(doc);
+    std::string output = render_json_and_delete(build_device_state_doc());
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
     httpd_resp_set_type(req, "application/json");
@@ -1369,6 +1419,11 @@ esp_err_t WiFiServerManager::api_settings_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "fan_temp_max_c", (double)tmax);
     cJSON_AddNumberToObject(root, "fan_power_min", (double)pmin);
     cJSON_AddNumberToObject(root, "fan_power_max", (double)pmax);
+    cJSON *maxC = cJSON_GetObjectItem(root, "maxC");
+    if (!cJSON_IsNumber(maxC)) {
+        cJSON_DeleteItemFromObject(root, "maxC");
+        cJSON_AddNumberToObject(root, "maxC", 1300.0);
+    }
 
     char *rendered = cJSON_PrintUnformatted(root);
     std::string output = rendered ? rendered : "{}";
@@ -1449,47 +1504,49 @@ esp_err_t WiFiServerManager::api_settings_set_handler(httpd_req_t *req) {
         cJSON_AddNumberToObject(root, "zones", (double)zones->valuedouble);
     }
 
-    bool fan_manual = fan_driver_get_manual();
-    bool fan_auto = fan_driver_get_auto_enabled();
-    uint8_t fan_power = fan_driver_get_power_percent();
-    float fan_tmin = 45.0f, fan_tmax = 280.0f;
-    uint8_t fan_pmin = 20, fan_pmax = 100;
-    fan_driver_get_auto_curve(&fan_tmin, &fan_tmax, &fan_pmin, &fan_pmax);
+    const cJSON *maxC = cJSON_GetObjectItem(incoming, "maxC");
+    if (cJSON_IsNumber(maxC)) {
+        double v = maxC->valuedouble;
+        if (v < 100.0) v = 100.0;
+        if (v > 1300.0) v = 1300.0;
+        cJSON_DeleteItemFromObject(root, "maxC");
+        cJSON_AddNumberToObject(root, "maxC", v);
+    }
+
+    device_commands::FanConfig fan_cfg = device_commands::current_fan_config();
 
     const cJSON *fanManual = cJSON_GetObjectItem(incoming, "fan_manual");
-    if (cJSON_IsBool(fanManual)) fan_manual = cJSON_IsTrue(fanManual);
+    if (cJSON_IsBool(fanManual)) fan_cfg.manual = cJSON_IsTrue(fanManual);
     const cJSON *fanAuto = cJSON_GetObjectItem(incoming, "fan_auto");
-    if (cJSON_IsBool(fanAuto)) fan_auto = cJSON_IsTrue(fanAuto);
+    if (cJSON_IsBool(fanAuto)) fan_cfg.auto_enabled = cJSON_IsTrue(fanAuto);
     const cJSON *fanPower = cJSON_GetObjectItem(incoming, "fan_power");
     if (cJSON_IsNumber(fanPower)) {
         int v = (int)fanPower->valuedouble;
         if (v < 0) v = 0;
         if (v > 100) v = 100;
-        fan_power = (uint8_t)v;
+        fan_cfg.power = static_cast<uint8_t>(v);
     }
     const cJSON *fanTMin = cJSON_GetObjectItem(incoming, "fan_temp_min_c");
-    if (cJSON_IsNumber(fanTMin)) fan_tmin = (float)fanTMin->valuedouble;
+    if (cJSON_IsNumber(fanTMin)) fan_cfg.temp_min_c = (float)fanTMin->valuedouble;
     const cJSON *fanTMax = cJSON_GetObjectItem(incoming, "fan_temp_max_c");
-    if (cJSON_IsNumber(fanTMax)) fan_tmax = (float)fanTMax->valuedouble;
+    if (cJSON_IsNumber(fanTMax)) fan_cfg.temp_max_c = (float)fanTMax->valuedouble;
     const cJSON *fanPMin = cJSON_GetObjectItem(incoming, "fan_power_min");
     if (cJSON_IsNumber(fanPMin)) {
         int v = (int)fanPMin->valuedouble;
         if (v < 0) v = 0;
         if (v > 100) v = 100;
-        fan_pmin = (uint8_t)v;
+        fan_cfg.power_min = static_cast<uint8_t>(v);
     }
     const cJSON *fanPMax = cJSON_GetObjectItem(incoming, "fan_power_max");
     if (cJSON_IsNumber(fanPMax)) {
         int v = (int)fanPMax->valuedouble;
         if (v < 0) v = 0;
         if (v > 100) v = 100;
-        fan_pmax = (uint8_t)v;
+        fan_cfg.power_max = static_cast<uint8_t>(v);
     }
 
-    fan_driver_set_auto_curve(fan_tmin, fan_tmax, fan_pmin, fan_pmax);
-    fan_driver_set_auto_enabled(fan_auto);
-    fan_driver_set_power_percent(fan_power);
-    fan_driver_set_manual(fan_manual);
+    device_commands::apply_fan_config(fan_cfg);
+    fan_cfg = device_commands::current_fan_config();
     cJSON_DeleteItemFromObject(root, "fan_manual");
     cJSON_DeleteItemFromObject(root, "fan_auto");
     cJSON_DeleteItemFromObject(root, "fan_power");
@@ -1497,13 +1554,13 @@ esp_err_t WiFiServerManager::api_settings_set_handler(httpd_req_t *req) {
     cJSON_DeleteItemFromObject(root, "fan_temp_max_c");
     cJSON_DeleteItemFromObject(root, "fan_power_min");
     cJSON_DeleteItemFromObject(root, "fan_power_max");
-    cJSON_AddBoolToObject(root, "fan_manual", fan_manual);
-    cJSON_AddBoolToObject(root, "fan_auto", fan_auto);
-    cJSON_AddNumberToObject(root, "fan_power", (double)fan_power);
-    cJSON_AddNumberToObject(root, "fan_temp_min_c", (double)fan_tmin);
-    cJSON_AddNumberToObject(root, "fan_temp_max_c", (double)fan_tmax);
-    cJSON_AddNumberToObject(root, "fan_power_min", (double)fan_pmin);
-    cJSON_AddNumberToObject(root, "fan_power_max", (double)fan_pmax);
+    cJSON_AddBoolToObject(root, "fan_manual", fan_cfg.manual);
+    cJSON_AddBoolToObject(root, "fan_auto", fan_cfg.auto_enabled);
+    cJSON_AddNumberToObject(root, "fan_power", (double)fan_cfg.power);
+    cJSON_AddNumberToObject(root, "fan_temp_min_c", (double)fan_cfg.temp_min_c);
+    cJSON_AddNumberToObject(root, "fan_temp_max_c", (double)fan_cfg.temp_max_c);
+    cJSON_AddNumberToObject(root, "fan_power_min", (double)fan_cfg.power_min);
+    cJSON_AddNumberToObject(root, "fan_power_max", (double)fan_cfg.power_max);
 
     // Always persist the offset in a stable key
     cJSON_DeleteItemFromObject(root, "temp_offset_c");
@@ -1880,28 +1937,110 @@ esp_err_t WiFiServerManager::api_touch_calibration_set_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static bool check_rate_limit(uint64_t &last_ms, uint32_t window_ms, const char *error, httpd_req_t *req) {
+static const char *result_code_to_str(device_commands::ResultCode code) {
+    switch (code) {
+        case device_commands::ResultCode::Ok: return "ok";
+        case device_commands::ResultCode::InvalidPayload: return "invalid_payload";
+        case device_commands::ResultCode::InvalidSchedule: return "invalid_schedule";
+        case device_commands::ResultCode::NoSchedule: return "no_schedule";
+        case device_commands::ResultCode::SensorInvalid: return "sensor_invalid";
+        case device_commands::ResultCode::TouchNotCalibrated: return "touch_not_calibrated";
+        default: return "internal";
+    }
+}
+
+static const char *result_message(device_commands::ResultCode code) {
+    switch (code) {
+        case device_commands::ResultCode::Ok: return "ok";
+        case device_commands::ResultCode::InvalidPayload: return "Invalid payload";
+        case device_commands::ResultCode::InvalidSchedule: return "Invalid schedule";
+        case device_commands::ResultCode::NoSchedule: return "No schedule loaded";
+        case device_commands::ResultCode::SensorInvalid: return "Sensor invalid";
+        case device_commands::ResultCode::TouchNotCalibrated: return "Touch not calibrated";
+        default: return "Internal error";
+    }
+}
+
+static void send_command_envelope(httpd_req_t *req,
+                                  bool ok,
+                                  const char *code,
+                                  const char *message,
+                                  const char *http_status = nullptr) {
+    if (http_status && http_status[0]) {
+        httpd_resp_set_status(req, http_status);
+    }
+    cJSON *doc = cJSON_CreateObject();
+    cJSON_AddBoolToObject(doc, "ok", ok);
+    cJSON_AddStringToObject(doc, "code", code ? code : (ok ? "ok" : "internal"));
+    cJSON_AddStringToObject(doc, "message", message ? message : "");
+    std::string out = render_json_and_delete(doc);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, out.c_str());
+}
+
+static bool check_rate_limit(uint64_t &last_ms, uint32_t window_ms, httpd_req_t *req) {
     const uint64_t now = (uint64_t)(esp_timer_get_time() / 1000ULL);
     if (last_ms > 0 && now > last_ms && (now - last_ms) < window_ms) {
-        httpd_resp_set_status(req, "429 Too Many Requests");
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, error);
+        send_command_envelope(req, false, "rate_limited", "Too many requests", "429 Too Many Requests");
         return false;
     }
     last_ms = now;
     return true;
 }
 
-static bool is_start_interlock_ok(std::string &reason) {
-    if (!thermalCtrl.isSensorHealthy()) {
-        reason = "sensor_invalid";
+static void send_command_result(httpd_req_t *req,
+                                const device_commands::CommandResult &result,
+                                const char *ok_message,
+                                const char *action,
+                                const char *source = "api") {
+    wifiServer.notifyCommandResult(action, result, ok_message, source);
+
+    switch (result.code) {
+        case device_commands::ResultCode::Ok:
+            send_command_envelope(req, true, "ok", ok_message ? ok_message : "ok");
+            break;
+        case device_commands::ResultCode::InvalidPayload:
+            send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "400 Bad Request");
+            break;
+        case device_commands::ResultCode::InvalidSchedule:
+            send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "400 Bad Request");
+            break;
+        case device_commands::ResultCode::NoSchedule:
+            send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
+            break;
+        case device_commands::ResultCode::SensorInvalid:
+            send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
+            break;
+        case device_commands::ResultCode::TouchNotCalibrated:
+            send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
+            break;
+        default:
+            send_command_envelope(req, false, "internal", "Internal error", "500 Internal Server Error");
+            break;
+    }
+}
+
+static bool parse_numeric_delta_from_body(const std::string &body, const char *json_key, double &out) {
+    if (body.empty()) return false;
+
+    char *end = nullptr;
+    const double raw = strtod(body.c_str(), &end);
+    if (end != body.c_str()) {
+        out = raw;
+        return true;
+    }
+
+    cJSON *root = cJSON_ParseWithLength(body.c_str(), body.size());
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
         return false;
     }
-    if (!display_driver_is_touch_calibrated()) {
-        reason = "touch_not_calibrated";
-        return false;
-    }
-    return true;
+
+    const cJSON *v = cJSON_GetObjectItem(root, json_key);
+    const bool ok = cJSON_IsNumber(v);
+    if (ok) out = v->valuedouble;
+    cJSON_Delete(root);
+    return ok;
 }
 
 static bool normalize_sha256_hex(const std::string &input, std::string &out_lower_hex) {
@@ -2285,135 +2424,93 @@ esp_err_t WiFiServerManager::manifest_handler(httpd_req_t *req) {
 }
 
 esp_err_t WiFiServerManager::api_start_handler(httpd_req_t *req) {
-    if (!check_rate_limit(wifiServer.lastStartCommandMs, START_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+    if (!check_rate_limit(wifiServer.lastStartCommandMs, START_RATE_LIMIT_MS, req)) {
         return ESP_OK;
     }
 
-    char buf[2048];
-    int ret, remaining = req->content_len;
-    
-    if (remaining > 0) {
-        if (remaining >= sizeof(buf)) { httpd_resp_send_500(req); return ESP_FAIL; }
-        ret = httpd_req_recv(req, buf, remaining);
-        if (ret > 0) {
-            buf[ret] = '\0';
-            std::string msg(buf);
-
-            cJSON *root = cJSON_Parse(msg.c_str());
-            if (!root) {
-                httpd_resp_sendstr(req, "{\"error\":\"invalid_schedule\"}");
-                return ESP_OK;
-            }
-
-            cJSON *schedule = cJSON_GetObjectItem(root, "schedule");
-            cJSON *steps = cJSON_GetObjectItem(root, "steps");
-            if (!steps) steps = cJSON_GetObjectItem(root, "segments");
-
-            if (schedule && cJSON_IsObject(schedule)) {
-                char *rendered = cJSON_PrintUnformatted(schedule);
-                if (rendered) {
-                    thermalCtrl.loadSchedule(rendered);
-                    free(rendered);
-                } else {
-                    cJSON_Delete(root);
-                    httpd_resp_sendstr(req, "{\"error\":\"invalid_schedule\"}");
-                    return ESP_OK;
-                }
-            } else if (steps) {
-                thermalCtrl.loadSchedule(msg);
-            } else {
-                cJSON_Delete(root);
-                httpd_resp_sendstr(req, "{\"error\":\"invalid_schedule\"}");
-                return ESP_OK;
-            }
-
-            cJSON_Delete(root);
-            std::string reason;
-            if (!is_start_interlock_ok(reason)) {
-                thermalCtrl.stop(std::string("Start blocked: ") + reason);
-                httpd_resp_set_status(req, "409 Conflict");
-                httpd_resp_set_type(req, "application/json");
-                if (reason == "sensor_invalid") {
-                    httpd_resp_sendstr(req, "{\"error\":\"sensor_invalid\"}");
-                } else {
-                    httpd_resp_sendstr(req, "{\"error\":\"touch_not_calibrated\"}");
-                }
-                return ESP_OK;
-            }
-
-            thermalCtrl.start();
-            httpd_resp_sendstr(req, "{\"status\":\"started\"}");
-        } 
-    } else {
-        if (thermalCtrl.getState().totalSteps > 0) {
-             std::string reason;
-             if (!is_start_interlock_ok(reason)) {
-                 thermalCtrl.stop(std::string("Start blocked: ") + reason);
-                 httpd_resp_set_status(req, "409 Conflict");
-                 httpd_resp_set_type(req, "application/json");
-                 if (reason == "sensor_invalid") {
-                     httpd_resp_sendstr(req, "{\"error\":\"sensor_invalid\"}");
-                 } else {
-                     httpd_resp_sendstr(req, "{\"error\":\"touch_not_calibrated\"}");
-                 }
-                 return ESP_OK;
-             }
-             thermalCtrl.start();
-             httpd_resp_sendstr(req, "{\"status\":\"started\"}");
-        } else {
-             httpd_resp_sendstr(req, "{\"error\":\"no_schedule\"}");
+    std::string payload;
+    payload.resize((size_t)req->content_len);
+    size_t off = 0;
+    while (off < payload.size()) {
+        const int r = httpd_req_recv(req, payload.data() + off, payload.size() - off);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
         }
+        off += (size_t)r;
     }
+
+    const device_commands::CommandResult res = payload.empty()
+        ? device_commands::start_loaded_schedule()
+        : device_commands::start_from_api_payload(payload);
+    send_command_result(req, res, "started", "start");
     return ESP_OK;
 }
 
 esp_err_t WiFiServerManager::api_stop_handler(httpd_req_t *req) {
-    if (!check_rate_limit(wifiServer.lastStopCommandMs, STOP_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+    if (!check_rate_limit(wifiServer.lastStopCommandMs, STOP_RATE_LIMIT_MS, req)) {
         return ESP_OK;
     }
-    thermalCtrl.stop("API Request");
-    httpd_resp_sendstr(req, "{\"status\":\"stopped\"}");
+    send_command_result(req, device_commands::stop("API Request"), "stopped", "stop");
     return ESP_OK;
 }
 
 esp_err_t WiFiServerManager::api_skip_handler(httpd_req_t *req) {
-    if (!check_rate_limit(wifiServer.lastSkipCommandMs, SKIP_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+    if (!check_rate_limit(wifiServer.lastSkipCommandMs, SKIP_RATE_LIMIT_MS, req)) {
         return ESP_OK;
     }
-    thermalCtrl.skipCurrentStep();
-    httpd_resp_sendstr(req, "{\"status\":\"skip_received\"}");
+    send_command_result(req, device_commands::skip(), "skip_received", "skip");
     return ESP_OK;
 }
 
 esp_err_t WiFiServerManager::api_add_temp_handler(httpd_req_t *req) {
-    if (!check_rate_limit(wifiServer.lastAddTempCommandMs, TUNE_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+    if (!check_rate_limit(wifiServer.lastAddTempCommandMs, TUNE_RATE_LIMIT_MS, req)) {
         return ESP_OK;
     }
-    char buf[100];
-    int ret = httpd_req_recv(req, buf, sizeof(buf));
-    if (ret > 0) {
-        buf[ret] = '\0';
-        thermalCtrl.addTemperatureToTarget(atof(buf));
-        httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
-    } else {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, NULL);
+    std::string body;
+    body.resize((size_t)req->content_len);
+    size_t off = 0;
+    while (off < body.size()) {
+        const int r = httpd_req_recv(req, body.data() + off, body.size() - off);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            send_command_result(req, {device_commands::ResultCode::InvalidPayload}, "ok", "add_temp");
+            return ESP_OK;
+        }
+        off += (size_t)r;
     }
+    double delta = 0.0;
+    if (!parse_numeric_delta_from_body(body, "degrees", delta)) {
+        send_command_result(req, {device_commands::ResultCode::InvalidPayload}, "ok", "add_temp");
+        return ESP_OK;
+    }
+    send_command_result(req, device_commands::add_temp(delta), "ok", "add_temp");
     return ESP_OK;
 }
 
 esp_err_t WiFiServerManager::api_add_time_handler(httpd_req_t *req) {
-    if (!check_rate_limit(wifiServer.lastAddTimeCommandMs, TUNE_RATE_LIMIT_MS, "{\"error\":\"rate_limited\"}", req)) {
+    if (!check_rate_limit(wifiServer.lastAddTimeCommandMs, TUNE_RATE_LIMIT_MS, req)) {
         return ESP_OK;
     }
-    char buf[100];
-    int ret = httpd_req_recv(req, buf, sizeof(buf));
-    if (ret > 0) {
-        buf[ret] = '\0';
-        thermalCtrl.addTimeToHold(atof(buf));
-        httpd_resp_sendstr(req, "{\"status\":\"ok\"}");
-    } else {
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, NULL);
+    std::string body;
+    body.resize((size_t)req->content_len);
+    size_t off = 0;
+    while (off < body.size()) {
+        const int r = httpd_req_recv(req, body.data() + off, body.size() - off);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            send_command_result(req, {device_commands::ResultCode::InvalidPayload}, "ok", "add_time");
+            return ESP_OK;
+        }
+        off += (size_t)r;
     }
+    double delta = 0.0;
+    if (!parse_numeric_delta_from_body(body, "minutes", delta)) {
+        send_command_result(req, {device_commands::ResultCode::InvalidPayload}, "ok", "add_time");
+        return ESP_OK;
+    }
+    send_command_result(req, device_commands::add_time(delta), "ok", "add_time");
     return ESP_OK;
 }
 
@@ -2464,50 +2561,42 @@ esp_err_t WiFiServerManager::api_fan_set_handler(httpd_req_t *req) {
         return ESP_OK;
     }
 
-    bool manual = fan_driver_get_manual();
-    bool auto_enabled = fan_driver_get_auto_enabled();
-    uint8_t power = fan_driver_get_power_percent();
-    float tmin = 45.0f, tmax = 280.0f;
-    uint8_t pmin = 20, pmax = 100;
-    fan_driver_get_auto_curve(&tmin, &tmax, &pmin, &pmax);
+    device_commands::FanConfig cfg = device_commands::current_fan_config();
 
     const cJSON *manual_item = cJSON_GetObjectItem(root, "manual");
-    if (cJSON_IsBool(manual_item)) manual = cJSON_IsTrue(manual_item);
+    if (cJSON_IsBool(manual_item)) cfg.manual = cJSON_IsTrue(manual_item);
 
     const cJSON *auto_item = cJSON_GetObjectItem(root, "auto");
-    if (cJSON_IsBool(auto_item)) auto_enabled = cJSON_IsTrue(auto_item);
+    if (cJSON_IsBool(auto_item)) cfg.auto_enabled = cJSON_IsTrue(auto_item);
 
     const cJSON *power_item = cJSON_GetObjectItem(root, "power");
     if (cJSON_IsNumber(power_item)) {
         int v = (int)power_item->valuedouble;
         if (v < 0) v = 0;
         if (v > 100) v = 100;
-        power = (uint8_t)v;
+        cfg.power = (uint8_t)v;
     }
 
     const cJSON *tmin_item = cJSON_GetObjectItem(root, "temp_min_c");
-    if (cJSON_IsNumber(tmin_item)) tmin = (float)tmin_item->valuedouble;
+    if (cJSON_IsNumber(tmin_item)) cfg.temp_min_c = (float)tmin_item->valuedouble;
     const cJSON *tmax_item = cJSON_GetObjectItem(root, "temp_max_c");
-    if (cJSON_IsNumber(tmax_item)) tmax = (float)tmax_item->valuedouble;
+    if (cJSON_IsNumber(tmax_item)) cfg.temp_max_c = (float)tmax_item->valuedouble;
     const cJSON *pmin_item = cJSON_GetObjectItem(root, "power_min");
     if (cJSON_IsNumber(pmin_item)) {
         int v = (int)pmin_item->valuedouble;
         if (v < 0) v = 0;
         if (v > 100) v = 100;
-        pmin = (uint8_t)v;
+        cfg.power_min = (uint8_t)v;
     }
     const cJSON *pmax_item = cJSON_GetObjectItem(root, "power_max");
     if (cJSON_IsNumber(pmax_item)) {
         int v = (int)pmax_item->valuedouble;
         if (v < 0) v = 0;
         if (v > 100) v = 100;
-        pmax = (uint8_t)v;
+        cfg.power_max = (uint8_t)v;
     }
 
-    fan_driver_set_auto_curve(tmin, tmax, pmin, pmax);
-    fan_driver_set_auto_enabled(auto_enabled);
-    fan_driver_set_power_percent(power);
-    fan_driver_set_manual(manual);
+    device_commands::apply_fan_config(cfg);
 
     wifiServer.notifySettingsChanged("fan");
 
