@@ -19,6 +19,7 @@ interface EditorStep {
 
 const ScheduleEditor = () => {
   const { t } = useLanguage();
+  const fixDegree = (v: string) => v.replace(/\uFFFD/g, '°');
   const { schedules, isLoading, saveSchedule, deleteSchedule, getScheduleDetails } = useSchedules();
   
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
@@ -357,13 +358,13 @@ const ScheduleEditor = () => {
                                     <label className="md:hidden text-[10px] font-bold text-zinc-500 uppercase mb-1 block">{t.schedules.rate}</label>
                                     <input type="number" min="0" max="9999" className="bg-zinc-900/50 border-zinc-800 rounded-lg pl-3 pr-14 py-2 text-white font-mono w-full focus:border-kiln-accent text-center text-lg" 
                                         value={step.rate} onChange={e => handleUpdateEditorStep(step.id, 'rate', e.target.value)} placeholder="FULL" />
-                                    <span className="absolute right-3 bottom-2.5 text-zinc-600 text-[10px] font-bold pointer-events-none">{t.schedules.rateUnit.replace(/[()]/g, '')}</span>
+                                    <span className="absolute right-3 bottom-2.5 text-zinc-600 text-[10px] font-bold pointer-events-none">{fixDegree(t.schedules.rateUnit).replace(/[()]/g, '')}</span>
                                 </div>
                                 <div className="col-span-1 md:col-span-3 relative">
                                     <label className="md:hidden text-[10px] font-bold text-zinc-500 uppercase mb-1 block">{t.schedules.targetTemp}</label>
                                     <input type="number" min="0" max="1320" className="bg-zinc-900/50 border-zinc-800 rounded-lg pl-3 pr-8 py-2 text-white font-mono w-full focus:border-kiln-accent text-center text-lg font-bold" 
                                         value={step.target} onChange={e => handleUpdateEditorStep(step.id, 'target', e.target.value)} />
-                                    <span className="absolute right-3 bottom-2.5 text-zinc-600 text-[10px] font-bold pointer-events-none">{t.schedules.tempUnit.replace(/[()]/g, '')}</span>
+                                    <span className="absolute right-3 bottom-2.5 text-zinc-600 text-[10px] font-bold pointer-events-none">{fixDegree(t.schedules.tempUnit).replace(/[()]/g, '')}</span>
                                 </div>
                                 <div className="col-span-2 md:col-span-3 relative">
                                     <label className="md:hidden text-[10px] font-bold text-zinc-500 uppercase mb-1 block">{t.schedules.time}</label>

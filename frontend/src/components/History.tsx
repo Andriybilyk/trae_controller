@@ -1,11 +1,12 @@
 ﻿
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Clock, Thermometer, Hash, AlertTriangle, CheckCircle, XCircle, Loader, X } from 'lucide-react';
+import { Clock, Thermometer, Hash, AlertTriangle, CheckCircle, XCircle, Loader, X, Trash2 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import toast from 'react-hot-toast';
-import { getJson } from '../api/http';
+import { deleteJson, getJson } from '../api/http';
+import { ConfirmModal } from './ConfirmModal';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -86,6 +87,8 @@ const History = () => {
     
     const [selectedFiring, setSelectedFiring] = useState<FiringDetail | null>(null);
     const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const [clearBusy, setClearBusy] = useState(false);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     const fetchHistory = async () => {
         setLoading(true);
@@ -107,6 +110,23 @@ const History = () => {
     useEffect(() => {
         fetchHistory();
     }, []);
+
+    const confirmClearHistory = async () => {
+        const tr = t.history as any;
+        setClearBusy(true);
+        try {
+            const res = await deleteJson<any>('/history');
+            if (!res.ok) throw new Error(res.message || tr.clearHistoryFailed || 'Failed to clear history');
+            toast.success(tr.historyCleared || 'History cleared');
+            setSelectedFiring(null);
+            setShowClearConfirm(false);
+            await fetchHistory();
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : (tr.clearHistoryFailed || 'Failed to clear history'));
+        } finally {
+            setClearBusy(false);
+        }
+    };
 
     const handleSelectFiring = async (id: string) => {
         setIsDetailLoading(true);
@@ -185,7 +205,29 @@ const History = () => {
 
     return (
         <div className="max-w-7xl mx-auto">
-            <h1 className="text-3xl font-bold text-white mb-6">{t.history.title}</h1>
+            <div className="mb-6 flex items-center justify-between gap-3">
+                <h1 className="text-3xl font-bold text-white">{t.history.title}</h1>
+                <button
+                    onClick={() => setShowClearConfirm(true)}
+                    disabled={clearBusy || loading}
+                    className="px-3 py-2 rounded-lg border border-red-500/30 text-red-300 bg-red-500/10 hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {clearBusy ? '...' : (((t.history as any).clearHistory) || 'Clear History')}
+                </button>
+            </div>
+
+            <ConfirmModal
+                open={showClearConfirm}
+                title={((t.history as any).clearHistory) || 'Clear History'}
+                description={((t.history as any).clearHistoryConfirm) || 'Delete all firing history?'}
+                confirmText={((t.history as any).clearHistory) || 'Clear History'}
+                cancelText={t.schedules.cancel}
+                icon={<Trash2 size={40} />}
+                variant="danger"
+                busy={clearBusy}
+                onConfirm={confirmClearHistory}
+                onCancel={() => setShowClearConfirm(false)}
+            />
 
             {history.length === 0 ? (
                 <div className="text-center text-zinc-500 py-20">

@@ -92,7 +92,10 @@ private:
     static esp_err_t api_fault_clear_handler(httpd_req_t *req);
     static esp_err_t api_fault_get_handler(httpd_req_t *req);
     static esp_err_t api_history_list_handler(httpd_req_t *req);
+    static esp_err_t api_history_clear_handler(httpd_req_t *req);
     static esp_err_t api_history_detail_handler(httpd_req_t *req);
+    static esp_err_t api_remote_get_handler(httpd_req_t *req);
+    static esp_err_t api_remote_set_handler(httpd_req_t *req);
     static esp_err_t manifest_handler(httpd_req_t *req);
     
     uint64_t lastBroadcast;

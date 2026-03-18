@@ -9,6 +9,11 @@ use std::time::{Duration, Instant};
 
 // Fonts are embedded via @font-face in the .slint files (compile-time), so we don't
 // need any runtime font registration here.
+const UI_TARGET_FPS: u64 = 30;
+const TOUCH_HOLD_DEADZONE_PX: i32 = 1;
+const TOUCH_FILTER_NUM: i32 = 1;
+const TOUCH_FILTER_DEN: i32 = 2;
+const TOUCH_FAST_MOVE_PX: i32 = 6;
 
 slint::include_modules!();
 
@@ -91,6 +96,9 @@ extern "C" {
     fn slint_bridge_copy_command_result(out: *mut SlintCommandResult) -> bool;
     fn slint_bridge_notify_schedules_changed();
     fn slint_bridge_ui_heartbeat();
+    fn slint_bridge_get_time_str(out: *mut c_char, out_len: i32) -> bool;
+    fn slint_bridge_get_language_is_ua() -> bool;
+    fn slint_bridge_set_language_is_ua(is_ua: bool);
 
     fn display_driver_touch_probe(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
     fn display_driver_touch_probe_raw(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
@@ -730,6 +738,8 @@ pub extern "C" fn slint_ui_run() {
 
     let ui = AppWindow::new().expect("Failed to create UI");
     ui.window().show().unwrap_or(());
+    let lang_is_ua = unsafe { slint_bridge_get_language_is_ua() };
+    ui.set_is_ua(lang_is_ua);
     ui.set_wifi_networks(ModelRc::new(VecModel::from(Vec::<WifiNetworkRow>::new())));
     ui.set_wifi_qr_image(build_qr_image(&format!("WIFI:T:nopass;S:{};;", CONTROLLER_AP_SSID)));
     ui.set_wifi_qr_hint("Scan to join controller Wi-Fi".into());
@@ -784,6 +794,7 @@ pub extern "C" fn slint_ui_run() {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let is_ua = !ui.get_is_ua();
             ui.set_is_ua(is_ua);
+            unsafe { slint_bridge_set_language_is_ua(is_ua) };
         });
     }
 
@@ -1272,12 +1283,21 @@ pub extern "C" fn slint_ui_run() {
     let mut last_touch = false;
     let mut last_x: u16 = 0;
     let mut last_y: u16 = 0;
+    let mut filtered_x: i32 = 0;
+    let mut filtered_y: i32 = 0;
+    let mut last_sent_x: i32 = 0;
+    let mut last_sent_y: i32 = 0;
+    let mut locked_scroll_x: i32 = 0;
+    let mut have_last_sent = false;
     let mut last_state_update = Instant::now();
     let mut last_ui_heartbeat = Instant::now();
+    let mut last_clock_update = Instant::now();
     let mut last_schedules_revision = unsafe { slint_bridge_get_schedules_revision() };
     let mut last_command_result_revision = unsafe { slint_bridge_get_command_result_revision() };
     let mut command_feedback_until = Instant::now();
     let mut last_qr_payload = String::new();
+    let frame_budget = Duration::from_millis(1000 / UI_TARGET_FPS);
+    let mut next_frame_at = Instant::now() + frame_budget;
 
     loop {
         slint::platform::update_timers_and_animations();
@@ -1285,6 +1305,16 @@ pub extern "C" fn slint_ui_run() {
         if last_ui_heartbeat.elapsed() >= Duration::from_millis(200) {
             last_ui_heartbeat = Instant::now();
             unsafe { slint_bridge_ui_heartbeat() };
+        }
+
+        if last_clock_update.elapsed() >= Duration::from_millis(1000) {
+            last_clock_update = Instant::now();
+            let mut buf = vec![0u8; 16];
+            let _ = unsafe { slint_bridge_get_time_str(buf.as_mut_ptr() as *mut c_char, buf.len() as i32) };
+            let label = c_buf_to_string(&buf);
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_current_time(label.into());
+            }
         }
 
         let command_revision = unsafe { slint_bridge_get_command_result_revision() };
@@ -1380,17 +1410,67 @@ pub extern "C" fn slint_ui_run() {
             }
         }
 
+        let active_view = if let Some(ui) = ui_weak.upgrade() {
+            ui.get_view()
+        } else {
+            View::Dashboard
+        };
+
         if pressed {
-            last_x = x;
-            last_y = y;
-            let pos = slint::LogicalPosition::new(x as f32, y as f32);
-            let _ = window.dispatch_event(WindowEvent::PointerMoved { position: pos });
+            let xi = x as i32;
+            let yi = y as i32;
+            if !last_touch {
+                filtered_x = xi;
+                filtered_y = yi;
+                locked_scroll_x = xi;
+            } else if !calib_active {
+                // Smooth touch jitter during hold/drag to avoid scroll shake on noisy ADC samples.
+                let dx_raw = (xi - filtered_x).abs();
+                let dy_raw = (yi - filtered_y).abs();
+                if dx_raw >= TOUCH_FAST_MOVE_PX || dy_raw >= TOUCH_FAST_MOVE_PX {
+                    // On faster swipes, avoid filter lag and keep scrolling responsive.
+                    filtered_x = xi;
+                    filtered_y = yi;
+                } else {
+                    filtered_x = (filtered_x * TOUCH_FILTER_NUM + xi) / TOUCH_FILTER_DEN;
+                    filtered_y = (filtered_y * TOUCH_FILTER_NUM + yi) / TOUCH_FILTER_DEN;
+                }
+            } else {
+                filtered_x = xi;
+                filtered_y = yi;
+            }
+
+            let mut send_x_i32 = filtered_x;
+            if !calib_active && active_view == View::Settings {
+                // Settings list should scroll only vertically.
+                send_x_i32 = locked_scroll_x;
+            }
+
+            let send_x = send_x_i32 as u16;
+            let send_y = filtered_y as u16;
+            last_x = send_x;
+            last_y = send_y;
+            let pos = slint::LogicalPosition::new(send_x as f32, send_y as f32);
             if !last_touch {
                 let _ = window.dispatch_event(WindowEvent::PointerPressed { position: pos, button: PointerEventButton::Left });
+                let _ = window.dispatch_event(WindowEvent::PointerMoved { position: pos });
+                last_sent_x = filtered_x;
+                last_sent_y = filtered_y;
+                have_last_sent = true;
+            } else {
+                let dx = (filtered_x - last_sent_x).abs();
+                let dy = (filtered_y - last_sent_y).abs();
+                if !have_last_sent || dx > TOUCH_HOLD_DEADZONE_PX || dy > TOUCH_HOLD_DEADZONE_PX {
+                    let _ = window.dispatch_event(WindowEvent::PointerMoved { position: pos });
+                    last_sent_x = filtered_x;
+                    last_sent_y = filtered_y;
+                    have_last_sent = true;
+                }
             }
         } else if last_touch {
             let pos = slint::LogicalPosition::new(last_x as f32, last_y as f32);
             let _ = window.dispatch_event(WindowEvent::PointerReleased { position: pos, button: PointerEventButton::Left });
+            have_last_sent = false;
         }
         last_touch = pressed;
 
@@ -1481,8 +1561,14 @@ pub extern "C" fn slint_ui_run() {
             renderer.render_by_line(buffer);
         });
 
-        // Run the UI + touch loop at ~60 Hz (lower CPU load, stable touch sampling).
-        std::thread::sleep(Duration::from_millis(16));
+        // Keep a stable frame cadence to reduce micro-stutter on MCU rendering.
+        let now = Instant::now();
+        if now < next_frame_at {
+            std::thread::sleep(next_frame_at - now);
+            next_frame_at += frame_budget;
+        } else {
+            next_frame_at = now + frame_budget;
+        }
     }
 }
 

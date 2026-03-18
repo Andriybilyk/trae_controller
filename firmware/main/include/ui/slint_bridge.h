@@ -51,6 +51,9 @@ bool slint_bridge_copy_command_result(slint_command_result_t *out);
 void slint_bridge_notify_schedules_changed(void);
 void slint_bridge_ui_heartbeat(void);
 uint64_t slint_bridge_get_ui_heartbeat_ms(void);
+bool slint_bridge_get_time_str(char *out, int32_t out_len);
+bool slint_bridge_get_language_is_ua(void);
+void slint_bridge_set_language_is_ua(bool is_ua);
 
 #ifdef __cplusplus
 }

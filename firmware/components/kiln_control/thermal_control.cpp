@@ -89,9 +89,12 @@ ThermalController::ThermalController() {
     thermoLastRaw = 0;
     thermoReadCount = 0;
     lastThermoReadMs = 0;
+    lastSensorOk = false;
     lastUpdate = 0;
     lastTemp = 0.0f;
     lastTempValid = false;
+    sensorHealthySinceMs = 0;
+    lastSensorHealthy = false;
     runtimeKp = Kp;
     runtimeKi = Ki;
     runtimeKd = Kd;
@@ -147,8 +150,11 @@ void ThermalController::begin() {
     thermoLastRaw = 0;
     thermoReadCount = 0;
     lastThermoReadMs = 0;
+    lastSensorOk = false;
     lastUpdate = 0;
     lastTempValid = false;
+    sensorHealthySinceMs = 0;
+    lastSensorHealthy = false;
 
     loadedScheduleName.clear();
     historyActive = false;
@@ -184,6 +190,35 @@ void ThermalController::loop() {
     
     updateTemperature();
     const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+
+    const bool sensor_healthy = isSensorHealthy();
+    if (sensor_healthy) {
+        if (!lastSensorHealthy) sensorHealthySinceMs = now_ms;
+    } else {
+        sensorHealthySinceMs = 0;
+    }
+    lastSensorHealthy = sensor_healthy;
+
+    if (kiln_fault_is_active()) {
+        const kiln_fault_t f = kiln_fault_get();
+        const bool is_sensor_fault = (f.code == KILN_FAULT_SENSOR_NAN || f.code == KILN_FAULT_SENSOR_OOR);
+        const bool can_clear = sensor_healthy
+            && sensorHealthySinceMs > 0
+            && (now_ms - sensorHealthySinceMs) >= SENSOR_FAULT_AUTO_CLEAR_MS
+            && state.currentTemp <= FAULT_CLEAR_MAX_TEMP_C;
+        if (is_sensor_fault && can_clear) {
+            ESP_LOGI(TAG, "Auto-clearing sensor fault after recovery.");
+            kiln_fault_clear();
+            state.isFiring = false;
+            state.status = KILN_IDLE;
+            state.errorMsg = "";
+            state.duration = 0;
+            state.timeRemaining = -1;
+            output = 0;
+            setpoint = 0;
+            state.targetTemp = 0;
+        }
+    }
 
     if (state.isFiring && state.startTime) {
         const uint64_t now_s = (uint64_t)(esp_timer_get_time() / 1000000ULL);
@@ -271,7 +306,8 @@ void ThermalController::updateTemperature() {
     float t = thermocouple->readCelsius(&raw);
     thermoLastRaw = raw;
     thermoReadCount++;
-    if (!std::isnan(t)) {
+    const bool raw_open = (raw & 0x4) != 0;
+    if (!std::isnan(t) && !raw_open) {
         state.currentTemp = t + temperatureOffsetC;
         // Rise-rate check (C/min)
         if (lastUpdate != 0 && now_ms > lastUpdate) {
@@ -287,8 +323,12 @@ void ThermalController::updateTemperature() {
         }
         lastTemp = state.currentTemp;
         lastTempValid = true;
+        lastSensorOk = true;
         lastUpdate = now_ms;
     } else {
+        state.currentTemp = NAN;
+        lastTempValid = false;
+        lastSensorOk = false;
         ESP_LOGW(TAG, "Thermocouple reading is NaN. Sensor might be disconnected or faulty.");
         kiln_fault_set(KILN_FAULT_SENSOR_NAN, "Sensor NaN/open");
     }
@@ -628,7 +668,7 @@ void ThermalController::autotuneFinalizeLocked(uint64_t now_ms) {
 
 bool ThermalController::isSensorHealthy() {
     // "Sensor healthy" is about plausibility, not process safety limits.
-    if (std::isnan(state.currentTemp) || state.currentTemp > SENSOR_TEMP_MAX_C || state.currentTemp < SENSOR_TEMP_MIN_C) {
+    if (!lastSensorOk || !std::isfinite(state.currentTemp) || state.currentTemp > SENSOR_TEMP_MAX_C || state.currentTemp < SENSOR_TEMP_MIN_C) {
         return false;
     }
     return true;

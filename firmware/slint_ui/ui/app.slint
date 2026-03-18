@@ -1,7 +1,6 @@
 ﻿import { VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
 // UI layout tweaks for touch usability
 
-
 import "../../data/fonts/sketch_260307b/FontFiles/PTSans-Regular.ttf";
 
 
@@ -780,19 +779,16 @@ export component AppWindow inherits Window {
 
 
 
-        if (root.view == View.Dashboard) : Rectangle {
-
-
-
+        if (root.view == View.Dashboard) : ScrollView {
             x: 0px; y: 0px;
-
-
-
             width: 480px; height: 280px;
+            horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+            vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+            mouse-drag-pan-enabled: true;
 
-
-
-            background: root.c_bg;
+            Rectangle {
+                width: 480px; height: 280px;
+                background: root.c_bg;
 
 
 
@@ -1870,8 +1866,8 @@ export component AppWindow inherits Window {
 
 
 
+            }
         }
-
 
 
         // (touch debug bar removed)
@@ -1972,6 +1968,9 @@ export component AppWindow inherits Window {
 
                 ScrollView { // schedules-list
                     x: 10px; y: 48px; width: 460px; height: parent.height - 58px;
+                    horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                    vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+                    mouse-drag-pan-enabled: true;
                     VerticalBox {
                         spacing: 6px;
                         for schedule[i] in root.schedules : Rectangle {
@@ -2208,9 +2207,12 @@ export component AppWindow inherits Window {
                 ScrollView {
                     x: 10px; y: 48px;
                     width: 438px; height: 218px;
+                    horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                    vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+                    mouse-drag-pan-enabled: true;
 
-                    VerticalBox {
-                        width: 426px;
+                    settings_box := VerticalBox {
+                        width: 438px;
                         spacing: 8px;
 
                         Rectangle {
@@ -2442,16 +2444,7 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                Rectangle {
-                    x: 456px; y: 52px; width: 8px; height: 210px;
-                    background: #1F1F23;
-                    border-radius: 2px;
-                }
-                Rectangle {
-                    x: 456px; y: 58px; width: 8px; height: 52px;
-                    background: #52525B;
-                    border-radius: 2px;
-                }
+                // (scrollbar hidden)
 
                 if (root.wifi_qr_visible) : Rectangle {
                     x: 0px; y: 0px; width: 480px; height: 280px;
@@ -2541,6 +2534,9 @@ export component AppWindow inherits Window {
 
                         if (!root.wifi_scan_busy && root.wifi_networks.length > 0) : ScrollView {
                             x: 8px; y: 40px; width: 432px; height: 204px;
+                            horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                            vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+                            mouse-drag-pan-enabled: true;
 
                             VerticalBox {
                                 spacing: 4px;
@@ -2761,6 +2757,9 @@ export component AppWindow inherits Window {
 
                 ScrollView {
                     x: 10px; y: 48px; width: 460px; height: parent.height - 58px;
+                    horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                    vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+                    mouse-drag-pan-enabled: true;
                     VerticalBox {
                         spacing: 6px;
                         if (root.editor_steps.length == 0) : Rectangle {

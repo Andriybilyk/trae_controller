@@ -36,6 +36,15 @@
 #ifndef TFT_SPI_CLOCK_HZ
 #define TFT_SPI_CLOCK_HZ (40 * 1000 * 1000)
 #endif
+// Number of full display lines per SPI DMA transaction chunk.
+// Larger chunks improve throughput; smaller chunks can reduce frame-time jitter.
+#ifndef TFT_SPI_DMA_LINES
+#define TFT_SPI_DMA_LINES 12
+#endif
+// SPI queued transactions for display writes.
+#ifndef TFT_SPI_QUEUE_SIZE
+#define TFT_SPI_QUEUE_SIZE 10
+#endif
 
 #ifndef TOUCH_CS
 #define TOUCH_CS        GPIO_NUM_4
@@ -62,6 +71,11 @@
 #define TOUCH_SPI_CLOCK_HZ (1 * 1000 * 1000)
 #endif
 
+// Target UI frame rate for Slint render loop.
+#ifndef UI_TARGET_FPS
+#define UI_TARGET_FPS 30
+#endif
+
 // 2. THERMOCOUPLE (MAX6675) - Software SPI
 #define MAXCLK          GPIO_NUM_41
 #define MAXCS           GPIO_NUM_42
@@ -79,6 +93,11 @@
 #define FIRMWARE_VERSION    "2.5.1"
 #define DEVICE_NAME         "Trae Kiln Controller"
 
+// --- Time / NTP ---
+// TZ format: https://man7.org/linux/man-pages/man3/tzset.3.html
+#define TIMEZONE_TZ         "EET-2EEST,M3.5.0/3,M10.5.0/4"
+#define SNTP_SERVER_1       "pool.ntp.org"
+
 // --- Safety Limits ---
 #define MAX_TEMP_SAFETY     1300.0f
 #define MAX_TEMP_RISE_RATE  500.0f
@@ -91,6 +110,8 @@
 // --- Fault Reset Policy ---
 // Only allow clearing a latched fault when temperature is below this threshold.
 #define FAULT_CLEAR_MAX_TEMP_C  (200.0f)
+// Auto-clear sensor fault after this stable healthy time (ms).
+#define SENSOR_FAULT_AUTO_CLEAR_MS (3000)
 
 // --- PID Defaults ---
 #define PID_WINDOW_SIZE     2000    // 2 seconds for SSR

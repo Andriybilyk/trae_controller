@@ -33,6 +33,8 @@ const formatMinutesToHM = (minutes: number | undefined) => {
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 };
 
+const fixDegreeText = (v: string) => v.replace(/\uFFFD/g, '°');
+
 const DashboardView = ({ 
     status, 
     selectedSchedule, 
@@ -214,7 +216,7 @@ const EditorView = ({
                         
                         <div className="flex-1 grid grid-cols-3 gap-2">
                             <div className="flex flex-col">
-                                <label className="text-[10px] text-zinc-500 uppercase font-bold truncate">{t.schedules.rateLabel}</label>
+                                <label className="text-[10px] text-zinc-500 uppercase font-bold truncate">{fixDegreeText(t.schedules.rateLabel)}</label>
                                 <input 
                                     type="number" 
                                     className="bg-transparent text-white font-mono font-bold text-xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"
@@ -223,7 +225,7 @@ const EditorView = ({
                                 />
                             </div>
                             <div className="flex flex-col">
-                                <label className="text-[10px] text-zinc-500 uppercase font-bold truncate">{t.schedules.targetLabel}</label>
+                                <label className="text-[10px] text-zinc-500 uppercase font-bold truncate">{fixDegreeText(t.schedules.targetLabel)}</label>
                                 <input 
                                     type="number" 
                                     className="bg-transparent text-white font-mono font-bold text-xl w-full border-b border-zinc-700 focus:border-kiln-accent focus:outline-none"

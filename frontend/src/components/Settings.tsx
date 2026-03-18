@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Square } from 'lucide-react';
+import { Save, Zap, Activity, Settings as SettingsIcon, Wrench, Thermometer, Shield, Download, Upload, Square, Globe } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useDeviceState } from '../contexts/DeviceStateContext';
 import toast from 'react-hot-toast';
@@ -22,6 +22,7 @@ const Settings = () => {
   const [autotuneTemp, setAutotuneTemp] = useState(600);
   const [pidInfo, setPidInfo] = useState<any>(null);
   const [pidLoading, setPidLoading] = useState(false);
+  const [faultBusy, setFaultBusy] = useState(false);
   const [showPidResetConfirm, setShowPidResetConfirm] = useState(false);
   const [showAutotuneStartConfirm, setShowAutotuneStartConfirm] = useState(false);
   const [showAutotuneStopConfirm, setShowAutotuneStopConfirm] = useState(false);
@@ -29,6 +30,25 @@ const Settings = () => {
   const [otaFile, setOtaFile] = useState<File | null>(null);
   const [otaSha256, setOtaSha256] = useState('');
   const [otaBusy, setOtaBusy] = useState(false);
+  const [remoteLoading, setRemoteLoading] = useState(false);
+  const [remoteSaving, setRemoteSaving] = useState(false);
+  const [remoteConfig, setRemoteConfig] = useState({
+    enabled: false,
+    uri: '',
+    username: '',
+    password: '',
+    clearPassword: false,
+    authKey: '',
+    clearAuthKey: false,
+    requireSignedCommands: true,
+    caPem: '',
+    clearCaCert: false,
+    deviceId: '',
+    hasPassword: false,
+    hasAuthKey: false,
+    hasCaCert: false,
+    connected: false
+  });
   const { state: deviceState, connected } = useDeviceState();
   const autotuneInfo = deviceState.autotune || null;
 
@@ -65,6 +85,69 @@ const Settings = () => {
     setPidLoading(false);
   };
 
+  const loadRemoteConfig = async () => {
+    setRemoteLoading(true);
+    try {
+      const res = await getJson<any>('/api/remote');
+      if (res.ok && res.data) {
+        const d = res.data;
+        setRemoteConfig((prev) => ({
+          ...prev,
+          enabled: !!d.enabled,
+          uri: typeof d.uri === 'string' ? d.uri : '',
+          username: typeof d.username === 'string' ? d.username : '',
+          password: '',
+          clearPassword: false,
+          authKey: '',
+          clearAuthKey: false,
+          requireSignedCommands: d.require_signed_commands !== false,
+          caPem: '',
+          clearCaCert: false,
+          deviceId: typeof d.device_id === 'string' ? d.device_id : '',
+          hasPassword: !!d.has_password,
+          hasAuthKey: !!d.has_auth_key,
+          hasCaCert: !!d.has_ca_cert,
+          connected: !!d.connected
+        }));
+      }
+    } catch (e) {
+      // ignore, handled by UI state
+    } finally {
+      setRemoteLoading(false);
+    }
+  };
+
+  const saveRemoteConfig = async () => {
+    try {
+      setRemoteSaving(true);
+      const payload: any = {
+        enabled: remoteConfig.enabled,
+        uri: remoteConfig.uri.trim(),
+        username: remoteConfig.username.trim(),
+        device_id: remoteConfig.deviceId.trim()
+      };
+      if (remoteConfig.password.trim().length > 0) payload.password = remoteConfig.password;
+      if (remoteConfig.clearPassword) payload.clear_password = true;
+      if (remoteConfig.authKey.trim().length > 0) payload.auth_key = remoteConfig.authKey;
+      if (remoteConfig.clearAuthKey) payload.clear_auth_key = true;
+      payload.require_signed_commands = remoteConfig.requireSignedCommands;
+      if (remoteConfig.caPem.trim().length > 0) payload.ca_pem = remoteConfig.caPem;
+      if (remoteConfig.clearCaCert) payload.clear_ca_cert = true;
+
+      const res = await postJson<any>('/api/remote', payload);
+      if (!res.ok) {
+        toastApiError(res, 'Failed to save remote access config');
+        return;
+      }
+      toast.success('Remote access settings saved');
+      await loadRemoteConfig();
+    } catch (e) {
+      toast.error('Connection error to controller.');
+    } finally {
+      setRemoteSaving(false);
+    }
+  };
+
   const resetPid = async () => {
     setShowPidResetConfirm(true);
   };
@@ -89,11 +172,12 @@ const Settings = () => {
 
   useEffect(() => {
     loadControllerSettings();
+    loadRemoteConfig();
 
     const onWs = (ev: any) => {
       const msg = ev?.detail;
       if (!msg || !msg.event) return;
-      if (msg.event === 'settings_changed') { loadControllerSettings(); loadPid(); }
+      if (msg.event === 'settings_changed') { loadControllerSettings(); loadPid(); loadRemoteConfig(); }
     };
     window.addEventListener('kiln_ws', onWs as any);
 
@@ -194,6 +278,23 @@ const Settings = () => {
       } finally {
           setConfirmBusy(null);
       }
+  };
+
+  const clearFault = async () => {
+    if (faultBusy) return;
+    try {
+      setFaultBusy(true);
+      const res = await postJson<any>('/fault/clear');
+      if (res.ok) {
+        toast.success(t.settings.faultCleared || "Fault cleared");
+      } else {
+        toastApiError(res, t.settings.faultClearFailed || "Failed to clear fault");
+      }
+    } catch (e) {
+      toast.error("Connection error to controller.");
+    } finally {
+      setFaultBusy(false);
+    }
   };
 
   return (
@@ -468,6 +569,164 @@ const Settings = () => {
       </div>
       
       <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg">
+         <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-3 border-b border-zinc-800 pb-4">
+            <Globe size={24} className="text-cyan-400" />
+            {t.settings.remoteAccess || "Remote Access (Internet)"}
+        </h2>
+        <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="md:col-span-2">
+                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+                      {t.settings.mqttBroker || "MQTT Broker URI"}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="mqtts://broker.example.com:8883"
+                      className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-cyan-500 focus:outline-none transition-colors"
+                      value={remoteConfig.uri}
+                      onChange={(e) => setRemoteConfig((prev) => ({ ...prev, uri: e.target.value }))}
+                    />
+                </div>
+                <div>
+                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+                      {t.settings.remoteStatus || "Remote Status"}
+                    </label>
+                    <div className={`h-[46px] rounded-lg border px-3 flex items-center font-mono text-sm ${
+                      remoteConfig.connected ? 'border-emerald-700 bg-emerald-900/20 text-emerald-300' : 'border-zinc-800 bg-black text-zinc-400'
+                    }`}>
+                      {remoteLoading ? 'loading...' : (remoteConfig.connected ? 'connected' : 'offline')}
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+                      {t.settings.remoteUser || "MQTT Username"}
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-cyan-500 focus:outline-none transition-colors"
+                      value={remoteConfig.username}
+                      onChange={(e) => setRemoteConfig((prev) => ({ ...prev, username: e.target.value }))}
+                    />
+                </div>
+                <div>
+                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+                      {t.settings.remotePassword || "MQTT Password"}
+                    </label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={remoteConfig.hasPassword ? '••••••••' : ''}
+                      className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-cyan-500 focus:outline-none transition-colors"
+                      value={remoteConfig.password}
+                      onChange={(e) => setRemoteConfig((prev) => ({ ...prev, password: e.target.value, clearPassword: false }))}
+                    />
+                </div>
+                <div>
+                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+                      {t.settings.authKey || "Command Auth Key"}
+                    </label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={remoteConfig.hasAuthKey ? '••••••••' : ''}
+                      className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-cyan-500 focus:outline-none transition-colors"
+                      value={remoteConfig.authKey}
+                      onChange={(e) => setRemoteConfig((prev) => ({ ...prev, authKey: e.target.value, clearAuthKey: false }))}
+                    />
+                </div>
+                <div>
+                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+                      {t.settings.deviceId || "Device ID"}
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-cyan-500 focus:outline-none transition-colors font-mono"
+                      value={remoteConfig.deviceId}
+                      onChange={(e) => setRemoteConfig((prev) => ({ ...prev, deviceId: e.target.value }))}
+                    />
+                </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg border border-zinc-800 bg-black/20 p-3">
+              <label className="inline-flex items-center gap-3 text-sm text-zinc-200">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-cyan-500"
+                  checked={remoteConfig.enabled}
+                  onChange={(e) => setRemoteConfig((prev) => ({ ...prev, enabled: e.target.checked }))}
+                />
+                {t.settings.enableRemote || "Enable remote access through Internet"}
+              </label>
+              <label className="inline-flex items-center gap-2 text-xs text-zinc-400">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-red-500"
+                  checked={remoteConfig.clearPassword}
+                  onChange={(e) => setRemoteConfig((prev) => ({ ...prev, clearPassword: e.target.checked, password: '' }))}
+                />
+                {t.settings.clearRemotePassword || "Clear saved password on controller"}
+              </label>
+            </div>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-lg border border-zinc-800 bg-black/20 p-3">
+              <label className="inline-flex items-center gap-3 text-sm text-zinc-200">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-amber-500"
+                  checked={remoteConfig.requireSignedCommands}
+                  onChange={(e) => setRemoteConfig((prev) => ({ ...prev, requireSignedCommands: e.target.checked }))}
+                />
+                {t.settings.requireSignedCommands || "Require signed remote commands (HMAC)"}
+              </label>
+              <label className="inline-flex items-center gap-2 text-xs text-zinc-400">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-red-500"
+                  checked={remoteConfig.clearAuthKey}
+                  onChange={(e) => setRemoteConfig((prev) => ({ ...prev, clearAuthKey: e.target.checked, authKey: '' }))}
+                />
+                {t.settings.clearAuthKey || "Clear command auth key on controller"}
+              </label>
+            </div>
+
+            <div className="text-xs text-zinc-500 font-mono bg-black/20 border border-zinc-800 rounded-lg p-3">
+              Topic: trae/{remoteConfig.deviceId || 'DEVICE_ID'}/cmd
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+                {t.settings.caCert || "Broker CA Certificate (PEM)"}
+              </label>
+              <textarea
+                rows={5}
+                placeholder={remoteConfig.hasCaCert ? 'CA cert is saved on controller (paste to replace)' : '-----BEGIN CERTIFICATE----- ...'}
+                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-cyan-500 focus:outline-none transition-colors font-mono text-xs"
+                value={remoteConfig.caPem}
+                onChange={(e) => setRemoteConfig((prev) => ({ ...prev, caPem: e.target.value, clearCaCert: false }))}
+              />
+              <label className="inline-flex items-center gap-2 text-xs text-zinc-400 mt-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-red-500"
+                  checked={remoteConfig.clearCaCert}
+                  onChange={(e) => setRemoteConfig((prev) => ({ ...prev, clearCaCert: e.target.checked, caPem: '' }))}
+                />
+                {t.settings.clearCaCert || "Clear saved CA certificate"}
+              </label>
+            </div>
+
+            <button
+              className="w-full py-3 bg-cyan-700 hover:bg-cyan-600 disabled:bg-zinc-700 disabled:text-zinc-400 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+              onClick={saveRemoteConfig}
+              disabled={remoteSaving || remoteLoading}
+            >
+              <Save size={18} /> {remoteSaving ? (t.settings.saving || 'Saving...') : (t.settings.saveRemote || "Save Remote Access")}
+            </button>
+        </div>
+      </div>
+
+      <div className="bg-kiln-card border border-kiln-border rounded-xl p-6 shadow-lg">
          <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-3 border-b border-zinc-800 pb-4">
             <Shield size={24} className="text-red-400" />
             {t.settings.safety}
@@ -479,10 +738,20 @@ const Settings = () => {
                 <div className="text-sm font-mono text-zinc-200 break-all">{deviceState.server_url || '-'}</div>
             </div>
             <div className="bg-black/20 border border-zinc-800 rounded-lg p-3">
-                <div className="text-[11px] uppercase text-zinc-500 font-bold">Fault</div>
+                <div className="text-[11px] uppercase text-zinc-500 font-bold">{t.settings.fault || "Fault"}</div>
                 <div className={`text-sm font-mono ${deviceState.fault_active ? 'text-red-400' : 'text-emerald-400'}`}>
                     {deviceState.fault_active ? `ACTIVE (${deviceState.fault_code ?? '-'})` : `NONE (${deviceState.fault_code ?? 0})`}
                 </div>
+                <div className="text-xs text-zinc-500 mt-1 break-words">
+                    {t.settings.faultReason || "Reason"}: {deviceState.fault_reason || '-'}
+                </div>
+                <button
+                  onClick={clearFault}
+                  disabled={!deviceState.fault_active || faultBusy}
+                  className="mt-2 w-full py-2 bg-red-600 hover:bg-red-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-lg font-bold transition-colors text-xs"
+                >
+                  {faultBusy ? (t.settings.clearing || "Clearing...") : (t.settings.clearFault || "Clear Fault")}
+                </button>
             </div>
             <div className="bg-black/20 border border-zinc-800 rounded-lg p-3">
                 <div className="text-[11px] uppercase text-zinc-500 font-bold">Uptime</div>

@@ -8,15 +8,20 @@
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "esp_system.h"
+#include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #include <atomic>
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <string>
+#include <time.h>
 
 static std::atomic<uint64_t> s_ui_heartbeat_ms{0};
+static constexpr const char *UI_PREF_NS = "ui_pref";
+static constexpr const char *UI_PREF_LANG_KEY = "lang";
 
 static bool notify_slint_command(const char *action,
                                  const device_commands::CommandResult &res,
@@ -165,5 +170,45 @@ extern "C" void slint_bridge_ui_heartbeat(void) {
 
 extern "C" uint64_t slint_bridge_get_ui_heartbeat_ms(void) {
     return s_ui_heartbeat_ms.load(std::memory_order_relaxed);
+}
+
+extern "C" bool slint_bridge_get_time_str(char *out, int32_t out_len) {
+    if (!out || out_len <= 0) return false;
+    out[0] = '\0';
+
+    time_t now = time(nullptr);
+    struct tm local_tm;
+    if (now < 100000 || !localtime_r(&now, &local_tm)) {
+        std::snprintf(out, out_len, "--:--");
+        return false;
+    }
+    const int year = local_tm.tm_year + 1900;
+    if (year < 2020) {
+        std::snprintf(out, out_len, "--:--");
+        return false;
+    }
+
+    std::snprintf(out, out_len, "%02d:%02d", local_tm.tm_hour, local_tm.tm_min);
+    return true;
+}
+
+extern "C" bool slint_bridge_get_language_is_ua(void) {
+    nvs_handle_t h = 0;
+    if (nvs_open(UI_PREF_NS, NVS_READONLY, &h) != ESP_OK) {
+        return true; // default UA for first boot
+    }
+    uint8_t value = 1;
+    esp_err_t err = nvs_get_u8(h, UI_PREF_LANG_KEY, &value);
+    nvs_close(h);
+    if (err != ESP_OK) return true;
+    return value != 0;
+}
+
+extern "C" void slint_bridge_set_language_is_ua(bool is_ua) {
+    nvs_handle_t h = 0;
+    if (nvs_open(UI_PREF_NS, NVS_READWRITE, &h) != ESP_OK) return;
+    (void)nvs_set_u8(h, UI_PREF_LANG_KEY, is_ua ? 1 : 0);
+    (void)nvs_commit(h);
+    nvs_close(h);
 }
 

@@ -163,7 +163,28 @@ export const translations = {
       serviceAutotune: "Service: PID Auto-Tune",
       warningText: "Warning: Kiln will heat to 150�C and oscillate. Ensure empty kiln.",
       initiateCalib: "Initiate Calibration",
-      confirmAutotune: "WARNING: This will start the calibration process. The kiln will heat to 150�C. Continue?"
+      confirmAutotune: "WARNING: This will start the calibration process. The kiln will heat to 150�C. Continue?",
+      fault: "Fault",
+      faultReason: "Reason",
+      clearFault: "Clear Fault",
+      clearing: "Clearing...",
+      faultCleared: "Fault cleared",
+      faultClearFailed: "Failed to clear fault",
+      remoteAccess: "Remote Access (Internet)",
+      mqttBroker: "MQTT Broker URI",
+      remoteStatus: "Remote Status",
+      remoteUser: "MQTT Username",
+      remotePassword: "MQTT Password",
+      deviceId: "Device ID",
+      enableRemote: "Enable remote access through Internet",
+      clearRemotePassword: "Clear saved password on controller",
+      saveRemote: "Save Remote Access",
+      saving: "Saving...",
+      authKey: "Command Auth Key",
+      requireSignedCommands: "Require signed remote commands (HMAC)",
+      clearAuthKey: "Clear command auth key on controller",
+      caCert: "Broker CA Certificate (PEM)",
+      clearCaCert: "Clear saved CA certificate"
     }
   },
   ua: {
@@ -330,7 +351,31 @@ export const translations = {
       serviceAutotune: "Сервіс: PID Автоналаштування",
       warningText: "Увага: піч нагріється до 150�C. Переконайтеся, що піч порожня.",
       initiateCalib: "Розпочати калібрування",
-      confirmAutotune: "УВАГА: Це запустить процес калібрування. Піч нагріється до 150�C. Продовжити?"
+      confirmAutotune: "УВАГА: Це запустить процес калібрування. Піч нагріється до 150�C. Продовжити?",
+      fault: "Fault",
+      faultReason: "Reason",
+      clearFault: "Clear Fault",
+      clearing: "Clearing...",
+      faultCleared: "Fault cleared",
+      faultClearFailed: "Failed to clear fault",
+      remoteAccess: "Remote Access (Internet)",
+      mqttBroker: "MQTT Broker URI",
+      remoteStatus: "Remote Status",
+      remoteUser: "MQTT Username",
+      remotePassword: "MQTT Password",
+      deviceId: "Device ID",
+      enableRemote: "Enable remote access through Internet",
+      clearRemotePassword: "Clear saved password on controller",
+      saveRemote: "Save Remote Access",
+      saving: "Saving...",
+      authKey: "Command Auth Key",
+      requireSignedCommands: "Require signed remote commands (HMAC)",
+      clearAuthKey: "Clear command auth key on controller",
+      caCert: "Broker CA Certificate (PEM)",
+      clearCaCert: "Clear saved CA certificate"
     }
   }
 };
+
+
+

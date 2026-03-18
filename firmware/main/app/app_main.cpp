@@ -17,6 +17,7 @@
 #include "slint_ui.h"
 #include "ui/slint_bridge.h"
 #include "net/wifi_server.h"
+#include "net/remote_access.h"
 #include "drivers/fan_driver.h"
 
 static const char *TAG = "MAIN";
@@ -126,6 +127,7 @@ static void server_task(void *arg) {
     s_server_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
 
     wifiServer.begin();
+    remote_access_init();
     s_server_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
     s_server_watchdog_armed.store(true, std::memory_order_relaxed);
 
@@ -134,6 +136,7 @@ static void server_task(void *arg) {
     while (true) {
         (void)esp_task_wdt_reset();
         wifiServer.loop();
+        remote_access_loop();
         s_server_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
 
         const uint64_t now = esp_timer_get_time() / 1000ULL; // ms

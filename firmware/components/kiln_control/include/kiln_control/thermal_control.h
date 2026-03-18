@@ -120,6 +120,7 @@ private:
     uint16_t thermoLastRaw;
     uint32_t thermoReadCount;
     uint64_t lastThermoReadMs;
+    bool lastSensorOk;
 
     // Loaded schedule metadata (for UI/history)
     std::string loadedScheduleName;
@@ -140,6 +141,8 @@ private:
     // Safety / diagnostics
     float lastTemp;
     bool lastTempValid;
+    uint64_t sensorHealthySinceMs;
+    bool lastSensorHealthy;
 
     // State
     KilnState state;

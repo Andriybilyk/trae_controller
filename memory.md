@@ -67,6 +67,11 @@
 - Web UX cleanup: fixed broken `°C` rendering and stray `???` separators in schedule/library views; numeric input spinners are hidden for touch-first editing.
 - Settings/Web + firmware config now include `maxC` (max allowed temperature) persistence in `/littlefs/config.json` for hardware configuration.
 - Fan command policy unified through `device_commands`: when fan power is non-zero it is clamped to a minimum of 60% across API/Web/Slint paths.
+- Remote internet-access MVP added via outbound MQTT/TLS bridge (`firmware/main/net/remote_access.cpp`): config persisted in NVS, status/events published, and a safety-limited remote command set (`stop/skip/add_temp/add_time/fan/fault_clear`) exposed through `/api/remote`.
+- Web Settings now includes Remote Access card (broker URI, credentials, device id, enable toggle, connection state) and saves to `GET/POST /api/remote`.
+- Remote command hardening v1: optional mandatory HMAC-SHA256 signature validation (`ts_ms` + `nonce` + command payload), replay protection (nonce ring), and timestamp skew checks are enforced in the MQTT command path.
+- Remote TLS hardening v1: controller now supports broker CA PEM upload/clear via `/api/remote` (`ca_pem`/`clear_ca_cert`) and requires a saved CA file for `mqtts://`/`wss://` connections.
+- Remote bootstrap auto-config added: on first boot remote mode is prefilled/enabled with `mqtts://test.mosquitto.org:8883`, random per-device `auth_key` is generated, and default ISRG Root X1 CA is provisioned if missing.
 
 ## TODO
 - P0: Verify Slint embedded build for `xtensa-esp32s3-espidf` and confirm Slint software renderer + touch input on hardware.
@@ -88,6 +93,8 @@
 - P1: UI polish: consistent typography sizes/contrast on the 480x320 panel; unify icon set (glyph-font based) across target + simulator; remove any debug-only overlays from release UI.
 - P1: Re-test editor input on hardware after UI changes: numeric keypad open/close, long program names, UA/EN keyboard rows, and touch-release edge cases.
 - P1: Persist fan curve + mode at boot explicitly (load config before fan init or defer fan init until LittleFS config is applied).
+- P1: Remote access hardening: broker TLS cert pinning/CA upload, per-device command auth (signed nonce), and role-based command allowlist.
+- P1: Remote hardening next: add CA upload/pinning (`mqtts` cert field in config), signed-command helper docs/examples, and per-command role scopes.
 - P2: API schema: extend compatibility fields with `fault_code` and `uptime_ms` across endpoints (DONE: `schema_version` + `fw_version` already added to canonical state).
 - P2: Persistent event log: ring-buffer faults/start/stop/overtemp into `/littlefs/logs`.
 - P2: OTA updates: add signed manifest validation (cryptographic signature) and rollback-status reporting endpoint.

@@ -11,11 +11,16 @@
 #include "esp_netif.h"
 #include "esp_log.h"
 #include "esp_mac.h"
+#include "esp_sntp.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "cJSON.h"
+#include "kiln_config/config.h"
+
+#include <time.h>
+#include <stdlib.h>
 
 static const char *TAG = "WIFI_CONN";
 
@@ -29,6 +34,20 @@ static TaskHandle_t wifi_scan_task_handle = NULL;
 static SemaphoreHandle_t scan_done_sem = NULL;
 static std::string scan_result_json;
 static bool s_scan_in_progress = false;
+static bool s_sntp_started = false;
+
+static void sntp_start_if_needed(void) {
+    if (s_sntp_started) return;
+    s_sntp_started = true;
+
+    setenv("TZ", TIMEZONE_TZ, 1);
+    tzset();
+
+    esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, SNTP_SERVER_1);
+    esp_sntp_init();
+    ESP_LOGI(TAG, "SNTP started (server=%s, TZ=%s)", SNTP_SERVER_1, TIMEZONE_TZ);
+}
 
 static void wifi_scan_task(void *pvParameters) {
     ESP_LOGI(TAG, "Starting WiFi Scan Task...");
@@ -176,6 +195,7 @@ static void sta_event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        sntp_start_if_needed();
     }
 }
 

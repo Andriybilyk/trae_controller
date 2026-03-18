@@ -37,6 +37,8 @@ static constexpr int DISPLAY_WIDTH = 480;  // LVGL landscape
 static constexpr int DISPLAY_HEIGHT = 320; // LVGL landscape
 static constexpr int LCD_X_OFFSET = 0;
 static constexpr int LCD_Y_OFFSET = 0;
+static constexpr size_t LCD_SPI_CHUNK_BYTES =
+    (size_t)DISPLAY_WIDTH * (size_t)((TFT_SPI_DMA_LINES > 0) ? TFT_SPI_DMA_LINES : 1) * 2U;
 
 static bool s_mirror_x = false;
 static bool s_mirror_y = false;
@@ -300,7 +302,19 @@ static esp_err_t lcd_tx(const void *data, size_t len_bytes, bool dc) {
 
 static esp_err_t lcd_cmd(uint8_t cmd) { return lcd_tx(&cmd, 1, false); }
 
-static esp_err_t lcd_data(const void *data, size_t len_bytes) { return lcd_tx(data, len_bytes, true); }
+static esp_err_t lcd_data(const void *data, size_t len_bytes) {
+    if (!data || len_bytes == 0) return ESP_OK;
+    const uint8_t *p = static_cast<const uint8_t *>(data);
+    size_t remaining = len_bytes;
+    while (remaining > 0) {
+        const size_t chunk = std::min(remaining, LCD_SPI_CHUNK_BYTES);
+        const esp_err_t err = lcd_tx(p, chunk, true);
+        if (err != ESP_OK) return err;
+        p += chunk;
+        remaining -= chunk;
+    }
+    return ESP_OK;
+}
 
 static esp_err_t lcd_write_u16be(uint16_t value) {
     uint8_t b[2] = {(uint8_t)(value >> 8), (uint8_t)(value & 0xFF)};
@@ -411,7 +425,7 @@ static esp_err_t display_spi_init(void) {
     buscfg.miso_io_num = TFT_MISO;
     buscfg.quadwp_io_num = -1;
     buscfg.quadhd_io_num = -1;
-    buscfg.max_transfer_sz = DISPLAY_WIDTH * 10 * 2 + 8;
+    buscfg.max_transfer_sz = (int)LCD_SPI_CHUNK_BYTES + 8;
 
     ESP_RETURN_ON_ERROR(spi_bus_initialize(LCD_HOST, &buscfg, SPI_DMA_CH_AUTO), TAG, "spi_bus_initialize");
 
@@ -419,7 +433,7 @@ static esp_err_t display_spi_init(void) {
     devcfg.clock_speed_hz = TFT_SPI_CLOCK_HZ;
     devcfg.mode = 0;
     devcfg.spics_io_num = TFT_CS;
-    devcfg.queue_size = 7;
+    devcfg.queue_size = TFT_SPI_QUEUE_SIZE;
     devcfg.pre_cb = lcd_spi_pre_transfer_cb;
     devcfg.flags = SPI_DEVICE_HALFDUPLEX;
 

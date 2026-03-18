@@ -129,6 +129,7 @@ const Dashboard = () => {
       effective_power: 0
   });
   const [fanBusy, setFanBusy] = useState(false);
+  const [faultBusy, setFaultBusy] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
   const getScheduleStepCount = (schedule: Schedule | undefined) => {
@@ -348,6 +349,23 @@ const Dashboard = () => {
       }
   };
 
+  const clearFault = async () => {
+      if (faultBusy) return;
+      try {
+          setFaultBusy(true);
+          const res = await postJson<any>('/fault/clear');
+          if (res.ok) {
+              toast.success(t.settings.faultCleared || "Fault cleared");
+          } else {
+              toastApiError(res, t.settings.faultClearFailed || "Failed to clear fault");
+          }
+      } catch (e) {
+          toast.error("Connection error to controller.");
+      } finally {
+          setFaultBusy(false);
+      }
+  };
+
   const getSegmentInfo = () => {
       if (!isIdle) {
           return `${status.step || 1} / ${status.totalSteps || activeSchedule?.steps?.length || '?'}`;
@@ -419,6 +437,26 @@ const Dashboard = () => {
               <ChevronDown size={20} className="text-zinc-500" />
           </button>
       </div>
+
+      {deviceState.fault_active && (
+        <div className="bg-red-950/40 border border-red-600/40 rounded-xl p-4 flex flex-col md:flex-row gap-3 md:items-center md:justify-between shadow-lg">
+            <div>
+                <div className="text-xs uppercase tracking-widest text-red-300 font-bold">
+                    {t.settings.fault || "Fault"}
+                </div>
+                <div className="text-sm text-red-100 font-mono">
+                    {t.settings.faultReason || "Reason"}: {deviceState.fault_reason || `Code ${deviceState.fault_code ?? '-'}`}
+                </div>
+            </div>
+            <button
+                onClick={clearFault}
+                disabled={faultBusy}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-zinc-800 disabled:text-zinc-500 text-white rounded-lg font-bold transition-colors text-sm whitespace-nowrap"
+            >
+                {faultBusy ? (t.settings.clearing || "Clearing...") : (t.settings.clearFault || "Clear Fault")}
+            </button>
+        </div>
+      )}
 
       <ConfirmModal
           open={showStopConfirm}
@@ -596,7 +634,7 @@ const Dashboard = () => {
         <div className="bg-kiln-card border border-kiln-border rounded-xl p-5 shadow-lg shadow-black/20 relative overflow-hidden md:col-span-2 lg:col-span-4 flex flex-col md:flex-row items-center justify-between group min-h-28 lg:min-h-[12.75rem] gap-3 md:gap-0">
             <div className="relative z-10 text-center md:text-left">
                 <div className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">
-                    {language === 'ua' ? 'РџРѕС‚РѕС‡РЅР° С‚РµРјРїРµСЂР°С‚СѓСЂР°' : t.dashboard.currentTemp}
+                    {t.dashboard.currentTemp}
                 </div>
                 <div className="text-6xl lg:text-7xl font-bold text-white tracking-tighter tabular-nums leading-none">
                     {(status.temp || 0).toFixed(1)}
