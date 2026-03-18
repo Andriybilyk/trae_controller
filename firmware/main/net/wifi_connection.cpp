@@ -1,5 +1,6 @@
 #include "net/wifi_connection.h"
 #include <string.h>
+#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -7,6 +8,7 @@
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
+#include "esp_netif.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "nvs_flash.h"
@@ -26,9 +28,11 @@ static const char *TAG = "WIFI_CONN";
 static TaskHandle_t wifi_scan_task_handle = NULL;
 static SemaphoreHandle_t scan_done_sem = NULL;
 static std::string scan_result_json;
+static bool s_scan_in_progress = false;
 
 static void wifi_scan_task(void *pvParameters) {
     ESP_LOGI(TAG, "Starting WiFi Scan Task...");
+    s_scan_in_progress = true;
     
     wifi_scan_config_t scan_config = {};
     scan_config.ssid = NULL;
@@ -71,6 +75,8 @@ static void wifi_scan_task(void *pvParameters) {
     }
     
     ESP_LOGI(TAG, "WiFi Scan completed.");
+    s_scan_in_progress = false;
+    wifi_scan_task_handle = NULL;
     xSemaphoreGive(scan_done_sem);
     vTaskDelete(NULL); // Delete self
 }
@@ -89,6 +95,11 @@ void wifi_start_scan(void) {
         esp_wifi_set_mode(WIFI_MODE_APSTA);
     }
     
+    if (s_scan_in_progress || wifi_scan_task_handle != NULL) {
+        ESP_LOGW(TAG, "WiFi scan already in progress");
+        return;
+    }
+
     xTaskCreate(wifi_scan_task, "wifi_scan", 4096, NULL, 5, &wifi_scan_task_handle);
 }
 
@@ -270,6 +281,28 @@ std::string wifi_scan_networks(void) {
 bool wifi_is_connected(void) {
     wifi_ap_record_t ap_info = {};
     return esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK;
+}
+
+std::string wifi_get_server_url(void) {
+    esp_netif_t *sta = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (sta) {
+        esp_netif_ip_info_t ip_info = {};
+        if (esp_netif_get_ip_info(sta, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
+            char url[32];
+            snprintf(url, sizeof(url), "http://" IPSTR, IP2STR(&ip_info.ip));
+            return std::string(url);
+        }
+    }
+    esp_netif_t *ap = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (ap) {
+        esp_netif_ip_info_t ip_info = {};
+        if (esp_netif_get_ip_info(ap, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
+            char url[32];
+            snprintf(url, sizeof(url), "http://" IPSTR, IP2STR(&ip_info.ip));
+            return std::string(url);
+        }
+    }
+    return std::string("http://192.168.4.1");
 }
 
 bool wifi_connect_with_credentials(const char* ssid, const char* password) {

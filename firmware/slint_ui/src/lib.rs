@@ -1,6 +1,6 @@
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType, Rgb565Pixel, LineBufferProvider};
 use slint::platform::{Platform, PointerEventButton, WindowEvent};
-use slint::{ModelRc, Timer, VecModel};
+use slint::{Image, ModelRc, Rgb8Pixel, SharedPixelBuffer, Timer, VecModel};
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -59,6 +59,7 @@ extern "C" {
     fn slint_bridge_wifi_scan_start();
     fn slint_bridge_wifi_scan_ready() -> bool;
     fn slint_bridge_wifi_scan_copy_results(out: *mut c_char, out_len: i32) -> bool;
+    fn slint_bridge_wifi_server_url_copy(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_get_schedules_revision() -> u32;
     fn slint_bridge_notify_schedules_changed();
     fn slint_bridge_ui_heartbeat();
@@ -295,6 +296,49 @@ fn parse_wifi_scan_rows(json: &str) -> Vec<WifiNetworkRow> {
         .collect()
 }
 
+const CONTROLLER_AP_SSID: &str = "TRAE_KILN_SETUP";
+
+fn wifi_qr_payload(wifi_ok: bool, server_url: &str) -> String {
+    if wifi_ok {
+        server_url.to_string()
+    } else {
+        format!("WIFI:T:nopass;S:{};;", CONTROLLER_AP_SSID)
+    }
+}
+
+fn build_qr_image(payload: &str) -> Image {
+    let qr = match qrcodegen::QrCode::encode_text(payload, qrcodegen::QrCodeEcc::Medium) {
+        Ok(q) => q,
+        Err(_) => {
+            let fallback: SharedPixelBuffer<Rgb8Pixel> =
+                SharedPixelBuffer::clone_from_slice(&[255u8, 255, 255], 1, 1);
+            return Image::from_rgb8(fallback);
+        }
+    };
+
+    let size = qr.size();
+    let border: i32 = 2;
+    let scale: i32 = 4;
+    let img_size = ((size + border * 2) * scale) as u32;
+    let mut data = vec![255u8; (img_size * img_size * 3) as usize];
+
+    for y in 0..img_size as i32 {
+        for x in 0..img_size as i32 {
+            let qx = x / scale - border;
+            let qy = y / scale - border;
+            let dark = qx >= 0 && qx < size && qy >= 0 && qy < size && qr.get_module(qx, qy);
+            let v = if dark { 0u8 } else { 255u8 };
+            let idx = ((y as u32 * img_size + x as u32) * 3) as usize;
+            data[idx] = v;
+            data[idx + 1] = v;
+            data[idx + 2] = v;
+        }
+    }
+
+    let buf: SharedPixelBuffer<Rgb8Pixel> = SharedPixelBuffer::clone_from_slice(&data, img_size, img_size);
+    Image::from_rgb8(buf)
+}
+
 fn refresh_schedule_model(ui: &AppWindow, state: &AppState) {
     let rows: Vec<ScheduleRow> = state
         .schedules
@@ -345,6 +389,14 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState) {
 
     let wifi_ok = unsafe { slint_bridge_wifi_is_connected() };
     ui.set_wifi_ok(wifi_ok);
+
+    let mut raw_url = vec![0 as c_char; 96];
+    let server_url = if unsafe { slint_bridge_wifi_server_url_copy(raw_url.as_mut_ptr(), raw_url.len() as i32) } {
+        unsafe { CStr::from_ptr(raw_url.as_ptr()) }.to_string_lossy().into_owned()
+    } else {
+        "http://192.168.4.1".to_string()
+    };
+    ui.set_wifi_server_url(server_url.into());
 }
 
 fn state_poll() -> SlintKilnState {
@@ -634,6 +686,8 @@ pub extern "C" fn slint_ui_run() {
     let ui = AppWindow::new().expect("Failed to create UI");
     ui.window().show().unwrap_or(());
     ui.set_wifi_networks(ModelRc::new(VecModel::from(Vec::<WifiNetworkRow>::new())));
+    ui.set_wifi_qr_image(build_qr_image(&format!("WIFI:T:nopass;S:{};;", CONTROLLER_AP_SSID)));
+    ui.set_wifi_qr_hint("Scan to join controller Wi-Fi".into());
 
     let mut state = AppState {
         schedules: load_schedules(),
@@ -750,6 +804,14 @@ pub extern "C" fn slint_ui_run() {
     {
         ui.on_wifi_disconnect(move || {
             unsafe { slint_bridge_wifi_disconnect() };
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_wifi_qr_toggle(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_wifi_qr_visible(!ui.get_wifi_qr_visible());
         });
     }
 
@@ -1004,6 +1066,11 @@ pub extern "C" fn slint_ui_run() {
                 ui.set_kb_step_index(step_index);
                 ui.set_kb_field(field.clone().into());
                 ui.set_kb_value(value.clone().into());
+                if field == "name" || field == "wifi_pass" {
+                    ui.set_kb_mode("alpha".into());
+                } else {
+                    ui.set_kb_mode("num".into());
+                }
                 ui.set_kb_visible(true);
             });
         });
@@ -1163,6 +1230,7 @@ pub extern "C" fn slint_ui_run() {
     let mut last_state_update = Instant::now();
     let mut last_ui_heartbeat = Instant::now();
     let mut last_schedules_revision = unsafe { slint_bridge_get_schedules_revision() };
+    let mut last_qr_payload = String::new();
 
     loop {
         slint::platform::update_timers_and_animations();
@@ -1265,6 +1333,28 @@ pub extern "C" fn slint_ui_run() {
             last_state_update = Instant::now();
             let s = state_poll();
             apply_state_to_ui(&ui, s);
+            let wifi_ok = ui.get_wifi_ok();
+            let url = ui.get_wifi_server_url().to_string();
+            let qr_payload = wifi_qr_payload(wifi_ok, &url);
+            if qr_payload != last_qr_payload {
+                last_qr_payload = qr_payload.clone();
+                ui.set_wifi_qr_image(build_qr_image(&qr_payload));
+                if wifi_ok {
+                    let hint = if ui.get_is_ua() {
+                        format!("Відкрити веб-інтерфейс: {}", url)
+                    } else {
+                        format!("Open web interface: {}", url)
+                    };
+                    ui.set_wifi_qr_hint(hint.into());
+                } else {
+                    let hint = if ui.get_is_ua() {
+                        format!("1) Скануйте QR ({}), 2) відкрийте http://192.168.4.1", CONTROLLER_AP_SSID)
+                    } else {
+                        format!("1) Scan QR ({}), 2) open http://192.168.4.1", CONTROLLER_AP_SSID)
+                    };
+                    ui.set_wifi_qr_hint(hint.into());
+                }
+            }
 
             let schedules_revision = unsafe { slint_bridge_get_schedules_revision() };
             if schedules_revision != last_schedules_revision {

@@ -120,6 +120,15 @@ extern "C" bool slint_bridge_wifi_scan_copy_results(char *out, int32_t out_len) 
     return true;
 }
 
+extern "C" bool slint_bridge_wifi_server_url_copy(char *out, int32_t out_len) {
+    if (!out || out_len <= 0) return false;
+    const std::string url = wifi_get_server_url();
+    const size_t n = std::min((size_t)(out_len - 1), url.size());
+    std::memcpy(out, url.data(), n);
+    out[n] = '\0';
+    return true;
+}
+
 extern "C" uint32_t slint_bridge_get_schedules_revision(void) {
     return wifiServer.getSchedulesRevision();
 }

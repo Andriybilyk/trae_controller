@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check } from 'lucide-react';
@@ -127,6 +127,38 @@ const Dashboard = () => {
   const [fanBusy, setFanBusy] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [isScheduleMenuOpen, setIsScheduleMenuOpen] = useState(false);
+  const getScheduleStepCount = (schedule: Schedule | undefined) => {
+      if (!schedule) return 0;
+      const local = Array.isArray(schedule.steps) ? schedule.steps.length : 0;
+      const remote = typeof schedule.stepsCount === 'number' ? schedule.stepsCount : 0;
+      return Math.max(local, remote);
+  };
+
+  const applyStatusFrame = useCallback((d: any) => {
+      if (!d || typeof d !== 'object') return;
+
+      const hasStatusSnapshot =
+          'temp' in d || 'target' in d || 'output' in d || 'status' in d || 'timeRemaining' in d;
+
+      if (hasStatusSnapshot) {
+          setStatus(prev => ({
+              ...prev,
+              ...d
+          }));
+      }
+
+      setFan(prev => ({
+          ...prev,
+          manual: typeof d.fan_manual === 'boolean' ? d.fan_manual : prev.manual,
+          auto: typeof d.fan_auto === 'boolean' ? d.fan_auto : prev.auto,
+          power: typeof d.fan_power === 'number' ? d.fan_power : prev.power,
+          effective_power: typeof d.fan_effective_power === 'number' ? d.fan_effective_power : prev.effective_power
+      }));
+
+      if (Array.isArray(d.history)) {
+          setHistory(d.history);
+      }
+  }, []);
 
   // Unified Idle Logic
   const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR';
@@ -190,17 +222,7 @@ const Dashboard = () => {
             const res = await fetch(`${API_BASE_URL}/status`);
             if (res.ok) {
                 const d = await res.json();
-                setStatus(d);
-                setFan(prev => ({
-                    ...prev,
-                    manual: d.fan_manual ?? prev.manual,
-                    auto: d.fan_auto ?? prev.auto,
-                    power: d.fan_power ?? prev.power,
-                    effective_power: d.fan_effective_power ?? prev.effective_power
-                }));
-                if (d.history && Array.isArray(d.history)) {
-                    setHistory(d.history);
-                }
+                applyStatusFrame(d);
             }
         } catch (e) {
             console.error("Connection error");
@@ -216,13 +238,20 @@ const Dashboard = () => {
         loadFan();
       }
     };
+    const onWsMessage = (ev: any) => {
+      const msg = ev?.detail;
+      if (!msg || typeof msg !== 'object') return;
+      applyStatusFrame(msg);
+    };
     window.addEventListener('kiln_ws', onWs as any);
+    window.addEventListener('kiln_ws_message', onWsMessage as any);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('kiln_ws', onWs as any);
+      window.removeEventListener('kiln_ws_message', onWsMessage as any);
     };
-  }, []);
+  }, [applyStatusFrame]);
 
   const handleStartFiring = async () => {
       if (!activeSchedule) {
@@ -407,7 +436,7 @@ const Dashboard = () => {
                           : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}
                   >
                       <div className="font-bold text-white text-sm mb-1 pr-6 truncate">{s.name}</div>
-                      <div className="text-xs text-zinc-500">{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.steps} ??? {s.type || t.schedules.custom}</div>
+                      <div className="text-xs text-zinc-500">{getScheduleStepCount(s)} {t.schedules.steps} ??? {s.type || t.schedules.custom}</div>
                       {selectedScheduleId === s.id && (
                           <div className="absolute top-4 right-4 text-kiln-accent">
                               <Check size={16} />
@@ -660,9 +689,23 @@ const Dashboard = () => {
                 <div className="text-xl font-bold text-white tabular-nums leading-none">{fanSpeed}%</div>
                 <div className="text-[10px] text-zinc-500 mt-1">PCB {Number(status.pcbTemp ?? 0).toFixed(1)}°C</div>
             </div>
-            <div className="flex flex-col items-center gap-1">
-                <button onClick={() => nudgeFanManual(5)} disabled={fanBusy} className="w-6 h-6 rounded bg-zinc-800 text-zinc-300 text-xs leading-none">+</button>
-                <button onClick={() => nudgeFanManual(-5)} disabled={fanBusy} className="w-6 h-6 rounded bg-zinc-800 text-zinc-300 text-xs leading-none">-</button>
+            <div className="flex flex-col items-center gap-2">
+                <button
+                    onClick={() => nudgeFanManual(5)}
+                    disabled={fanBusy}
+                    className="w-10 h-10 rounded-md bg-zinc-800 text-zinc-200 text-2xl leading-none active:scale-95"
+                    title="Increase fan power"
+                >
+                    +
+                </button>
+                <button
+                    onClick={() => nudgeFanManual(-5)}
+                    disabled={fanBusy}
+                    className="w-10 h-10 rounded-md bg-zinc-800 text-zinc-200 text-2xl leading-none active:scale-95"
+                    title="Decrease fan power"
+                >
+                    -
+                </button>
             </div>
           </div>
         </div>
@@ -821,7 +864,7 @@ const Dashboard = () => {
                               className={`w-full p-4 rounded-xl text-left border transition-all ${selectedScheduleId === s.id ? 'bg-zinc-800 border-kiln-accent' : 'bg-zinc-900/50 border-zinc-800'}`}
                           >
                               <div className="font-bold text-white text-lg">{s.name}</div>
-                              <div className="text-sm text-zinc-500">{s.steps?.length || 0} segments</div>
+                              <div className="text-sm text-zinc-500">{getScheduleStepCount(s)} segments</div>
                           </button>
                       ))
                   )}
@@ -834,3 +877,5 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+

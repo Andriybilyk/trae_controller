@@ -37,6 +37,13 @@
 - Slint editor keyboard opening is deferred by one UI tick to avoid re-entrant overlay creation during touch release on ESP32-S3; text keyboard rows are sized to stay within 480x320 without overlap.
 - Runtime safety interlock added for start: start is blocked when thermocouple sensor is unhealthy or touch calibration is missing (`display_driver_is_touch_calibrated()`).
 - Watchdog hardening added: UI heartbeat (Rust -> C++ bridge) + NET heartbeat monitored by control task; stall triggers emergency stop and forced `heater_off` path.
+- NET watchdog is now armed only after `wifiServer.begin()` completes to avoid false `NET stalled` trips during blocking STA reconnect/init windows after manual Wi-Fi reconfiguration.
+- Wi-Fi UX hardening: Settings Wi-Fi card/buttons and network rows were enlarged for touch usability; UI now shows runtime web URL (`http://<sta-ip>` when connected, fallback `http://192.168.4.1`).
+- Captive portal scan flow fixed in `wifi_setup.html`: start scan via `/scan_wifi`, then poll `/scan_results` until completion; avoids false "scan error" on phones.
+- Wi-Fi scan backend guard added: avoid launching overlapping scan tasks (`scan already in progress`) to reduce scan race failures from repeated mobile requests.
+- Wi-Fi Settings layout updated: right-side connection status chip (`Connected/Disconnected`), dedicated web URL row + QR button, action buttons moved below with spacing, and visible right-side scroll indicator for Settings page.
+- On-device QR overlay added (generated in Rust via `qrcodegen`): when Wi‑Fi is connected QR points to current web UI URL; when disconnected QR points to setup portal `http://192.168.4.1`.
+- Server URL detection improved in firmware networking: prefer current STA IP from `WIFI_STA_DEF`, fallback to AP IP from `WIFI_AP_DEF`, then `http://192.168.4.1`.
 - Command debounce/rate-limit added on both sides: Slint start/stop/keyboard anti-bounce plus HTTP API rate-limit for start/stop/skip/add-temp/add-time.
 - OTA endpoint added: `POST /api/ota/update` writes to next OTA partition and requires SHA-256 header (`X-Firmware-Sha256` or alias) before boot-partition switch + reboot.
 - Frontend Settings now has OTA upload flow: file pick, browser SHA-256 calculation, upload to `/api/ota/update` with checksum header.
@@ -44,12 +51,14 @@
 - Fan APIs added for web sync/control: `GET/POST /api/fan`; status payload now includes `fan_manual`, `fan_auto`, `fan_power`, `fan_effective_power`.
 - Web Dashboard fan card is now the primary fan control (double-width card, icon tap toggles ON/OFF, manual +/- speed, PCB temperature readout); fan controls and simulator route were removed from web Settings.
 - Fan runtime policy: during firing, automatic fan output has a minimum floor of 60% (board sensor driven) to protect SSR area cooling.
+- Unified model initiative started: plan for a shared Slint/Web/iOS state-command contract is documented in `docs/UNIFIED_CONTROL_MODEL_PLAN.md`.
 
 ## TODO
 - P0: Verify Slint embedded build for `xtensa-esp32s3-espidf` and confirm Slint software renderer + touch input on hardware.
 - P0: Touch accuracy: finalize a repeatable calibration flow (web 9‑point) and document the recommended reset/apply order (calibration/affine/grid).
 - P0: Safety/fault manager: latched faults + single `heater_off()` path (sensor open/NaN, overtemp, rise-rate, watchdog).
 - P0: Validate watchdog thresholds (`UI/NET 4s`, TWDT 12s) on real hardware under Wi-Fi loss, UI heavy input, and OTA reboot scenarios.
+- P0: Verify reconnect flow from Slint UI (`disconnect -> reboot -> reconnect`) no longer triggers false `Watchdog: NET stalled` during STA init.
 - P0: Heater HAL: isolate GPIO control (SSR + safety relay) behind a small API; no direct GPIO from UI/NET.
 - P0: Sensor diagnostics: explicit fault causes (thermocouple open/NaN, out-of-range, stuck value) + rate-of-rise limit (use `MAX_TEMP_RISE_RATE`).
 - P1: Firing profiles: strict model (segments ramp/hold), validation + versioned JSON schema, persistence in NVS.
@@ -57,6 +66,8 @@
 - P1: FreeRTOS tasks: split `control/ui/net` loops with defined rates + watchdog strategy. (DONE: moved loops to dedicated tasks; main task deletes itself)
 - P1: Config hygiene: remove WiFi credentials from headers; defaults via Kconfig, runtime via NVS.
 - P1: Sync: add WS events for history changes + "active schedule loaded" so multiple web clients/LVGL stay aligned.
+- P1: Implement `docs/UNIFIED_CONTROL_MODEL_PLAN.md` phases 0-2 (canonical firmware state/command adapter + Slint/Web alignment).
+- P1: Prepare iOS bootstrap spec from `docs/UNIFIED_CONTROL_MODEL_PLAN.md` phase 4 (BLE discovery + Wi-Fi API handoff).
 - P1: Autotune UX: show progress/result in Settings/Dashboard (cycles, Ku/Pu, final PID) + add STOP button calling `/api/autotune/stop`.
 - P1: PID controls: `GET /api/pid` + `POST /api/pid/reset` in UI with clear "default vs tuned" indicator.
 - P1: UI polish: consistent typography sizes/contrast on the 480x320 panel; unify icon set (glyph-font based) across target + simulator; remove any debug-only overlays from release UI.

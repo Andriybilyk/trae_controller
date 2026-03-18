@@ -26,6 +26,7 @@ static constexpr uint64_t NET_HEARTBEAT_TIMEOUT_MS = 4000;
 
 static TaskHandle_t s_ui_task = nullptr;
 static std::atomic<uint64_t> s_server_heartbeat_ms{0};
+static std::atomic<bool> s_server_watchdog_armed{false};
 static std::atomic<float> s_board_temp_c{25.0f};
 static temperature_sensor_handle_t s_board_temp_sensor = nullptr;
 
@@ -86,7 +87,11 @@ static void control_task(void *arg) {
         const uint64_t net_hb = s_server_heartbeat_ms.load(std::memory_order_relaxed);
 
         const bool ui_stalled = (ui_hb > 0) && (now > ui_hb) && ((now - ui_hb) > UI_HEARTBEAT_TIMEOUT_MS);
-        const bool net_stalled = (net_hb > 0) && (now > net_hb) && ((now - net_hb) > NET_HEARTBEAT_TIMEOUT_MS);
+        const bool net_watchdog_armed = s_server_watchdog_armed.load(std::memory_order_relaxed);
+        const bool net_stalled = net_watchdog_armed &&
+                                 (net_hb > 0) &&
+                                 (now > net_hb) &&
+                                 ((now - net_hb) > NET_HEARTBEAT_TIMEOUT_MS);
 
         if (!watchdog_latched && (ui_stalled || net_stalled)) {
             watchdog_latched = true;
@@ -117,9 +122,12 @@ static void server_task(void *arg) {
     (void)arg;
     ESP_LOGI("SRV_TASK", "Starting server task");
     (void)esp_task_wdt_add(nullptr);
+    s_server_watchdog_armed.store(false, std::memory_order_relaxed);
     s_server_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
 
     wifiServer.begin();
+    s_server_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
+    s_server_watchdog_armed.store(true, std::memory_order_relaxed);
 
     uint64_t lastLog = 0;
 

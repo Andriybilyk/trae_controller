@@ -34,6 +34,7 @@ void slint_bridge_wifi_disconnect(void);
 void slint_bridge_wifi_scan_start(void);
 bool slint_bridge_wifi_scan_ready(void);
 bool slint_bridge_wifi_scan_copy_results(char *out, int32_t out_len);
+bool slint_bridge_wifi_server_url_copy(char *out, int32_t out_len);
 uint32_t slint_bridge_get_schedules_revision(void);
 void slint_bridge_notify_schedules_changed(void);
 void slint_bridge_ui_heartbeat(void);

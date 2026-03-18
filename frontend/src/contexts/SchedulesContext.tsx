@@ -237,6 +237,11 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             ws.onmessage = (ev) => {
                 try {
                     const msg = JSON.parse(ev.data);
+                    if (msg) {
+                        try {
+                            window.dispatchEvent(new CustomEvent('kiln_ws_message', { detail: msg }));
+                        } catch {}
+                    }
                     if (msg && msg.event) {
                         try {
                             window.dispatchEvent(new CustomEvent('kiln_ws', { detail: msg }));

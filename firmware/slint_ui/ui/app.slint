@@ -448,6 +448,7 @@ export component AppWindow inherits Window {
     in-out property <string> kb_value: "";
     in-out property <int> kb_step_index: -1;
     in-out property <string> kb_field: "";
+    in-out property <string> kb_mode: "num";
 
     // Fan (manual override + power %)
     in-out property <bool> fan_manual: false;
@@ -457,6 +458,10 @@ export component AppWindow inherits Window {
     in-out property <bool> wifi_scan_busy: false;
     in-out property <string> wifi_selected_ssid: "";
     in-out property <string> wifi_password: "";
+    in-out property <string> wifi_server_url: "http://192.168.4.1";
+    in-out property <bool> wifi_qr_visible: false;
+    in-out property <image> wifi_qr_image;
+    in-out property <string> wifi_qr_hint: "";
 
     callback toggle_language();
 
@@ -535,6 +540,7 @@ export component AppWindow inherits Window {
     callback fan_power_changed(int);
     callback wifi_open_picker();
     callback wifi_disconnect();
+    callback wifi_qr_toggle();
 
     callback kb_key(string);
     callback kb_open(string, int, string);
@@ -2175,90 +2181,16 @@ export component AppWindow inherits Window {
                     TouchArea { width: parent.width; height: parent.height; clicked => { root.view = View.Dashboard; } }
                 }
 
-                VerticalBox {
+                ScrollView {
                     x: 10px; y: 48px;
-                    spacing: 4px;
+                    width: 438px; height: 218px;
 
-                    Rectangle {
-                        width: 460px; height: 98px;
-                        background: #0F0F0F;
-                        border-color: #27272A;
-                        border-width: 1px;
-                        border-radius: 12px;
-
-                        Text {
-                            x: 12px; y: 10px;
-                            text: root.is_ua ? "Wi‑Fi" : "Wi‑Fi";
-                            color: #FFFFFF;
-                            font-family: "PT Sans";
-                            font-size: 16px;
-                        }
-
-                        Text {
-                            x: 12px; y: 34px;
-                            text: root.wifi_ok
-                                ? (root.is_ua ? "Підключено" : "Connected")
-                                : (root.is_ua ? "Немає з'єднання" : "Disconnected");
-                            color: #A1A1AA;
-                            font-family: "PT Sans";
-                            font-size: 12px;
-                        }
-
-                        Text {
-                            x: 12px; y: 50px;
-                            text: root.wifi_selected_ssid == ""
-                                ? (root.is_ua ? "Оберіть мережу зі списку" : "Pick a network from list")
-                                : root.wifi_selected_ssid;
-                            color: #A1A1AA;
-                            font-family: "PT Sans";
-                            font-size: 12px;
-                        }
+                    VerticalBox {
+                        width: 426px;
+                        spacing: 8px;
 
                         Rectangle {
-                            x: 12px; y: 76px; width: 212px; height: 18px;
-                            background: #27272A;
-                            border-radius: 8px;
-                            Text {
-                                text: root.wifi_ok ? (root.is_ua ? "Змінити мережу" : "Change network")
-                                                  : (root.is_ua ? "Пошук мережі" : "Search networks");
-                                color: #FFFFFF;
-                                font-family: "PT Sans";
-                                font-size: 11px;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                            TouchArea {
-                                width: parent.width; height: parent.height;
-                                clicked => { root.wifi_open_picker(); }
-                            }
-                        }
-
-                        Rectangle {
-                            x: 236px; y: 76px; width: 212px; height: 18px;
-                            background: #7F1D1D;
-                            border-radius: 8px;
-                            Text {
-                                text: root.is_ua ? "Відключити Wi‑Fi" : "Disconnect Wi‑Fi";
-                                color: #FFFFFF;
-                                font-family: "PT Sans";
-                                font-size: 11px;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                            TouchArea {
-                                width: parent.width; height: parent.height;
-                                clicked => { root.wifi_disconnect(); }
-                            }
-                        }
-                    }
-
-                    if (root.wifi_picker_visible) : Rectangle {
-                        x: 0px; y: 0px; width: 480px; height: 280px;
-                        background: #000000CC;
-                        z: 2000;
-
-                        Rectangle {
-                            x: 16px; y: 12px; width: 448px; height: 252px;
+                            width: 426px; height: 146px;
                             background: #0F0F0F;
                             border-color: #27272A;
                             border-width: 1px;
@@ -2266,72 +2198,111 @@ export component AppWindow inherits Window {
 
                             Text {
                                 x: 12px; y: 10px;
-                                text: root.is_ua ? "Вибір Wi‑Fi мережі" : "Select Wi‑Fi network";
+                                text: "Wi‑Fi";
                                 color: #FFFFFF;
                                 font-family: "PT Sans";
                                 font-size: 16px;
+                                font-weight: 700;
                             }
 
                             Rectangle {
-                                x: 404px; y: 8px; width: 32px; height: 24px;
-                                background: #27272A;
+                                x: 294px; y: 8px; width: 120px; height: 24px;
+                                background: root.wifi_ok ? #073B2A : #2A2A2F;
                                 border-radius: 8px;
-                                Text { text: "X"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                                TouchArea { width: parent.width; height: parent.height; clicked => { root.wifi_picker_visible = false; } }
+                                Text {
+                                    text: root.wifi_ok ? "Connected" : "Disconnected";
+                                    color: root.wifi_ok ? #10B981 : #A1A1AA;
+                                    font-family: "PT Sans";
+                                    font-size: 13px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
                             }
 
-                            if (root.wifi_scan_busy) : Text {
-                                x: 12px; y: 44px;
-                                text: root.is_ua ? "Пошук мереж..." : "Scanning networks...";
+                            Text {
+                                x: 12px; y: 38px;
+                                text: root.wifi_selected_ssid == ""
+                                    ? (root.is_ua ? "Оберіть мережу зі списку" : "Pick a network from list")
+                                    : root.wifi_selected_ssid;
                                 color: #A1A1AA;
                                 font-family: "PT Sans";
-                                font-size: 14px;
+                                font-size: 13px;
                             }
 
-                            if (!root.wifi_scan_busy && root.wifi_networks.length == 0) : Text {
-                                x: 12px; y: 44px;
-                                text: root.is_ua ? "Мереж не знайдено" : "No networks found";
-                                color: #A1A1AA;
-                                font-family: "PT Sans";
-                                font-size: 14px;
+                            Rectangle {
+                                x: 12px; y: 58px; width: 276px; height: 36px;
+                                background: #18181B;
+                                border-color: #27272A;
+                                border-width: 1px;
+                                border-radius: 9px;
+                                Text {
+                                    x: 10px; y: 9px;
+                                    text: root.wifi_server_url;
+                                    color: #60A5FA;
+                                    font-family: "PT Sans";
+                                    font-size: 12px;
+                                }
                             }
 
-                            if (!root.wifi_scan_busy && root.wifi_networks.length > 0) : ScrollView {
-                                x: 8px; y: 40px; width: 432px; height: 204px;
+                            Rectangle {
+                                x: 294px; y: 58px; width: 120px; height: 36px;
+                                background: #1F2937;
+                                border-radius: 9px;
+                                Text {
+                                    text: "QR";
+                                    color: #FFFFFF;
+                                    font-family: "PT Sans";
+                                    font-size: 14px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                                TouchArea {
+                                    width: parent.width; height: parent.height;
+                                    clicked => { root.wifi_qr_toggle(); }
+                                }
+                            }
 
-                                VerticalBox {
-                                    spacing: 4px;
-                                    for net in root.wifi_networks : Rectangle {
-                                        width: 430px; height: 30px;
-                                        background: #18181B;
-                                        border-color: #27272A;
-                                        border-width: 1px;
-                                        border-radius: 8px;
+                            Rectangle {
+                                x: 12px; y: 106px; width: 196px; height: 30px;
+                                background: #27272A;
+                                border-radius: 9px;
+                                Text {
+                                    text: root.wifi_ok ? (root.is_ua ? "Змінити мережу" : "Change network")
+                                                      : (root.is_ua ? "Пошук мережі" : "Search networks");
+                                    color: #FFFFFF;
+                                    font-family: "PT Sans";
+                                    font-size: 14px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                                TouchArea {
+                                    width: parent.width; height: parent.height;
+                                    clicked => { root.wifi_open_picker(); }
+                                }
+                            }
 
-                                        Text {
-                                            x: 8px; y: 6px;
-                                            text: net.ssid + " (" + net.rssi + " dBm)";
-                                            color: #FFFFFF;
-                                            font-family: "PT Sans";
-                                            font-size: 13px;
-                                        }
-
-                                        TouchArea {
-                                            width: parent.width; height: parent.height;
-                                            clicked => {
-                                                root.wifi_selected_ssid = net.ssid;
-                                                root.wifi_password = "";
-                                                root.kb_open("wifi_pass", -1, "");
-                                            }
-                                        }
-                                    }
+                            Rectangle {
+                                x: 214px; y: 106px; width: 200px; height: 30px;
+                                background: #7F1D1D;
+                                border-radius: 9px;
+                                Text {
+                                    text: root.is_ua ? "Відключити Wi‑Fi" : "Disconnect Wi‑Fi";
+                                    color: #FFFFFF;
+                                    font-family: "PT Sans";
+                                    font-size: 14px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                                TouchArea {
+                                    width: parent.width; height: parent.height;
+                                    clicked => { root.wifi_disconnect(); }
                                 }
                             }
                         }
-                    }
 
-                    Rectangle {
-                        width: 460px; height: 66px;
+                        Rectangle {
+                        width: 426px; height: 86px;
                         background: #0F0F0F;
                         border-color: #27272A;
                         border-width: 1px;
@@ -2346,7 +2317,7 @@ export component AppWindow inherits Window {
                         }
 
                         Text {
-                            x: 12px; y: 34px;
+                            x: 12px; y: 52px;
                             text: root.fan_manual
                                 ? (root.is_ua ? "Ручний режим" : "Manual mode")
                                 : (root.is_ua ? "Вимкнено" : "Off");
@@ -2356,14 +2327,14 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: 356px; y: 8px; width: 92px; height: 24px;
+                            x: 318px; y: 8px; width: 96px; height: 30px;
                             background: root.fan_manual ? #10B981 : #27272A;
                             border-radius: 10px;
                             Text {
                                 text: root.fan_manual ? (root.is_ua ? "ВКЛ" : "ON") : (root.is_ua ? "ВИКЛ" : "OFF");
                                 color: root.fan_manual ? #000000 : #FFFFFF;
                                 font-family: "PT Sans";
-                                font-size: 14px;
+                                font-size: 16px;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -2381,10 +2352,10 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // -
-                            x: 310px; y: 34px; width: 44px; height: 24px;
+                            x: 214px; y: 46px; width: 60px; height: 32px;
                             background: root.fan_manual ? #27272A : #18181B;
                             border-radius: 10px;
-                            Text { text: "−"; color: #FFFFFF; font-family: "PT Sans"; font-size: 20px; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { text: "−"; color: #FFFFFF; font-family: "PT Sans"; font-size: 26px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
                                 clicked => {
@@ -2397,10 +2368,10 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // % (tap for keypad)
-                            x: 358px; y: 34px; width: 60px; height: 24px;
+                            x: 278px; y: 46px; width: 64px; height: 32px;
                             background: root.fan_manual ? #27272A : #18181B;
                             border-radius: 10px;
-                            Text { text: root.fan_power + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { text: root.fan_power + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
                                 clicked => {
@@ -2414,10 +2385,10 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // +
-                            x: 422px; y: 34px; width: 44px; height: 24px;
+                            x: 348px; y: 46px; width: 66px; height: 32px;
                             background: root.fan_manual ? #27272A : #18181B;
                             border-radius: 10px;
-                            Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 24px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
                                 clicked => {
@@ -2430,8 +2401,8 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    Rectangle {
-                        width: 460px; height: 46px;
+                        Rectangle {
+                        width: 426px; height: 46px;
                         background: #27272A;
                         border-radius: 12px;
                         Text {
@@ -2443,6 +2414,138 @@ export component AppWindow inherits Window {
                             vertical-alignment: center;
                         }
                         TouchArea { width: parent.width; height: parent.height; clicked => { root.start_touch_calibration(); } }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    x: 456px; y: 52px; width: 8px; height: 210px;
+                    background: #1F1F23;
+                    border-radius: 2px;
+                }
+                Rectangle {
+                    x: 456px; y: 58px; width: 8px; height: 52px;
+                    background: #52525B;
+                    border-radius: 2px;
+                }
+
+                if (root.wifi_qr_visible) : Rectangle {
+                    x: 0px; y: 0px; width: 480px; height: 280px;
+                    background: #000000D0;
+                    z: 2100;
+
+                    Rectangle {
+                        x: 80px; y: 14px; width: 320px; height: 252px;
+                        background: #0F0F0F;
+                        border-color: #27272A;
+                        border-width: 1px;
+                        border-radius: 12px;
+
+                        Text {
+                            x: 16px; y: 10px;
+                            text: root.is_ua ? "QR для підключення" : "QR for connection";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                        }
+                        Image {
+                            x: 76px; y: 36px; width: 168px; height: 168px;
+                            source: root.wifi_qr_image;
+                        }
+                        Text {
+                            x: 16px; y: 206px; width: 288px; height: 32px;
+                            text: root.wifi_qr_hint;
+                            color: #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 11px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            x: 126px; y: 232px; width: 68px; height: 16px;
+                            background: #27272A;
+                            border-radius: 8px;
+                            Text { text: "Close"; color: #FFFFFF; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.wifi_qr_toggle(); } }
+                        }
+                    }
+                }
+
+                if (root.wifi_picker_visible) : Rectangle {
+                    x: 0px; y: 0px; width: 480px; height: 280px;
+                    background: #000000CC;
+                    z: 2000;
+
+                    Rectangle {
+                        x: 16px; y: 12px; width: 448px; height: 252px;
+                        background: #0F0F0F;
+                        border-color: #27272A;
+                        border-width: 1px;
+                        border-radius: 12px;
+
+                        Text {
+                            x: 12px; y: 10px;
+                            text: root.is_ua ? "Вибір Wi‑Fi мережі" : "Select Wi‑Fi network";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                        }
+
+                        Rectangle {
+                            x: 398px; y: 8px; width: 38px; height: 28px;
+                            background: #27272A;
+                            border-radius: 8px;
+                            Text { text: "X"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.wifi_picker_visible = false; } }
+                        }
+
+                        if (root.wifi_scan_busy) : Text {
+                            x: 12px; y: 44px;
+                            text: root.is_ua ? "Пошук мереж..." : "Scanning networks...";
+                            color: #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 14px;
+                        }
+
+                        if (!root.wifi_scan_busy && root.wifi_networks.length == 0) : Text {
+                            x: 12px; y: 44px;
+                            text: root.is_ua ? "Мереж не знайдено" : "No networks found";
+                            color: #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 14px;
+                        }
+
+                        if (!root.wifi_scan_busy && root.wifi_networks.length > 0) : ScrollView {
+                            x: 8px; y: 40px; width: 432px; height: 204px;
+
+                            VerticalBox {
+                                spacing: 4px;
+                                for net in root.wifi_networks : Rectangle {
+                                    width: 430px; height: 38px;
+                                    background: #18181B;
+                                    border-color: #27272A;
+                                    border-width: 1px;
+                                    border-radius: 8px;
+
+                                    Text {
+                                        x: 8px; y: 9px;
+                                        text: net.ssid + " (" + net.rssi + " dBm)";
+                                        color: #FFFFFF;
+                                        font-family: "PT Sans";
+                                        font-size: 14px;
+                                    }
+
+                                    TouchArea {
+                                        width: parent.width; height: parent.height;
+                                        clicked => {
+                                            root.wifi_selected_ssid = net.ssid;
+                                            root.wifi_password = "";
+                                            root.kb_open("wifi_pass", -1, "");
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
         }
@@ -3314,7 +3417,7 @@ export component AppWindow inherits Window {
 
 
     // Full-screen text keyboard (program name)
-    if (root.kb_visible && (root.kb_field == "name" || root.kb_field == "wifi_pass")) : Rectangle {
+    if (root.kb_visible && (root.kb_field == "name" || (root.kb_field == "wifi_pass" && root.kb_mode == "alpha"))) : Rectangle {
         x: 0px;
         y: 0px;
         width: 480px;
@@ -3409,7 +3512,13 @@ export component AppWindow inherits Window {
             key_pressed(v) => { root.kb_key(v); }
         }
 
-        KbKeyButton { x: 10px; y: 238px; width: 300px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
+        if (root.kb_field == "wifi_pass") : KbKeyButton { x: 10px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: "123"; font_size: 16px;
+            pressed(v) => { root.kb_mode = "num"; }
+        }
+        if (root.kb_field != "wifi_pass") : KbKeyButton { x: 10px; y: 238px; width: 300px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
+            pressed(v) => { root.kb_key("SPACE"); }
+        }
+        if (root.kb_field == "wifi_pass") : KbKeyButton { x: 90px; y: 238px; width: 220px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
             pressed(v) => { root.kb_key("SPACE"); }
         }
         KbKeyButton { x: 318px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: "⌫"; font_size: 22px;
@@ -3421,7 +3530,7 @@ export component AppWindow inherits Window {
     }
 
     // Bottom numeric keyboard overlay (Editor)
-    if (root.kb_visible && root.kb_field != "name") : Rectangle {
+    if (root.kb_visible && (root.kb_field != "name" && (root.kb_field != "wifi_pass" || root.kb_mode == "num"))) : Rectangle {
         x: 0px;
         y: 0px;
         width: 480px;
@@ -3451,6 +3560,10 @@ export component AppWindow inherits Window {
             font-family: "PT Sans";
             font-size: 30px;
             font-weight: 700;
+        }
+
+        if (root.kb_field == "wifi_pass") : KbKeyButton { x: 388px; y: 8px; width: 80px; height: 32px; background: #27272A; label: "ABC"; font_size: 12px;
+            pressed(v) => { root.kb_mode = "alpha"; }
         }
 
         property <length> kx: 25px;

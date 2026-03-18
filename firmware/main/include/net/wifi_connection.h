@@ -54,6 +54,12 @@ bool wifi_is_scan_done(void);
 bool wifi_is_connected(void);
 
 /**
+ * @brief Get URL for web interface.
+ * Returns STA URL when connected, otherwise SoftAP fallback.
+ */
+std::string wifi_get_server_url(void);
+
+/**
  * @brief Save credentials for manual connect flow.
  */
 bool wifi_connect_with_credentials(const char* ssid, const char* password);
