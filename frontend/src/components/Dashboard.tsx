@@ -166,7 +166,7 @@ const Dashboard = () => {
   }, []);
 
   // Unified Idle Logic
-  const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR';
+  const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' || status.status === 'FAULT';
 
   // Derived active schedule
   const activeSchedule = schedules.find(s => s.id === selectedScheduleId);

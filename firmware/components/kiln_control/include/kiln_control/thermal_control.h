@@ -7,18 +7,19 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "kiln_safety/faults.h"
 
-class MAX6675;
+class MAX31855;
 class PID;
 
 enum KilnStatus {
     KILN_IDLE = 0,
-    KILN_PREHEAT = 1,
-    KILN_RAMP = 2,
-    KILN_HOLD = 3,
-    KILN_COOL = 4,
-    KILN_COMPLETE = 5,
-    KILN_ERROR = 6,
+    KILN_RUNNING = 1,
+    KILN_HOLD = 2,
+    KILN_COOLING = 3,
+    KILN_COMPLETE = 4,
+    KILN_FAULT = 5,
+    KILN_PAUSED = 6,
     KILN_TUNING = 7
 };
 
@@ -36,7 +37,7 @@ struct KilnState {
 };
 
 struct ThermoStats {
-    uint16_t raw;
+    uint32_t raw;
     uint32_t readCount;
 };
 
@@ -107,7 +108,7 @@ private:
     SemaphoreHandle_t mutex;
 
     // Hardware
-    MAX6675 *thermocouple;
+    MAX31855 *thermocouple;
     PID *pid;
 
     // PID Variables
@@ -117,10 +118,14 @@ private:
     float temperatureOffsetC;
 
     // Telemetry
-    uint16_t thermoLastRaw;
+    uint32_t thermoLastRaw;
     uint32_t thermoReadCount;
     uint64_t lastThermoReadMs;
     bool lastSensorOk;
+    uint32_t sensorValidStreak;
+    uint32_t sensorInvalidStreak;
+    uint32_t sensorStuckStreak;
+    uint32_t sensorShortStreak;
 
     // Loaded schedule metadata (for UI/history)
     std::string loadedScheduleName;
@@ -157,6 +162,9 @@ private:
     float stepStartTemp;
 
     // Methods
+    void tripFaultLocked(kiln_fault_code_t code, const char *reason);
+    void applyFaultStateLocked();
+    bool sensorRecoveredForClearLocked(uint64_t now_ms) const;
     void updateTemperature();
     void computePID();
     void driveSSR();
@@ -164,6 +172,9 @@ private:
 
     void loadRuntimeSettingsLocked();
     void persistRuntimeSettingsLocked();
+    void saveRecoveryStateLocked();
+    void loadRecoveryStateLocked();
+    void clearRecoveryStateLocked();
 
     struct AutoTune {
         bool active = false;

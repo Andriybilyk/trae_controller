@@ -1,56 +1,45 @@
 dependencies:
   atanisoft/esp_lcd_touch_xpt2046:
-    component_hash: 7e6381b67b6e487379118368b8e91624dc87036ef5734818de1db9eb35697998
-    dependencies:
-    - name: espressif/esp_lcd_touch
-      registry_url: https://components.espressif.com
-      require: private
-      version: '>=1.0.4'
-    - name: idf
-      require: private
-      version: '>=4.4'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\atanisoft__esp_lcd_touch_xpt2046
+      type: local
     version: 1.0.6
   espressif/cjson:
-    component_hash: 002c6d1872ee4c97d333938ebe107a29841cc847f9de89e676714bd2844057ea
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.0'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cjson
+      type: local
     version: 1.7.19~1
   espressif/esp_lcd_touch:
-    component_hash: 3f85a7d95af876f1a6ecca8eb90a81614890d0f03a038390804e5a77e2caf862
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=4.4.2'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com
-      type: service
+      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch
+      type: local
     version: 1.2.1
+  espressif/mdns:
+    dependencies: []
+    source:
+      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__mdns
+      type: local
+    version: 1.10.1
   idf:
     source:
       type: idf
     version: 5.5.3
   joltwallet/littlefs:
-    component_hash: dcea25bcef2de023f089f5f01e8d8c46ad1b8ffef75861ad5ffb4098555839df
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.0'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\joltwallet__littlefs
+      type: local
     version: 1.20.4
 direct_dependencies:
 - atanisoft/esp_lcd_touch_xpt2046
 - espressif/cjson
+- espressif/esp_lcd_touch
+- espressif/mdns
+- idf
 - joltwallet/littlefs
-manifest_hash: 3a38aa76577089899eddf1a0365300011943c2122ee6de3a81d6e923fcf22d4d
+manifest_hash: dd32b9dcc3bcae32a7b4ca51cbf11eb4f250878b7dd1f743f27e1f61e031b95b
 target: esp32s3
 version: 2.0.0

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
@@ -269,6 +269,23 @@
             const btn = document.getElementById('connect-btn');
             btn.disabled = true;
             btn.innerHTML = '<div class="spinner"></div> Connecting...';
+            
+            // Allow form submission, but intercept the result visually to redirect to the new mDNS host
+            setTimeout(() => {
+                document.body.innerHTML = `
+                    <div class="container" style="text-align: center; margin-top: 50px;">
+                        <h2>Connecting to Wi-Fi...</h2>
+                        <div class="spinner" style="width: 40px; height: 40px; border-width: 5px; margin: 20px auto;"></div>
+                        <p>The kiln is restarting and connecting to your network.</p>
+                        <p>You will be redirected automatically in 15 seconds.</p>
+                        <p>If not, go to <a href="http://kiln.local">http://kiln.local</a></p>
+                    </div>
+                `;
+                setTimeout(() => {
+                    window.location.href = "http://kiln.local";
+                }, 15000);
+            }, 1000);
+
             return true;
         }
 

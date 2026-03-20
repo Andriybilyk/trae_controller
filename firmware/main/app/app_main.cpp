@@ -8,6 +8,8 @@
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "driver/temperature_sensor.h"
+#include "esp_ota_ops.h"
+#include "mdns.h"
 #include <cstring>
 #include <atomic>
 
@@ -122,7 +124,6 @@ static void control_task(void *arg) {
 static void server_task(void *arg) {
     (void)arg;
     ESP_LOGI("SRV_TASK", "Starting server task");
-    (void)esp_task_wdt_add(nullptr);
     s_server_watchdog_armed.store(false, std::memory_order_relaxed);
     s_server_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
 
@@ -134,7 +135,6 @@ static void server_task(void *arg) {
     uint64_t lastLog = 0;
 
     while (true) {
-        (void)esp_task_wdt_reset();
         wifiServer.loop();
         remote_access_loop();
         s_server_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
@@ -150,10 +150,13 @@ static void server_task(void *arg) {
 }
 
 extern "C" void app_main(void) {
+    // Confirm OTA update if we booted successfully
+    esp_ota_mark_app_valid_cancel_rollback();
+
     esp_task_wdt_config_t twdt_config = {};
     twdt_config.timeout_ms = 12000;
     twdt_config.idle_core_mask = 0;
-    twdt_config.trigger_panic = true;
+    twdt_config.trigger_panic = false;
     (void)esp_task_wdt_init(&twdt_config);
 
     // Initialize NVS (needed for WiFi)
@@ -226,7 +229,22 @@ extern "C" void app_main(void) {
     // Init Thermal Control
     ESP_LOGI(TAG, "Init Thermal Control...");
     thermalCtrl.begin();
-    thermalCtrl.stop("System Boot");
+    // Do not call stop() immediately, as it clears the recovery state.
+    // Instead, check if it was already recovered in begin()
+    if (thermalCtrl.getState().isFiring == false) {
+        thermalCtrl.stop("System Boot");
+    }
+
+    // 6. Initialize mDNS so we can resolve http://kiln.local
+    esp_err_t err = mdns_init();
+    if (err == ESP_OK) {
+        mdns_hostname_set("kiln");
+        mdns_instance_name_set("Trae Kiln Controller");
+        mdns_service_add("Kiln Web UI", "_http", "_tcp", 80, NULL, 0);
+        ESP_LOGI(TAG, "mDNS initialized. Hostname: kiln.local");
+    } else {
+        ESP_LOGE(TAG, "mDNS init failed: %d", err);
+    }
 
     ESP_LOGI(TAG, "Setup Complete.");
 

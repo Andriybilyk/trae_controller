@@ -420,6 +420,13 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState) {
     if fault_reason.is_empty() {
         fault_reason = c_buf_to_string(&state.error_msg);
     }
+    let prev_fault_active = ui.get_fault_active();
+    let prev_fault_reason = ui.get_fault_reason().to_string();
+    if !state.fault_active {
+        ui.set_fault_popup_hidden(false);
+    } else if !prev_fault_active || prev_fault_reason != fault_reason {
+        ui.set_fault_popup_hidden(false);
+    }
     ui.set_fault_active(state.fault_active);
     ui.set_fault_reason(fault_reason.into());
 
@@ -1124,6 +1131,7 @@ pub extern "C" fn slint_ui_run() {
                 ui.set_kb_value(value.clone().into());
                 if field == "name" || field == "wifi_pass" {
                     ui.set_kb_mode("alpha".into());
+                    ui.set_kb_caps(false);
                 } else {
                     ui.set_kb_mode("num".into());
                 }

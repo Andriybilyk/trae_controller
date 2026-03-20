@@ -51,7 +51,7 @@ const DashboardView = ({
     onOpenLibrary: () => void; 
 }) => {
     // Unified Idle Logic
-    const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR';
+    const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' || status.status === 'FAULT';
 
     return (
         <div className="grid grid-cols-2 h-full gap-2">
@@ -60,7 +60,7 @@ const DashboardView = ({
                 
                 {/* Status Badge */}
                 <div className="absolute top-2 right-2">
-                     <span className={`px-2 py-1 rounded-full text-white font-bold text-[10px] ${status.status === 'IDLE' ? 'bg-zinc-800' : status.status === 'ERROR' ? 'bg-red-500' : 'bg-kiln-accent text-black'}`}>
+                     <span className={`px-2 py-1 rounded-full text-white font-bold text-[10px] ${status.status === 'IDLE' ? 'bg-zinc-800' : (status.status === 'ERROR' || status.status === 'FAULT') ? 'bg-red-500' : 'bg-kiln-accent text-black'}`}>
                         {status.status}
                     </span>
                 </div>
@@ -537,7 +537,7 @@ const ControllerScreen = () => {
                             {language}
                         </button>
                         <span>{currentTime}</span>
-                        <Wifi size={14} className={status.status !== 'ERROR' ? "text-emerald-500" : "text-zinc-600"} />
+                        <Wifi size={14} className={(status.status !== 'ERROR' && status.status !== 'FAULT') ? "text-emerald-500" : "text-zinc-600"} />
                     </div>
                 </div>
 

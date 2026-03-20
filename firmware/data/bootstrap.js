@@ -33,4 +33,6 @@ window.fetch = async (input, init) => {
   return res;
 };
 
-await import("/assets/index-da16b362.js");
+const html = await (await originalFetch("/index.html", { cache: "no-store" })).text();
+const m = html.match(/src="(\/assets\/index-[^"]+\.js)"/);
+await import(m ? m[1] : "/assets/index-f98ef54f.js");

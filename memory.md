@@ -72,6 +72,9 @@
 - Remote command hardening v1: optional mandatory HMAC-SHA256 signature validation (`ts_ms` + `nonce` + command payload), replay protection (nonce ring), and timestamp skew checks are enforced in the MQTT command path.
 - Remote TLS hardening v1: controller now supports broker CA PEM upload/clear via `/api/remote` (`ca_pem`/`clear_ca_cert`) and requires a saved CA file for `mqtts://`/`wss://` connections.
 - Remote bootstrap auto-config added: on first boot remote mode is prefilled/enabled with `mqtts://test.mosquitto.org:8883`, random per-device `auth_key` is generated, and default ISRG Root X1 CA is provisioned if missing.
+- Thermal safety refactor: centralized fault path in `thermal_control` now forces one consistent fail-safe behavior (`heater_off`, latched `KILN_FAULT`, unified reason propagation/history finalize) instead of scattered fault handling branches.
+- Sensor robustness update: thermocouple validation now includes invalid/spike streak latching, `open/short/stuck` heuristics, read-timeout watchdog fault, and auto-clear only after stable valid recovery.
+- Runtime state model aligned for UI/API clarity: kiln status string now emits `IDLE/RUNNING/HOLD/COOLING/COMPLETE/FAULT/PAUSED/TUNING`.
 
 ## TODO
 - P0: Verify Slint embedded build for `xtensa-esp32s3-espidf` and confirm Slint software renderer + touch input on hardware.

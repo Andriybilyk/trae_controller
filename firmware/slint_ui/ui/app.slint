@@ -1,4 +1,4 @@
-﻿import { VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
+import { VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
 // UI layout tweaks for touch usability
 
 import "../../data/fonts/sketch_260307b/FontFiles/PTSans-Regular.ttf";
@@ -274,75 +274,39 @@ export component AppWindow inherits Window {
 
     // Theme (keep it explicit; easier to tweak without hunting literals).
 
-
-
     // Use mostly neutral greys (R=G=B) so the panel looks consistent and doesn't drift "blue/yellow".
-
-
 
     property <color> c_bg: #000000;
 
-
-
     property <color> c_panel: #000000;
-
-
 
     property <color> c_card: #111118;
 
-
-
     property <color> c_border: #27272A;
-
-
 
     property <color> c_text: #FFFFFF;
 
-
-
     property <color> c_muted: #A1A1AA;
-
-
 
     property <color> c_subtle: #71717A;
 
-
-
     property <color> c_accent: #00D084;
-
-
 
     property <color> c_warn: #F59E0B;
 
-
-
     property <color> c_danger: #FF3B30;
-
-
 
     // Status styling (based on status_label coming from firmware: IDLE/RAMP/ERROR/...).
 
-
-
     // Keep RAMP green like in your reference UI; only ERROR is red.
-
-
 
     property <color> status_fg: root.status_label == "ERROR" ? c_danger : c_accent;
 
-
-
     property <color> status_bg: root.status_label == "ERROR" ? #2A0B0B : #062016;
-
-
 
     in-out property <View> view: View.Dashboard;
 
-
-
     in-out property <bool> show_stop_confirm: false;
-
-
 
     in-out property <bool> is_ua: false;
 
@@ -425,6 +389,7 @@ export component AppWindow inherits Window {
 
 
     in-out property <string> fault_reason: "";
+    in-out property <bool> fault_popup_hidden: false;
 
 
 
@@ -448,6 +413,7 @@ export component AppWindow inherits Window {
     in-out property <int> kb_step_index: -1;
     in-out property <string> kb_field: "";
     in-out property <string> kb_mode: "num";
+    in-out property <bool> kb_caps: false;
 
     // Fan (manual override + power %)
     in-out property <bool> fan_manual: false;
@@ -674,66 +640,52 @@ export component AppWindow inherits Window {
 
 
 
-    if (root.fault_active) : Rectangle {
-
-
-
-        x: 0px; y: 40px;
-
-
-
-        width: 480px; height: 28px;
-
-
-
+    if (root.fault_active && !root.fault_popup_hidden) : Rectangle {
+        x: 30px; y: 108px;
+        width: 420px; height: 84px;
         background: #7F1D1D;
-
-
-
         border-color: #DC2626;
-
-
-
-        border-width: 1px;
-
-
-
+        border-width: 2px;
+        border-radius: 10px;
+        z: 1200;
         Text {
-
-
-
-            x: 10px; y: 6px;
-
-
-
+            x: 16px; y: 14px;
+            width: parent.width - 64px;
             text: root.fault_reason == "" ? "FAULT" : ("FAULT: " + root.fault_reason);
-
-
-
             color: #FFFFFF;
-
-
-
             font-family: "PT Sans";
-
-
-
-            font-size: 12px;
-
-
-
+            font-size: 14px;
+            horizontal-alignment: center;
+            overflow: elide;
         }
-
-
-
+        Rectangle {
+            x: parent.width - 34px;
+            y: 10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            background: #991B1B;
+            border-color: #DC2626;
+            border-width: 1px;
+            Text {
+                text: "×";
+                color: #FFFFFF;
+                font-family: "PT Sans";
+                font-size: 18px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            TouchArea {
+                width: parent.width;
+                height: parent.height;
+                clicked => { root.fault_popup_hidden = true; }
+            }
+        }
     }
 
-
-
-    
     if (root.command_feedback_visible) : Rectangle {
         x: 0px;
-        y: root.fault_active ? 68px : 40px;
+        y: 40px;
         width: 480px;
         height: 24px;
         background: root.command_feedback_ok ? #064E3B : #7F1D1D;
@@ -759,7 +711,7 @@ export component AppWindow inherits Window {
 
 
 
-        x: 0px; y: root.fault_active ? 68px : 40px;
+        x: 0px; y: 40px;
 
 
 
@@ -853,65 +805,21 @@ export component AppWindow inherits Window {
 
 
                 Rectangle {
-
-
-
-                    x: 170px; y: 14px;
-
-
-
-                    width: 52px; height: 22px;
-
-
-
+                    x: 160px; y: 14px;
+                    width: 65px; height: 22px;
                     background: root.status_bg;
-
-
-
                     border-color: root.status_fg;
-
-
-
                     border-width: 1px;
-
-
-
                     border-radius: 11px;
 
-
-
                     Text {
-
-
-
                         text: root.status_label;
-
-
-
                         color: root.status_fg;
-
-
-
                         font-family: "PT Sans";
-
-
-
-                        font-size: 14px;
-
-
-
+                        font-size: 13px;
                         horizontal-alignment: center;
-
-
-
                         vertical-alignment: center;
-
-
-
                     }
-
-
-
                 }
 
 
@@ -3440,7 +3348,7 @@ export component AppWindow inherits Window {
 
 
     // Full-screen text keyboard (program name)
-    if (root.kb_visible && (root.kb_field == "name" || (root.kb_field == "wifi_pass" && root.kb_mode == "alpha"))) : Rectangle {
+    if (root.kb_visible && ((root.kb_field == "name" && root.kb_mode == "alpha") || (root.kb_field == "wifi_pass" && root.kb_mode == "alpha"))) : Rectangle {
         x: 0px;
         y: 0px;
         width: 480px;
@@ -3449,13 +3357,19 @@ export component AppWindow inherits Window {
 
         background: #000000;
 
-        property <[string]> ua_r1: ["Й","Ц","У","К","Е","Н","Г","Ш","Щ","З","Х","Ї"];
-        property <[string]> ua_r2: ["Ф","І","В","А","П","Р","О","Л","Д","Ж","Є"];
-        property <[string]> ua_r3: ["Я","Ч","С","М","И","Т","Ь","Б","Ю","Ґ"];
+        property <[string]> ua_r1_uc: ["Й","Ц","У","К","Е","Н","Г","Ш","Щ","З","Х","Ї"];
+        property <[string]> ua_r2_uc: ["Ф","І","В","А","П","Р","О","Л","Д","Ж","Є"];
+        property <[string]> ua_r3_uc: ["Я","Ч","С","М","И","Т","Ь","Б","Ю","Ґ"];
+        property <[string]> ua_r1_lc: ["й","ц","у","к","е","н","г","ш","щ","з","х","ї"];
+        property <[string]> ua_r2_lc: ["ф","і","в","а","п","р","о","л","д","ж","є"];
+        property <[string]> ua_r3_lc: ["я","ч","с","м","и","т","ь","б","ю","ґ"];
 
-        property <[string]> en_r1: ["Q","W","E","R","T","Y","U","I","O","P"];
-        property <[string]> en_r2: ["A","S","D","F","G","H","J","K","L"];
-        property <[string]> en_r3: ["Z","X","C","V","B","N","M"];
+        property <[string]> en_r1_uc: ["Q","W","E","R","T","Y","U","I","O","P"];
+        property <[string]> en_r2_uc: ["A","S","D","F","G","H","J","K","L"];
+        property <[string]> en_r3_uc: ["Z","X","C","V","B","N","M"];
+        property <[string]> en_r1_lc: ["q","w","e","r","t","y","u","i","o","p"];
+        property <[string]> en_r2_lc: ["a","s","d","f","g","h","j","k","l"];
+        property <[string]> en_r3_lc: ["z","x","c","v","b","n","m"];
 
         Rectangle {
             x: 0px; y: 0px; width: parent.width; height: 70px;
@@ -3504,7 +3418,9 @@ export component AppWindow inherits Window {
 
         KbKeyRow {
             row_y: -78px;
-            keys: root.is_ua ? parent.ua_r1 : parent.en_r1;
+            keys: root.is_ua
+                ? (root.kb_caps ? parent.ua_r1_uc : parent.ua_r1_lc)
+                : (root.kb_caps ? parent.en_r1_uc : parent.en_r1_lc);
             key_width: root.is_ua ? 38px : 46px;
             key_height: 44px;
             gap: 2px;
@@ -3515,7 +3431,9 @@ export component AppWindow inherits Window {
 
         KbKeyRow {
             row_y: -30px;
-            keys: root.is_ua ? parent.ua_r2 : parent.en_r2;
+            keys: root.is_ua
+                ? (root.kb_caps ? parent.ua_r2_uc : parent.ua_r2_lc)
+                : (root.kb_caps ? parent.en_r2_uc : parent.en_r2_lc);
             key_width: root.is_ua ? 40px : 48px;
             key_height: 44px;
             gap: 2px;
@@ -3526,7 +3444,9 @@ export component AppWindow inherits Window {
 
         KbKeyRow {
             row_y: 18px;
-            keys: root.is_ua ? parent.ua_r3 : parent.en_r3;
+            keys: root.is_ua
+                ? (root.kb_caps ? parent.ua_r3_uc : parent.ua_r3_lc)
+                : (root.kb_caps ? parent.en_r3_uc : parent.en_r3_lc);
             key_width: root.is_ua ? 46px : 66px;
             key_height: 44px;
             gap: 2px;
@@ -3535,13 +3455,16 @@ export component AppWindow inherits Window {
             key_pressed(v) => { root.kb_key(v); }
         }
 
-        if (root.kb_field == "wifi_pass") : KbKeyButton { x: 10px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: "123"; font_size: 16px;
+        KbKeyButton { x: 10px; y: 238px; width: 60px; height: 60px; background: #3F3F46; label: "123"; font_size: 16px;
             pressed(v) => { root.kb_mode = "num"; }
         }
-        if (root.kb_field != "wifi_pass") : KbKeyButton { x: 10px; y: 238px; width: 300px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
-            pressed(v) => { root.kb_key("SPACE"); }
+        KbKeyButton { x: 72px; y: 238px; width: 50px; height: 60px; background: #3F3F46; label: root.is_ua ? "UA" : "EN"; font_size: 14px;
+            pressed(v) => { root.is_ua = !root.is_ua; }
         }
-        if (root.kb_field == "wifi_pass") : KbKeyButton { x: 90px; y: 238px; width: 220px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
+        KbKeyButton { x: 124px; y: 238px; width: 50px; height: 60px; background: root.kb_caps ? #10B981 : #3F3F46; label: "⇧"; font_size: 20px;
+            pressed(v) => { root.kb_caps = !root.kb_caps; }
+        }
+        KbKeyButton { x: 176px; y: 238px; width: 134px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
             pressed(v) => { root.kb_key("SPACE"); }
         }
         KbKeyButton { x: 318px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: "⌫"; font_size: 22px;
@@ -3553,7 +3476,7 @@ export component AppWindow inherits Window {
     }
 
     // Bottom numeric keyboard overlay (Editor)
-    if (root.kb_visible && (root.kb_field != "name" && (root.kb_field != "wifi_pass" || root.kb_mode == "num"))) : Rectangle {
+    if (root.kb_visible && ((root.kb_field == "name" && root.kb_mode == "num") || (root.kb_field == "wifi_pass" && root.kb_mode == "num") || (root.kb_field != "name" && root.kb_field != "wifi_pass"))) : Rectangle {
         x: 0px;
         y: 0px;
         width: 480px;
@@ -3585,7 +3508,7 @@ export component AppWindow inherits Window {
             font-weight: 700;
         }
 
-        if (root.kb_field == "wifi_pass") : KbKeyButton { x: 388px; y: 8px; width: 80px; height: 32px; background: #27272A; label: "ABC"; font_size: 12px;
+        if (root.kb_field == "wifi_pass" || root.kb_field == "name") : KbKeyButton { x: 388px; y: 8px; width: 80px; height: 32px; background: #27272A; label: "ABC"; font_size: 12px;
             pressed(v) => { root.kb_mode = "alpha"; }
         }
 

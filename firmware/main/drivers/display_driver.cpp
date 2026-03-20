@@ -48,9 +48,9 @@ static int s_lcd_y_offset = 0;
 static int s_touch_spi_mode = 0;
 static int s_touch_spi_hz = TOUCH_SPI_CLOCK_HZ;
 
-static bool s_touch_swap_xy = true;
+static bool s_touch_swap_xy = false;
 static bool s_touch_mirror_x = false;
-static bool s_touch_mirror_y = true;
+static bool s_touch_mirror_y = false;
 
 static bool s_touch_cal_enabled = false;
 static uint16_t s_touch_cal_left = 0;
@@ -80,6 +80,10 @@ static float s_touch_quad_c = 60.641743f;
 static gpio_num_t s_touch_sclk = TOUCH_SCLK;
 static gpio_num_t s_touch_mosi = TOUCH_MOSI;
 static gpio_num_t s_touch_miso = TOUCH_MISO;
+
+static bool is_strap_unsafe_gpio(gpio_num_t pin) {
+    return pin == GPIO_NUM_0 || pin == GPIO_NUM_3 || pin == GPIO_NUM_45 || pin == GPIO_NUM_46;
+}
 
 static esp_lcd_panel_io_handle_t s_touch_io = nullptr;
 static esp_lcd_touch_handle_t s_touch = nullptr;
@@ -168,11 +172,11 @@ static void load_touch_from_nvs() {
     (void)nvs_get_blob(h, "grid_dy", s_touch_grid_dy.data(), &grid_sz);
 
     int32_t pin = -1;
-    if (nvs_get_i32(h, "sclk", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin)) s_touch_sclk = (gpio_num_t)pin;
+    if (nvs_get_i32(h, "sclk", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin) && !is_strap_unsafe_gpio((gpio_num_t)pin)) s_touch_sclk = (gpio_num_t)pin;
     pin = -1;
-    if (nvs_get_i32(h, "mosi", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin)) s_touch_mosi = (gpio_num_t)pin;
+    if (nvs_get_i32(h, "mosi", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin) && !is_strap_unsafe_gpio((gpio_num_t)pin)) s_touch_mosi = (gpio_num_t)pin;
     pin = -1;
-    if (nvs_get_i32(h, "miso", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin)) s_touch_miso = (gpio_num_t)pin;
+    if (nvs_get_i32(h, "miso", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin) && !is_strap_unsafe_gpio((gpio_num_t)pin)) s_touch_miso = (gpio_num_t)pin;
     nvs_close(h);
 }
 
@@ -560,6 +564,7 @@ void display_driver_init(void) {
     s_touch_swap_xy = true;
     s_touch_mirror_x = s_mirror_x;
     s_touch_mirror_y = s_mirror_y ? false : true;
+
     load_touch_from_nvs();
     display_gpio_init();
     ESP_ERROR_CHECK(display_spi_init());
@@ -875,6 +880,9 @@ bool display_driver_set_touch_pins(int sclk, int mosi, int miso) {
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)sclk)) return false;
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)mosi)) return false;
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)miso)) return false;
+    if (is_strap_unsafe_gpio((gpio_num_t)sclk)) return false;
+    if (is_strap_unsafe_gpio((gpio_num_t)mosi)) return false;
+    if (is_strap_unsafe_gpio((gpio_num_t)miso)) return false;
 
     s_touch_sclk = (gpio_num_t)sclk;
     s_touch_mosi = (gpio_num_t)mosi;

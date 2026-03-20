@@ -15,6 +15,11 @@ typedef enum {
     KILN_FAULT_RISE_RATE = 4,
     KILN_FAULT_EMERGENCY_STOP = 5,
     KILN_FAULT_AUTOTUNE_FAILED = 6,
+    KILN_FAULT_SENSOR_OPEN = 7,
+    KILN_FAULT_SENSOR_SHORT = 8,
+    KILN_FAULT_SENSOR_STUCK = 9,
+    KILN_FAULT_WATCHDOG = 10,
+    KILN_FAULT_SSR = 11,
 } kiln_fault_code_t;
 
 typedef struct {

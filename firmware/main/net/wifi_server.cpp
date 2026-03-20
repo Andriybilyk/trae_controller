@@ -231,14 +231,29 @@ static void ensure_schedule_id(cJSON *schedule) {
 }
 
 esp_err_t WiFiServerManager::index_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "index_handler called for URI: %s", req->uri);
+    
     if (strncmp(req->uri, "/api/", 5) == 0 || strncmp(req->uri, "/assets/", 8) == 0) {
+        ESP_LOGW(TAG, "index_handler rejecting /api/ or /assets/ request: %s", req->uri);
         httpd_resp_send_404(req);
         return ESP_FAIL;
     }
 
+    if (strcmp(req->uri, "/") != 0 &&
+        strcmp(req->uri, "/index.html") != 0 &&
+        strcmp(req->uri, "/wifi_setup.html") != 0) {
+        ESP_LOGI(TAG, "Redirecting unknown SPA path %s to /", req->uri);
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", "/");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
+
     char host_str[64];
     if (httpd_req_get_hdr_value_str(req, "Host", host_str, sizeof(host_str)) == ESP_OK) {
+        ESP_LOGI(TAG, "Host header: %s", host_str);
         if (wifiServer.isAPMode && strstr(host_str, "192.168.4.1") == NULL) {
+            ESP_LOGI(TAG, "Redirecting Captive Portal request from %s to 192.168.4.1", host_str);
             httpd_resp_set_status(req, "302 Found");
             httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
             httpd_resp_send(req, NULL, 0);
@@ -251,20 +266,26 @@ esp_err_t WiFiServerManager::index_handler(httpd_req_t *req) {
         path = "/littlefs/wifi_setup.html";
     }
 
+    ESP_LOGI(TAG, "Serving file: %s", path);
     FILE* f = fopen(path, "r");
     if (f == NULL) {
+        ESP_LOGE(TAG, "File not found: %s", path);
         httpd_resp_send_404(req);
         return ESP_FAIL;
     }
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
 
-    char line[128];
-    while (fgets(line, sizeof(line), f)) {
-        httpd_resp_sendstr_chunk(req, line);
+    char chunk[512];
+    size_t chunksize;
+    while ((chunksize = fread(chunk, 1, sizeof(chunk), f)) > 0) {
+        if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+            fclose(f);
+            return ESP_FAIL;
+        }
     }
     fclose(f);
-    httpd_resp_sendstr_chunk(req, NULL);
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -313,6 +334,7 @@ esp_err_t static_asset_handler(httpd_req_t *req) {
 }
 
 esp_err_t redirect_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "redirect_handler called for URI: %s", req->uri);
     httpd_resp_set_status(req, "302 Found");
     httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
     httpd_resp_send(req, NULL, 0);
@@ -377,14 +399,14 @@ esp_err_t WiFiServerManager::save_wifi_handler(httpd_req_t *req) {
     }
 
     ESP_LOGI(TAG, "Saving WiFi: SSID='%s'", ssid);
-    wifi_save_creds(ssid, password);
-
-    httpd_resp_sendstr(req, "WiFi Saved. Rebooting...");
-    
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    esp_restart();
-
-    return ESP_OK;
+    bool ok = wifi_connect_with_credentials(ssid, password);
+    if (ok) {
+        httpd_resp_sendstr(req, "WiFi Saved. Connecting...");
+        return ESP_OK;
+    }
+    httpd_resp_set_status(req, "500 Internal Server Error");
+    httpd_resp_sendstr(req, "WiFi save/connect failed");
+    return ESP_FAIL;
 }
 
 esp_err_t WiFiServerManager::ws_handler(httpd_req_t *req) {
@@ -763,9 +785,15 @@ void WiFiServerManager::loop() {
 
 static const char* status_to_str(int s) {
     switch(s) {
-        case 0: return "IDLE"; case 1: return "PREHEAT"; case 2: return "RAMP";
-        case 3: return "HOLD"; case 4: return "COOL"; case 5: return "COMPLETE";
-        case 6: return "ERROR"; case 7: return "TUNING"; default: return "IDLE";
+        case 0: return "IDLE";
+        case 1: return "RUNNING";
+        case 2: return "HOLD";
+        case 3: return "COOLING";
+        case 4: return "COMPLETE";
+        case 5: return "FAULT";
+        case 6: return "PAUSED";
+        case 7: return "TUNING";
+        default: return "IDLE";
     }
 }
 
@@ -837,6 +865,24 @@ static std::string render_json_and_delete(cJSON *doc) {
 
 void WiFiServerManager::broadcastState() {
     if (!server) return;
+    
+    // Check if there are any connected websocket clients before building JSON
+    size_t clients = 10;
+    int client_fds[10];
+    if (httpd_get_client_list(server, &clients, client_fds) != ESP_OK || clients == 0) {
+        return;
+    }
+
+    bool has_ws_clients = false;
+    for (size_t i = 0; i < clients; i++) {
+        if (httpd_ws_get_fd_info(server, client_fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
+            has_ws_clients = true;
+            break;
+        }
+    }
+
+    if (!has_ws_clients) return;
+
     std::string output = render_json_and_delete(build_device_state_doc());
 
     httpd_ws_frame_t ws_pkt;
@@ -845,14 +891,10 @@ void WiFiServerManager::broadcastState() {
     ws_pkt.len = output.length();
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    size_t clients = 10;
-    int client_fds[10];
-    if (httpd_get_client_list(server, &clients, client_fds) == ESP_OK) {
-        for (size_t i = 0; i < clients; i++) {
-            if (httpd_ws_get_fd_info(server, client_fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
-                httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
-                taskYIELD();
-            }
+    for (size_t i = 0; i < clients; i++) {
+        if (httpd_ws_get_fd_info(server, client_fds[i]) == HTTPD_WS_CLIENT_WEBSOCKET) {
+            httpd_ws_send_frame_async(server, client_fds[i], &ws_pkt);
+            taskYIELD();
         }
     }
 }
@@ -2540,10 +2582,7 @@ esp_err_t WiFiServerManager::api_touch_pins_set_handler(httpd_req_t *req) {
     }
 
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, "{\"status\":\"ok\",\"rebooting\":true}");
-
-    vTaskDelay(pdMS_TO_TICKS(200));
-    esp_restart();
+    httpd_resp_sendstr(req, "{\"status\":\"ok\",\"reboot_required\":true}");
     return ESP_OK;
 }
 
