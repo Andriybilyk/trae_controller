@@ -35,6 +35,8 @@ void slint_bridge_get_state(slint_kiln_state_t *out);
 bool slint_bridge_start_schedule_json(const char *json);
 bool slint_bridge_load_schedule_json(const char *json);
 void slint_bridge_stop(void);
+bool slint_bridge_start_autotune(float target_c);
+void slint_bridge_stop_autotune(void);
 
 void slint_bridge_set_fan_manual(bool enabled);
 void slint_bridge_set_fan_power(int32_t percent);

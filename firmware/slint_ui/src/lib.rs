@@ -81,6 +81,8 @@ extern "C" {
     fn slint_bridge_start_schedule_json(json: *const c_char) -> bool;
     fn slint_bridge_load_schedule_json(json: *const c_char) -> bool;
     fn slint_bridge_stop();
+    fn slint_bridge_start_autotune(target_c: f32) -> bool;
+    fn slint_bridge_stop_autotune();
 
     fn slint_bridge_set_fan_manual(enabled: bool);
     fn slint_bridge_set_fan_power(percent: i32);
@@ -877,6 +879,24 @@ pub extern "C" fn slint_ui_run() {
 
     {
         let ui_weak = ui_weak.clone();
+        ui.on_autotune_start(move |target| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let clamped = target.clamp(100, 1200);
+            ui.set_autotune_target_c(clamped);
+            unsafe {
+                let _ = slint_bridge_start_autotune(clamped as f32);
+            }
+        });
+    }
+
+    {
+        ui.on_autotune_stop(move || {
+            unsafe { slint_bridge_stop_autotune() };
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
         let wifi_scan_in_progress = wifi_scan_in_progress.clone();
         ui.on_wifi_open_picker(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
@@ -1241,6 +1261,7 @@ pub extern "C" fn slint_ui_run() {
                 "target" => (0, 2000, 4usize),
                 "hold" => (0, 999, 3usize),
                 "fan" => (0, 100, 3usize),
+                "autotune" => (100, 1200, 4usize),
                 _ => (0, 9999, 5usize),
             };
 
@@ -1281,6 +1302,9 @@ pub extern "C" fn slint_ui_run() {
                         let parsed = parse_int_with_clamp(&value, min, max, ui.get_fan_power());
                         ui.set_fan_power(parsed);
                         unsafe { slint_bridge_set_fan_power(parsed) };
+                    } else if field == "autotune" {
+                        let parsed = parse_int_with_clamp(&value, min, max, ui.get_autotune_target_c());
+                        ui.set_autotune_target_c(parsed);
                     }
                     ui.set_kb_visible(false);
                 }
@@ -1607,4 +1631,3 @@ pub extern "C" fn slint_ui_run() {
         }
     }
 }
-

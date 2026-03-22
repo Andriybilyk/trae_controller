@@ -78,6 +78,23 @@ extern "C" void slint_bridge_stop(void) {
     (void)notify_slint_command("stop", device_commands::stop("User Button"), "stopped");
 }
 
+extern "C" bool slint_bridge_start_autotune(float target_c) {
+    const bool ok = thermalCtrl.startAutotune(target_c);
+    if (ok) {
+        wifiServer.notifyAutotuneState("start");
+        wifiServer.notifyCommandResult("autotune_start", {device_commands::ResultCode::Ok}, "started", "slint");
+    } else {
+        wifiServer.notifyCommandResult("autotune_start", {device_commands::ResultCode::SensorInvalid}, "started", "slint");
+    }
+    return ok;
+}
+
+extern "C" void slint_bridge_stop_autotune(void) {
+    thermalCtrl.stopAutotune("Autotune stopped");
+    wifiServer.notifyAutotuneState("stop");
+    wifiServer.notifyCommandResult("autotune_stop", {device_commands::ResultCode::Ok}, "stopped", "slint");
+}
+
 extern "C" void slint_bridge_set_fan_manual(bool enabled) {
     device_commands::set_fan_manual(enabled);
     (void)notify_slint_command("fan_manual", {device_commands::ResultCode::Ok}, "ok");

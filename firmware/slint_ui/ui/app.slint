@@ -418,6 +418,7 @@ export component AppWindow inherits Window {
     // Fan (manual override + power %)
     in-out property <bool> fan_manual: false;
     in-out property <int> fan_power: 0;
+    in-out property <int> autotune_target_c: 600;
     in-out property <[WifiNetworkRow]> wifi_networks;
     in-out property <bool> wifi_picker_visible: false;
     in-out property <bool> wifi_scan_busy: false;
@@ -506,6 +507,8 @@ export component AppWindow inherits Window {
 
 
     callback fan_power_changed(int);
+    callback autotune_start(int);
+    callback autotune_stop();
     callback wifi_open_picker();
     callback wifi_disconnect();
     callback wifi_qr_toggle();
@@ -2330,6 +2333,71 @@ export component AppWindow inherits Window {
                                     if (root.fan_manual) {
                                         root.fan_power = min(root.fan_power + 10, 100);
                                         root.fan_power_changed(root.fan_power);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                        Rectangle {
+                        width: 426px; height: 108px;
+                        background: #0F0F0F;
+                        border-color: #27272A;
+                        border-width: 1px;
+                        border-radius: 12px;
+
+                        Text {
+                            x: 12px; y: 8px;
+                            text: root.is_ua ? "PID Автоналаштування" : "PID Autotune";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                        }
+
+                        Text {
+                            x: 12px; y: 30px;
+                            text: root.is_ua ? "Цільова температура" : "Target temperature";
+                            color: #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 12px;
+                        }
+
+                        Rectangle {
+                            x: 12px; y: 50px; width: 130px; height: 32px;
+                            background: #27272A;
+                            border-radius: 10px;
+                            Text { text: root.autotune_target_c + "°C"; color: #FFFFFF; font-family: "PT Sans"; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => {
+                                    if (!(root.kb_visible && root.kb_field == "autotune" && root.kb_step_index == -1)) {
+                                        root.kb_open("autotune", -1, root.autotune_target_c + "");
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            x: 150px; y: 50px; width: 264px; height: 40px;
+                            background: root.status_label == "TUNING" ? #7F1D1D : (root.fault_active ? #18181B : #14532D);
+                            border-radius: 10px;
+                            Text {
+                                text: root.status_label == "TUNING"
+                                    ? (root.is_ua ? "Зупинити автоналаштування" : "Stop autotune")
+                                    : (root.is_ua ? "Запустити автоналаштування" : "Start autotune");
+                                color: root.status_label == "TUNING" ? #FFFFFF : (root.fault_active ? #71717A : #FFFFFF);
+                                font-family: "PT Sans";
+                                font-size: 14px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            TouchArea {
+                                width: parent.width; height: parent.height;
+                                clicked => {
+                                    if (root.status_label == "TUNING") {
+                                        root.autotune_stop();
+                                    } else if (!root.fault_active) {
+                                        root.autotune_start(root.autotune_target_c);
                                     }
                                 }
                             }
