@@ -41,7 +41,7 @@ if (ESPUP_EXPORT STREQUAL "")
 else()
     add_custom_command(
         OUTPUT ${SLINT_UI_LIB}
-        COMMAND powershell -ExecutionPolicy Bypass -NoProfile -Command "& ${ESPUP_EXPORT}; $env:RUSTUP_TOOLCHAIN='esp'; $env:RUSTFLAGS='-Cdebuginfo=0 -Clink-arg=/PDB:NONE'; $env:CARGO_PROFILE_RELEASE_DEBUG='0'; $env:CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG='0'; & ${CARGO_EXE} build --release --target ${SLINT_UI_TARGET} -Z build-std=core,alloc,std"
+        COMMAND C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe -ExecutionPolicy Bypass -NoProfile -Command "& ${ESPUP_EXPORT}; $env:RUSTUP_TOOLCHAIN='esp'; $env:RUSTFLAGS='-Cdebuginfo=0 -Clink-arg=/PDB:NONE'; $env:CARGO_PROFILE_RELEASE_DEBUG='0'; $env:CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG='0'; & ${CARGO_EXE} build --release --target ${SLINT_UI_TARGET} -Z build-std=core,alloc,std"
         DEPENDS ${SLINT_UI_DEPS}
         WORKING_DIRECTORY ${SLINT_UI_DIR}
         VERBATIM

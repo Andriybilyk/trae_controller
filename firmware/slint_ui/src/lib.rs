@@ -158,6 +158,8 @@ struct AppState {
     selected_index: Option<usize>,
     editing_index: Option<usize>,
     editor_steps: Vec<EditorStepRow>,
+    display_temp_c: f32,
+    display_temp_valid: bool,
 }
 
 struct EspPlatform {
@@ -394,8 +396,11 @@ fn c_buf_to_string(buf: &[u8]) -> String {
     String::from_utf8_lossy(&buf[..nul]).trim().to_string()
 }
 
-fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState) {
-    let status_label = match state.status {
+fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppState) {
+    let status_label = if state.fault_active {
+        "ERROR"
+    } else {
+        match state.status {
         1 => "PREHEAT",
         2 => "RAMP",
         3 => "HOLD",
@@ -404,11 +409,29 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState) {
         6 => "ERROR",
         7 => "TUNING",
         _ => "IDLE",
+        }
     };
     let is_idle = !state.is_firing;
 
-    ui.set_temp(state.current_temp as f32);
-    ui.set_temp_label(format!("{:.1}", state.current_temp).into());
+    let mut shown_temp = state.current_temp;
+    if state.current_temp.is_finite() {
+        if !app_state.display_temp_valid || !app_state.display_temp_c.is_finite() {
+            app_state.display_temp_c = state.current_temp;
+            app_state.display_temp_valid = true;
+        } else {
+            const ALPHA: f32 = 0.25;
+            const DEAD_BAND_C: f32 = 0.12;
+            let prev = app_state.display_temp_c;
+            let blended = prev * (1.0 - ALPHA) + state.current_temp * ALPHA;
+            app_state.display_temp_c = if (blended - prev).abs() < DEAD_BAND_C { prev } else { blended };
+        }
+        shown_temp = app_state.display_temp_c;
+    } else {
+        app_state.display_temp_valid = false;
+    }
+
+    ui.set_temp(shown_temp);
+    ui.set_temp_label(format!("{:.1}", shown_temp).into());
     ui.set_target(state.target_temp as i32);
     ui.set_status_label(status_label.into());
     ui.set_is_idle(is_idle);
@@ -756,6 +779,8 @@ pub extern "C" fn slint_ui_run() {
         selected_index: None,
         editing_index: None,
         editor_steps: Vec::new(),
+        display_temp_c: 0.0,
+        display_temp_valid: false,
     };
 
     if !state.schedules.is_empty() {
@@ -1486,7 +1511,10 @@ pub extern "C" fn slint_ui_run() {
         if last_state_update.elapsed() >= Duration::from_millis(500) {
             last_state_update = Instant::now();
             let s = state_poll();
-            apply_state_to_ui(&ui, s);
+            {
+                let mut state = app_state.borrow_mut();
+                apply_state_to_ui(&ui, s, &mut state);
+            }
             let wifi_ok = ui.get_wifi_ok();
             let url = ui.get_wifi_server_url().to_string();
             let qr_payload = wifi_qr_payload(wifi_ok, &url);
@@ -1579,5 +1607,4 @@ pub extern "C" fn slint_ui_run() {
         }
     }
 }
-
 

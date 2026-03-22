@@ -2,6 +2,8 @@
 
 #include "esp_log.h"
 #include "driver/ledc.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "kiln_config/config.h"
 
 static const char *TAG = "FAN";
@@ -16,6 +18,7 @@ static uint8_t s_auto_power_max_percent = 100;
 static uint8_t s_effective_power_percent = 0;
 static float s_source_temp_c = 0.0f;
 static bool s_inited = false;
+static SemaphoreHandle_t s_mutex = nullptr;
 static constexpr uint8_t kFiringMinPowerPercent = 60;
 
 static constexpr ledc_mode_t kMode = LEDC_LOW_SPEED_MODE;
@@ -27,6 +30,14 @@ static constexpr uint32_t kPwmHz = 25000;                       // keep it above
 static uint32_t duty_from_percent(uint8_t percent) {
     if (percent >= 100) return (1u << kDutyRes) - 1u;
     return (uint32_t)percent * (((1u << kDutyRes) - 1u)) / 100u;
+}
+
+static void lock_state() {
+    if (s_mutex) xSemaphoreTakeRecursive(s_mutex, portMAX_DELAY);
+}
+
+static void unlock_state() {
+    if (s_mutex) xSemaphoreGiveRecursive(s_mutex);
 }
 
 static void apply_output(void) {
@@ -55,7 +66,12 @@ static uint8_t auto_power_for_temp(float temp_c) {
 }
 
 void fan_driver_init(void) {
-    if (s_inited) return;
+    if (!s_mutex) s_mutex = xSemaphoreCreateRecursiveMutex();
+    lock_state();
+    if (s_inited) {
+        unlock_state();
+        return;
+    }
 
     ledc_timer_config_t timer = {};
     timer.speed_mode = kMode;
@@ -67,6 +83,7 @@ void fan_driver_init(void) {
     const esp_err_t t_ok = ledc_timer_config(&timer);
     if (t_ok != ESP_OK) {
         ESP_LOGE(TAG, "ledc_timer_config failed: %s", esp_err_to_name(t_ok));
+        unlock_state();
         return;
     }
 
@@ -82,6 +99,7 @@ void fan_driver_init(void) {
     const esp_err_t c_ok = ledc_channel_config(&ch);
     if (c_ok != ESP_OK) {
         ESP_LOGE(TAG, "ledc_channel_config failed: %s", esp_err_to_name(c_ok));
+        unlock_state();
         return;
     }
 
@@ -92,31 +110,54 @@ void fan_driver_init(void) {
     apply_output();
 
     ESP_LOGI(TAG, "Init OK (GPIO=%d, %u Hz)", (int)FAN_PIN, (unsigned)kPwmHz);
+    unlock_state();
 }
 
 void fan_driver_set_manual(bool enabled) {
+    lock_state();
     s_manual = enabled;
     s_effective_power_percent = s_manual ? s_power_percent : 0;
     apply_output();
+    unlock_state();
 }
 
 void fan_driver_set_power_percent(uint8_t percent) {
+    lock_state();
     if (percent > 100) percent = 100;
     s_power_percent = percent;
     if (s_manual) s_effective_power_percent = s_power_percent;
     apply_output();
+    unlock_state();
 }
 
-bool fan_driver_get_manual(void) { return s_manual; }
-uint8_t fan_driver_get_power_percent(void) { return s_power_percent; }
+bool fan_driver_get_manual(void) {
+    lock_state();
+    const bool v = s_manual;
+    unlock_state();
+    return v;
+}
+uint8_t fan_driver_get_power_percent(void) {
+    lock_state();
+    const uint8_t v = s_power_percent;
+    unlock_state();
+    return v;
+}
 
 void fan_driver_set_auto_enabled(bool enabled) {
+    lock_state();
     s_auto_enabled = enabled;
+    unlock_state();
 }
 
-bool fan_driver_get_auto_enabled(void) { return s_auto_enabled; }
+bool fan_driver_get_auto_enabled(void) {
+    lock_state();
+    const bool v = s_auto_enabled;
+    unlock_state();
+    return v;
+}
 
 void fan_driver_set_auto_curve(float temp_min_c, float temp_max_c, uint8_t power_min_percent, uint8_t power_max_percent) {
+    lock_state();
     if (temp_min_c < -50.0f) temp_min_c = -50.0f;
     if (temp_max_c > 1300.0f) temp_max_c = 1300.0f;
     if (temp_max_c < temp_min_c + 1.0f) temp_max_c = temp_min_c + 1.0f;
@@ -129,16 +170,20 @@ void fan_driver_set_auto_curve(float temp_min_c, float temp_max_c, uint8_t power
     s_auto_temp_max_c = temp_max_c;
     s_auto_power_min_percent = power_min_percent;
     s_auto_power_max_percent = power_max_percent;
+    unlock_state();
 }
 
 void fan_driver_get_auto_curve(float *temp_min_c, float *temp_max_c, uint8_t *power_min_percent, uint8_t *power_max_percent) {
+    lock_state();
     if (temp_min_c) *temp_min_c = s_auto_temp_min_c;
     if (temp_max_c) *temp_max_c = s_auto_temp_max_c;
     if (power_min_percent) *power_min_percent = s_auto_power_min_percent;
     if (power_max_percent) *power_max_percent = s_auto_power_max_percent;
+    unlock_state();
 }
 
 void fan_driver_update_from_temperature(float temp_c, bool is_firing) {
+    lock_state();
     s_source_temp_c = temp_c;
     if (s_manual) {
         s_effective_power_percent = s_power_percent;
@@ -150,12 +195,19 @@ void fan_driver_update_from_temperature(float temp_c, bool is_firing) {
         s_effective_power_percent = auto_power;
     }
     apply_output();
+    unlock_state();
 }
 
 uint8_t fan_driver_get_effective_power_percent(void) {
-    return s_effective_power_percent;
+    lock_state();
+    const uint8_t v = s_effective_power_percent;
+    unlock_state();
+    return v;
 }
 
 float fan_driver_get_source_temp_c(void) {
-    return s_source_temp_c;
+    lock_state();
+    const float v = s_source_temp_c;
+    unlock_state();
+    return v;
 }

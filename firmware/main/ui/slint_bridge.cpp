@@ -211,4 +211,3 @@ extern "C" void slint_bridge_set_language_is_ua(bool is_ua) {
     (void)nvs_commit(h);
     nvs_close(h);
 }
-

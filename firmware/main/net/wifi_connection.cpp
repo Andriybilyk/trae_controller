@@ -337,16 +337,7 @@ std::string wifi_get_server_url(void) {
 bool wifi_connect_with_credentials(const char* ssid, const char* password) {
     if (!ssid || !ssid[0]) return false;
     wifi_save_creds(ssid, password ? password : "");
-    wifi_config_t wifi_config = {};
-    strncpy((char*)wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
-    strncpy((char*)wifi_config.sta.password, password ? password : "", sizeof(wifi_config.sta.password) - 1);
-    esp_err_t err = esp_wifi_set_mode(WIFI_MODE_STA);
-    if (err != ESP_OK) return false;
-    err = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
-    if (err != ESP_OK) return false;
-    (void)esp_wifi_disconnect();
-    err = esp_wifi_connect();
-    return err == ESP_OK;
+    return true;
 }
 
 void wifi_disconnect_and_forget(void) {

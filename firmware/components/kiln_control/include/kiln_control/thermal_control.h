@@ -69,6 +69,8 @@ public:
     void addTimeToHold(float minutesToAdd);
     bool setTemperatureOffset(float offsetC);
     float getTemperatureOffset();
+    bool setUserMaxTemperatureC(float maxC);
+    float getUserMaxTemperatureC();
 
     struct AutoTuneStatus {
         bool active;
@@ -116,6 +118,7 @@ private:
     uint64_t windowStartTime;
     double runtimeKp, runtimeKi, runtimeKd;
     float temperatureOffsetC;
+    float userMaxTempC;
 
     // Telemetry
     uint32_t thermoLastRaw;
@@ -148,6 +151,10 @@ private:
     bool lastTempValid;
     uint64_t sensorHealthySinceMs;
     bool lastSensorHealthy;
+
+    float tempFilterBuf[5];
+    uint8_t tempFilterCount;
+    uint8_t tempFilterIndex;
 
     // State
     KilnState state;

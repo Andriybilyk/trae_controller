@@ -81,10 +81,6 @@ static gpio_num_t s_touch_sclk = TOUCH_SCLK;
 static gpio_num_t s_touch_mosi = TOUCH_MOSI;
 static gpio_num_t s_touch_miso = TOUCH_MISO;
 
-static bool is_strap_unsafe_gpio(gpio_num_t pin) {
-    return pin == GPIO_NUM_0 || pin == GPIO_NUM_3 || pin == GPIO_NUM_45 || pin == GPIO_NUM_46;
-}
-
 static esp_lcd_panel_io_handle_t s_touch_io = nullptr;
 static esp_lcd_touch_handle_t s_touch = nullptr;
 
@@ -172,11 +168,11 @@ static void load_touch_from_nvs() {
     (void)nvs_get_blob(h, "grid_dy", s_touch_grid_dy.data(), &grid_sz);
 
     int32_t pin = -1;
-    if (nvs_get_i32(h, "sclk", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin) && !is_strap_unsafe_gpio((gpio_num_t)pin)) s_touch_sclk = (gpio_num_t)pin;
+    if (nvs_get_i32(h, "sclk", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin)) s_touch_sclk = (gpio_num_t)pin;
     pin = -1;
-    if (nvs_get_i32(h, "mosi", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin) && !is_strap_unsafe_gpio((gpio_num_t)pin)) s_touch_mosi = (gpio_num_t)pin;
+    if (nvs_get_i32(h, "mosi", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin)) s_touch_mosi = (gpio_num_t)pin;
     pin = -1;
-    if (nvs_get_i32(h, "miso", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin) && !is_strap_unsafe_gpio((gpio_num_t)pin)) s_touch_miso = (gpio_num_t)pin;
+    if (nvs_get_i32(h, "miso", &pin) == ESP_OK && GPIO_IS_VALID_GPIO((gpio_num_t)pin)) s_touch_miso = (gpio_num_t)pin;
     nvs_close(h);
 }
 
@@ -356,8 +352,11 @@ static esp_err_t lcd_set_rotation_landscape_1(void) {
 }
 
 static esp_err_t st7796_init_sequence(void) {
+    ESP_LOGI(TAG, "Starting ST7796 initialization sequence...");
+    
     // Init sequence adapted from LovyanGFX Panel_ST7796 defaults.
     const auto tx = [](uint8_t cmd, std::initializer_list<uint8_t> data, int delay_ms = 0) -> esp_err_t {
+        ESP_LOGD(TAG, "ST7796 cmd 0x%02X, data size: %zu, delay: %d ms", cmd, data.size(), delay_ms);
         ESP_RETURN_ON_ERROR(lcd_cmd(cmd), TAG, "cmd 0x%02X", cmd);
         if (!data.size()) {
             if (delay_ms) vTaskDelay(pdMS_TO_TICKS(delay_ms));
@@ -396,6 +395,8 @@ static esp_err_t st7796_init_sequence(void) {
     // Idle off + display on
     ESP_RETURN_ON_ERROR(tx(0x38, {}), TAG, "IDMOFF");
     ESP_RETURN_ON_ERROR(tx(0x29, {}), TAG, "DISPON");
+    
+    ESP_LOGI(TAG, "ST7796 initialization sequence completed successfully");
     return ESP_OK;
 }
 
@@ -423,6 +424,10 @@ static void display_gpio_init(void) {
 }
 
 static esp_err_t display_spi_init(void) {
+    ESP_LOGI(TAG, "Initializing SPI bus for display...");
+    ESP_LOGI(TAG, "SPI pins: SCLK=%d, MOSI=%d, MISO=%d, CS=%d, DC=%d, RST=%d, BL=%d", 
+             TFT_SCLK, TFT_MOSI, TFT_MISO, TFT_CS, TFT_DC, TFT_RST, TFT_BL);
+    
     spi_bus_config_t buscfg{};
     buscfg.sclk_io_num = TFT_SCLK;
     buscfg.mosi_io_num = TFT_MOSI;
@@ -442,11 +447,14 @@ static esp_err_t display_spi_init(void) {
     devcfg.flags = SPI_DEVICE_HALFDUPLEX;
 
     ESP_RETURN_ON_ERROR(spi_bus_add_device(LCD_HOST, &devcfg, &s_lcd_spi), TAG, "spi_bus_add_device lcd");
+    
+    ESP_LOGI(TAG, "SPI display device initialized successfully");
 
     const bool touch_shares_bus = (s_touch_sclk == TFT_SCLK) && (s_touch_mosi == TFT_MOSI) && (s_touch_miso == TFT_MISO);
     s_touch_host = touch_shares_bus ? LCD_HOST : TOUCH_HOST;
 
     if (!touch_shares_bus) {
+        ESP_LOGI(TAG, "Touch controller uses separate SPI bus");
         spi_bus_config_t tbus{};
         tbus.sclk_io_num = s_touch_sclk;
         tbus.mosi_io_num = s_touch_mosi;
@@ -461,10 +469,12 @@ static esp_err_t display_spi_init(void) {
 }
 
 static void display_reset(void) {
+    ESP_LOGI(TAG, "Resetting display controller...");
     gpio_set_level(TFT_RST, 0);
     vTaskDelay(pdMS_TO_TICKS(20));
     gpio_set_level(TFT_RST, 1);
     vTaskDelay(pdMS_TO_TICKS(120));
+    ESP_LOGI(TAG, "Display reset completed");
 }
 
 static esp_err_t touch_deinit(void) {
@@ -567,13 +577,29 @@ void display_driver_init(void) {
 
     load_touch_from_nvs();
     display_gpio_init();
-    ESP_ERROR_CHECK(display_spi_init());
+    
+    esp_err_t err = display_spi_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize SPI bus: %s", esp_err_to_name(err));
+        return;
+    }
+    
     display_reset();
-    ESP_ERROR_CHECK(st7796_init_sequence());
-    ESP_ERROR_CHECK(touch_init());
+    
+    err = st7796_init_sequence();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize ST7796 controller: %s", esp_err_to_name(err));
+        gpio_set_level(TFT_BL, 0);
+        return;
+    }
+    
+    err = touch_init();
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize touch controller: %s", esp_err_to_name(err));
+    }
 
     gpio_set_level(TFT_BL, 1);
-    ESP_LOGI(TAG, "Display initialized");
+    ESP_LOGI(TAG, "Display initialized successfully");
 }
 
 bool display_driver_blit_rgb565(int x, int y, int w, int h, const uint16_t *data) {
@@ -880,9 +906,6 @@ bool display_driver_set_touch_pins(int sclk, int mosi, int miso) {
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)sclk)) return false;
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)mosi)) return false;
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)miso)) return false;
-    if (is_strap_unsafe_gpio((gpio_num_t)sclk)) return false;
-    if (is_strap_unsafe_gpio((gpio_num_t)mosi)) return false;
-    if (is_strap_unsafe_gpio((gpio_num_t)miso)) return false;
 
     s_touch_sclk = (gpio_num_t)sclk;
     s_touch_mosi = (gpio_num_t)mosi;

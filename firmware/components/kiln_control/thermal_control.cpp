@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <inttypes.h>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -13,6 +14,8 @@
 #include "esp_timer.h"
 
 #include "kiln_config/config.h"
+#include "kiln_config/config_store.h"
+#include "kiln_config/fs_utils.h"
 #include "kiln_hal_heater/heater_hal.h"
 #include "kiln_control/PID.h"
 #include "kiln_control/max31855.h"
@@ -26,45 +29,18 @@ static constexpr uint32_t SENSOR_SHORT_LATCH_COUNT = 20;  // ~5s
 static constexpr float SENSOR_STUCK_DELTA_C = 0.05f;
 static constexpr uint64_t SENSOR_READ_TIMEOUT_MS = 5000;
 static constexpr const char* RECOVERY_FILE = "/littlefs/recovery.json";
+static constexpr const char* EVENTS_LOG_FILE = "/littlefs/logs/events.log";
+static constexpr const char* EVENTS_LOG_PREV_FILE = "/littlefs/logs/events.log.1";
+static constexpr size_t EVENTS_LOG_MAX_BYTES = 64 * 1024;
 
-static std::string read_file_to_string(const char *path) {
-    FILE *f = fopen(path, "r");
-    if (!f) return {};
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    if (size <= 0) {
-        fclose(f);
-        return {};
-    }
-
-    std::string out;
-    out.resize((size_t)size);
-    const size_t r = fread(out.data(), 1, out.size(), f);
-    fclose(f);
-    out.resize(r);
-    return out;
-}
-
-static bool write_string_to_file(const char *path, const std::string &data) {
-    const std::string tmp = std::string(path) + ".tmp";
-    FILE *f = fopen(tmp.c_str(), "w");
-    if (!f) return false;
-    const size_t w = fwrite(data.data(), 1, data.size(), f);
-    fflush(f);
-    const int fd = fileno(f);
-    if (fd >= 0) (void)fsync(fd);
-    fclose(f);
-    if (w != data.size()) {
-        (void)unlink(tmp.c_str());
-        return false;
-    }
-    if (rename(tmp.c_str(), path) != 0) {
-        (void)unlink(tmp.c_str());
-        return false;
-    }
-    return true;
+static void rotate_event_log_if_needed() {
+    const size_t size = kiln_fs_file_size(EVENTS_LOG_FILE);
+    if (size < EVENTS_LOG_MAX_BYTES) return;
+    SemaphoreHandle_t m = kiln_config_fs_mutex();
+    if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
+    (void)unlink(EVENTS_LOG_PREV_FILE);
+    (void)rename(EVENTS_LOG_FILE, EVENTS_LOG_PREV_FILE);
+    if (m) xSemaphoreGiveRecursive(m);
 }
 
 static void append_event_log(const char *type, const char *msg) {
@@ -72,8 +48,9 @@ static void append_event_log(const char *type, const char *msg) {
     if (!msg) msg = "";
 
     (void)mkdir("/littlefs/logs", 0777);
+    rotate_event_log_if_needed();
 
-    FILE *f = fopen("/littlefs/logs/events.log", "a");
+    FILE *f = fopen(EVENTS_LOG_FILE, "a");
     if (!f) return;
     const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
     fprintf(f, "%llu %s %s\n", (unsigned long long)now_ms, type, msg);
@@ -106,10 +83,13 @@ ThermalController::ThermalController() {
     lastTempValid = false;
     sensorHealthySinceMs = 0;
     lastSensorHealthy = false;
+    tempFilterCount = 0;
+    tempFilterIndex = 0;
     runtimeKp = Kp;
     runtimeKi = Ki;
     runtimeKd = Kd;
     temperatureOffsetC = 0.0f;
+    userMaxTempC = (float)MAX_TEMP_SAFETY;
 
     loadedScheduleName.clear();
 
@@ -170,6 +150,8 @@ void ThermalController::begin() {
     lastTempValid = false;
     sensorHealthySinceMs = 0;
     lastSensorHealthy = false;
+    tempFilterCount = 0;
+    tempFilterIndex = 0;
 
     loadedScheduleName.clear();
     historyActive = false;
@@ -339,12 +321,47 @@ void ThermalController::updateTemperature() {
     float t = thermocouple->readCelsius(&raw);
     thermoLastRaw = raw;
     thermoReadCount++;
+    const bool raw_all_zero = (raw == 0x00000000U);
+    const bool raw_all_ones = (raw == 0xFFFFFFFFU);
+    const bool raw_comm_bad = raw_all_zero || raw_all_ones;
+    if (raw_comm_bad) t = NAN;
+
     const bool raw_fault = (raw & 0x00010000U) != 0;
     const bool raw_open = raw_fault && ((raw & 0x00000001U) != 0);
     const bool raw_short = raw_fault && ((raw & 0x00000006U) != 0);
+
+    if (raw_comm_bad || raw_fault) {
+        static uint64_t last_log_ms = 0;
+        if (now_ms - last_log_ms >= 1000) {
+            ESP_LOGW(TAG,
+                     "Thermo raw=0x%08" PRIx32 " comm_bad=%d fault=%d open=%d short=%d",
+                     raw,
+                     (int)raw_comm_bad,
+                     (int)raw_fault,
+                     (int)raw_open,
+                     (int)raw_short);
+            last_log_ms = now_ms;
+        }
+    }
+
     const float measured = t + temperatureOffsetC;
     const bool finite = std::isfinite(measured);
     const bool in_range = finite && measured >= SENSOR_TEMP_MIN_C && measured <= SENSOR_TEMP_MAX_C;
+
+    if ((!finite || !in_range) && !raw_fault && !raw_comm_bad) {
+        static uint64_t last_bad_log_ms = 0;
+        if (now_ms - last_bad_log_ms >= 1000) {
+            ESP_LOGW(TAG,
+                     "Thermo invalid raw=0x%08" PRIx32 " t=%.2f off=%.2f measured=%.2f finite=%d in_range=%d",
+                     raw,
+                     (double)t,
+                     (double)temperatureOffsetC,
+                     (double)measured,
+                     (int)finite,
+                     (int)in_range);
+            last_bad_log_ms = now_ms;
+        }
+    }
 
     if (raw_fault || !finite || !in_range) {
         sensorValidStreak = 0;
@@ -353,7 +370,9 @@ void ThermalController::updateTemperature() {
         lastTempValid = false;
         state.currentTemp = NAN;
 
-        if (raw_open && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
+        if (raw_comm_bad && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
+            tripFaultLocked(KILN_FAULT_SENSOR_NAN, "Sensor comm/no-data");
+        } else if (raw_open && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
             tripFaultLocked(KILN_FAULT_SENSOR_OPEN, "Sensor open");
         } else if (raw_short && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
             tripFaultLocked(KILN_FAULT_SENSOR_SHORT, "Sensor short");
@@ -365,25 +384,71 @@ void ThermalController::updateTemperature() {
         return;
     }
 
-    // Basic spike filter: reject single physically implausible jumps.
-    if (lastTempValid && lastUpdate != 0 && now_ms > lastUpdate) {
-        const float dt_min = (float)(now_ms - lastUpdate) / 60000.0f;
-        const float max_jump = std::max(5.0f, MAX_TEMP_RISE_RATE * dt_min * 2.0f + 5.0f);
-        if (std::fabs(measured - lastTemp) > max_jump) {
-            sensorValidStreak = 0;
-            sensorInvalidStreak++;
-            lastSensorOk = false;
-            if (sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
-                tripFaultLocked(KILN_FAULT_SENSOR_OOR, "Sensor spike/out of range");
+    float filtered = measured;
+    {
+        const float previous = lastTemp;
+        const bool have_previous = lastTempValid;
+
+        if (tempFilterCount < 5) {
+            tempFilterBuf[tempFilterIndex] = measured;
+            tempFilterIndex = (uint8_t)((tempFilterIndex + 1) % 5);
+            tempFilterCount++;
+        } else {
+            tempFilterBuf[tempFilterIndex] = measured;
+            tempFilterIndex = (uint8_t)((tempFilterIndex + 1) % 5);
+        }
+
+        float tmp[5];
+        const uint8_t n = tempFilterCount;
+        for (uint8_t i = 0; i < n; i++) tmp[i] = tempFilterBuf[i];
+        std::sort(tmp, tmp + n);
+        filtered = tmp[n / 2];
+
+        if (have_previous && lastUpdate != 0 && now_ms > lastUpdate) {
+            const float dt_min = (float)(now_ms - lastUpdate) / 60000.0f;
+            const float max_jump = std::max(5.0f, MAX_TEMP_RISE_RATE * dt_min * 2.0f + 5.0f);
+            if (std::fabs(filtered - previous) > max_jump) {
+                static uint64_t last_spike_log_ms = 0;
+                if (now_ms - last_spike_log_ms >= 1000) {
+                    ESP_LOGW(TAG,
+                             "Thermo spike raw=0x%08" PRIx32 " last=%.2f now=%.2f max_jump=%.2f",
+                             raw,
+                             (double)previous,
+                             (double)filtered,
+                             (double)max_jump);
+                    last_spike_log_ms = now_ms;
+                }
+                sensorValidStreak = 0;
+                sensorInvalidStreak++;
+                lastSensorOk = false;
+                if (sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
+                    tripFaultLocked(KILN_FAULT_SENSOR_OOR, "Sensor spike/out of range");
+                }
+                return;
             }
-            return;
         }
     }
 
     sensorInvalidStreak = 0;
     sensorValidStreak++;
     lastSensorOk = true;
-    state.currentTemp = measured;
+    state.currentTemp = filtered;
+
+    {
+        static uint64_t last_ok_log_ms = 0;
+        if (now_ms - last_ok_log_ms >= 5000) {
+            int32_t cj12 = (int32_t)((raw >> 4) & 0x0FFFU);
+            if (cj12 & 0x0800) cj12 |= ~0x0FFF;
+            const float cj_c = (float)cj12 * 0.0625f;
+            ESP_LOGI(TAG,
+                     "Thermo ok raw=0x%08" PRIx32 " measured=%.2f filtered=%.2f cj=%.2f",
+                     raw,
+                     (double)measured,
+                     (double)filtered,
+                     (double)cj_c);
+            last_ok_log_ms = now_ms;
+        }
+    }
 
     // Rise-rate check (C/min) with valid points only.
     if (lastUpdate != 0 && now_ms > lastUpdate && lastTempValid) {
@@ -421,7 +486,7 @@ void ThermalController::loadRuntimeSettingsLocked() {
     runtimeKd = Kd;
     temperatureOffsetC = 0.0f;
 
-    const std::string file = read_file_to_string(CONFIG_FILE);
+    const std::string file = kiln_config_load_json_config();
     if (file.empty()) return;
 
     cJSON *root = cJSON_Parse(file.c_str());
@@ -431,7 +496,14 @@ void ThermalController::loadRuntimeSettingsLocked() {
     }
 
     const cJSON *off = cJSON_GetObjectItem(root, "temp_offset_c");
+    if (!cJSON_IsNumber(off)) off = cJSON_GetObjectItem(root, "offset");
     if (cJSON_IsNumber(off)) temperatureOffsetC = (float)off->valuedouble;
+
+    const cJSON *maxC = cJSON_GetObjectItem(root, "maxC");
+    if (cJSON_IsNumber(maxC)) {
+        const float v = (float)maxC->valuedouble;
+        userMaxTempC = std::max(100.0f, std::min((float)MAX_TEMP_SAFETY, v));
+    }
 
     const cJSON *pidObj = cJSON_GetObjectItem(root, "pid");
     if (cJSON_IsObject(pidObj)) {
@@ -450,7 +522,7 @@ void ThermalController::loadRuntimeSettingsLocked() {
 
 void ThermalController::persistRuntimeSettingsLocked() {
     cJSON *root = nullptr;
-    const std::string existing = read_file_to_string(CONFIG_FILE);
+    const std::string existing = kiln_config_load_json_config();
     if (!existing.empty()) root = cJSON_Parse(existing.c_str());
     if (!root || !cJSON_IsObject(root)) {
         if (root) cJSON_Delete(root);
@@ -477,7 +549,7 @@ void ThermalController::persistRuntimeSettingsLocked() {
     const std::string out = rendered ? rendered : "{}";
     if (rendered) free(rendered);
     cJSON_Delete(root);
-    (void)write_string_to_file(CONFIG_FILE, out);
+    (void)kiln_config_save_json_config(out);
 }
 
 void ThermalController::saveRecoveryStateLocked() {
@@ -509,11 +581,11 @@ void ThermalController::saveRecoveryStateLocked() {
     if (rendered) free(rendered);
     cJSON_Delete(root);
     
-    (void)write_string_to_file(RECOVERY_FILE, out);
+    (void)kiln_fs_write_text_atomic(RECOVERY_FILE, out);
 }
 
 void ThermalController::loadRecoveryStateLocked() {
-    const std::string file = read_file_to_string(RECOVERY_FILE);
+    const std::string file = kiln_fs_read_text(RECOVERY_FILE);
     if (file.empty()) return;
 
     cJSON *root = cJSON_Parse(file.c_str());
@@ -610,6 +682,22 @@ float ThermalController::getTemperatureOffset() {
     return v;
 }
 
+bool ThermalController::setUserMaxTemperatureC(float maxC) {
+    if (!mutex) return false;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    userMaxTempC = std::max(100.0f, std::min((float)MAX_TEMP_SAFETY, maxC));
+    xSemaphoreGiveRecursive(mutex);
+    return true;
+}
+
+float ThermalController::getUserMaxTemperatureC() {
+    if (!mutex) return (float)MAX_TEMP_SAFETY;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    const float v = userMaxTempC;
+    xSemaphoreGiveRecursive(mutex);
+    return v;
+}
+
 ThermalController::AutoTuneStatus ThermalController::getAutotuneStatus() {
     AutoTuneStatus s{};
     if (!mutex) return s;
@@ -679,7 +767,8 @@ bool ThermalController::startAutotune(float setpointC) {
     tune = AutoTune{};
     tune.active = true;
     tune.heaterOn = true;
-    tune.setpointC = std::max(50.0f, std::min((float)MAX_TEMP_SAFETY - 25.0f, setpointC));
+    const float max_allowed = std::max(50.0f, std::min((float)MAX_TEMP_SAFETY - 25.0f, userMaxTempC - 25.0f));
+    tune.setpointC = std::max(50.0f, std::min(max_allowed, setpointC));
     tune.hysteresisC = 5.0f;
     tune.startMs = (uint64_t)(esp_timer_get_time() / 1000ULL);
     tune.lastSwitchMs = tune.startMs;
@@ -732,7 +821,7 @@ void ThermalController::autotuneLoopLocked(uint64_t now_ms) {
     setpoint = state.targetTemp;
     state.timeRemaining = -1;
 
-    if (!isSensorHealthy()) {
+    if (!isSensorHealthy() && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
         append_event_log("AUTOTUNE_FAIL", "sensor fault");
         heater_hal_all_off();
         tune.active = false;
@@ -887,12 +976,13 @@ void ThermalController::processSchedule() {
     ESP_LOGI(TAG, "Processing Step %d of %d: Type %d, Value %.2f", state.currentStep + 1, state.totalSteps, step.type, step.value);
 
     if (step.type == 0) { // RAMP
-        state.status = (state.currentTemp > step.value + 2.0f) ? KILN_COOLING : KILN_RUNNING;
-        state.targetTemp = step.value;
+        const float target = std::min(step.value, userMaxTempC);
+        state.status = (state.currentTemp > target + 2.0f) ? KILN_COOLING : KILN_RUNNING;
+        state.targetTemp = target;
         setpoint = state.targetTemp;
         state.timeRemaining = -1;
         
-        if (state.currentTemp >= step.value - 1.0f) { // Hysteresis 1.0C
+        if (state.currentTemp >= target - 1.0f) { // Hysteresis 1.0C
             state.currentStep++;
             ESP_LOGI(TAG, "RAMP Step %d completed. Moving to next step.", state.currentStep);
             stepStartTime = esp_timer_get_time() / 1000;
@@ -1011,7 +1101,7 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
 
     // Update list file
     cJSON *arr = nullptr;
-    const std::string list = read_file_to_string("/littlefs/history.json");
+    const std::string list = kiln_fs_read_text("/littlefs/history.json");
     if (!list.empty()) {
         cJSON *parsed = cJSON_Parse(list.c_str());
         if (parsed && cJSON_IsArray(parsed)) arr = parsed;
@@ -1030,7 +1120,7 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     if (renderedArr) free(renderedArr);
     cJSON_Delete(arr);
 
-    (void)write_string_to_file("/littlefs/history.json", outArr);
+    (void)kiln_fs_write_text_atomic("/littlefs/history.json", outArr);
 
     // Detail file
     cJSON *detail = cJSON_CreateObject();
@@ -1053,7 +1143,7 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     std::string path = "/littlefs/history_";
     path += historyId;
     path += ".json";
-    (void)write_string_to_file(path.c_str(), outDetail);
+    (void)kiln_fs_write_text_atomic(path.c_str(), outDetail);
 
     historyActive = false;
 }

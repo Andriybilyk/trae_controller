@@ -77,9 +77,9 @@
 #endif
 
 // 2. THERMOCOUPLE (MAX6675) - Software SPI
-#define MAXCLK          GPIO_NUM_41
+#define MAXCLK          GPIO_NUM_40
 #define MAXCS           GPIO_NUM_42
-#define MAXDO           GPIO_NUM_40 
+#define MAXDO           GPIO_NUM_41
 
 // 3. RELAYS
 #define SSR_ZONE1_PIN       GPIO_NUM_21

@@ -24,7 +24,7 @@ public:
         io_conf.mode = GPIO_MODE_INPUT;
         io_conf.pin_bit_mask = (1ULL << _miso);
         io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-        io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+        io_conf.pull_up_en = GPIO_PULLUP_ENABLE;
         gpio_config(&io_conf);
 
         gpio_set_level(_cs, 1);
@@ -48,15 +48,15 @@ private:
     gpio_num_t _sclk, _cs, _miso;
     uint32_t _last_raw = 0;
 
-    static inline void delay_edge() { esp_rom_delay_us(2); }
+    static inline void delay_edge() { esp_rom_delay_us(10); }
 
     uint8_t readByteSlow() {
         uint8_t d = 0;
         for (int i = 7; i >= 0; i--) {
-            gpio_set_level(_sclk, 0);
+            gpio_set_level(_sclk, 1);
             delay_edge();
             if (gpio_get_level(_miso)) d |= (uint8_t)(1U << i);
-            gpio_set_level(_sclk, 1);
+            gpio_set_level(_sclk, 0);
             delay_edge();
         }
         return d;
@@ -79,4 +79,3 @@ private:
 };
 
 #endif
-

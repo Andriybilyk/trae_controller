@@ -4,6 +4,7 @@
 #include "esp_http_server.h"
 #include <string>
 #include <mutex>
+#include <atomic>
 #include "kiln_control/thermal_control.h"
 #include "app/device_commands.h"
 
@@ -29,7 +30,7 @@ public:
 
     // Schedules sync helpers
     void notifySchedulesChanged(const char *action, const char *name = nullptr);
-    uint32_t getSchedulesRevision() const { return schedulesRevision; }
+    uint32_t getSchedulesRevision() const { return schedulesRevision.load(std::memory_order_relaxed); }
 
     // Settings/autotune sync helpers
     void notifySettingsChanged(const char *action);
@@ -38,8 +39,8 @@ public:
                              const device_commands::CommandResult &result,
                              const char *ok_message,
                              const char *source);
-    uint32_t getSettingsRevision() const { return settingsRevision; }
-    uint32_t getCommandResultRevision() const { return commandResultRevision; }
+    uint32_t getSettingsRevision() const { return settingsRevision.load(std::memory_order_relaxed); }
+    uint32_t getCommandResultRevision() const { return commandResultRevision.load(std::memory_order_relaxed); }
     bool copyLastCommandResult(command_result_snapshot_t *out) const;
     
     bool isAPMode; 
@@ -84,6 +85,8 @@ private:
     static esp_err_t api_touch_affine_set_handler(httpd_req_t *req);
     static esp_err_t api_touch_grid_get_handler(httpd_req_t *req);
     static esp_err_t api_touch_grid_set_handler(httpd_req_t *req);
+    static esp_err_t api_touch_profile_get_handler(httpd_req_t *req);
+    static esp_err_t api_touch_profile_set_handler(httpd_req_t *req);
     static esp_err_t api_touch_pins_get_handler(httpd_req_t *req);
     static esp_err_t api_touch_pins_set_handler(httpd_req_t *req);
     static esp_err_t api_touch_probe_handler(httpd_req_t *req);
@@ -99,13 +102,13 @@ private:
     static esp_err_t manifest_handler(httpd_req_t *req);
     
     uint64_t lastBroadcast;
-    uint32_t schedulesRevision = 0;
-    uint32_t settingsRevision = 0;
-    uint32_t commandResultRevision = 0;
+    std::atomic<uint32_t> schedulesRevision{0};
+    std::atomic<uint32_t> settingsRevision{0};
+    std::atomic<uint32_t> commandResultRevision{0};
     mutable std::mutex commandResultMutex;
     command_result_snapshot_t lastCommandResult{};
-    bool lastTuneActive = false;
-    int lastTuneCycles = -1;
+    std::atomic<bool> lastTuneActive{false};
+    std::atomic<int> lastTuneCycles{-1};
     uint64_t lastStartCommandMs = 0;
     uint64_t lastStopCommandMs = 0;
     uint64_t lastSkipCommandMs = 0;

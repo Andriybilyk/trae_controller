@@ -659,11 +659,11 @@ export component AppWindow inherits Window {
             overflow: elide;
         }
         Rectangle {
-            x: parent.width - 34px;
-            y: 10px;
-            width: 24px;
-            height: 24px;
-            border-radius: 12px;
+            x: parent.width - 46px;
+            y: 8px;
+            width: 34px;
+            height: 34px;
+            border-radius: 17px;
             background: #991B1B;
             border-color: #DC2626;
             border-width: 1px;
@@ -671,7 +671,7 @@ export component AppWindow inherits Window {
                 text: "×";
                 color: #FFFFFF;
                 font-family: "PT Sans";
-                font-size: 18px;
+                font-size: 24px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
@@ -805,18 +805,19 @@ export component AppWindow inherits Window {
 
 
                 Rectangle {
-                    x: 160px; y: 14px;
-                    width: 65px; height: 22px;
+                    x: 148px; y: 12px;
+                    width: root.status_label == "ERROR" ? 78px : 70px;
+                    height: 26px;
                     background: root.status_bg;
                     border-color: root.status_fg;
-                    border-width: 1px;
-                    border-radius: 11px;
+                    border-width: root.status_label == "ERROR" ? 2px : 1px;
+                    border-radius: 13px;
 
                     Text {
                         text: root.status_label;
                         color: root.status_fg;
                         font-family: "PT Sans";
-                        font-size: 13px;
+                        font-size: 14px;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -1452,7 +1453,7 @@ export component AppWindow inherits Window {
                         width: 106px; height: 94px;
 
 
-                        background: root.selected_schedule_name == "" ? root.c_border : root.c_accent;
+                        background: root.fault_active ? #4A1111 : (root.selected_schedule_name == "" ? root.c_border : root.c_accent);
 
 
 
@@ -1472,7 +1473,7 @@ export component AppWindow inherits Window {
 
 
 
-                            color: root.selected_schedule_name == "" ? root.c_muted : #000000;
+                            color: (root.selected_schedule_name == "" || root.fault_active) ? root.c_muted : #000000;
 
 
 
@@ -1600,7 +1601,7 @@ export component AppWindow inherits Window {
 
 
 
-                                color: #000000;
+                                color: root.fault_active ? #FFFFFF : #000000;
 
 
 
@@ -1636,7 +1637,7 @@ export component AppWindow inherits Window {
 
 
 
-                                color: #000000;
+                                color: root.fault_active ? #FFFFFF : #000000;
 
 
 
@@ -1664,7 +1665,7 @@ export component AppWindow inherits Window {
 
 
 
-                width: parent.width; height: parent.height; clicked => { root.start_firing(); } }
+                width: parent.width; height: parent.height; clicked => { if (!root.fault_active) { root.start_firing(); } } }
 
 
                     }
@@ -2366,19 +2367,12 @@ export component AppWindow inherits Window {
                         border-width: 1px;
                         border-radius: 12px;
 
-                        Text {
-                            x: 16px; y: 10px;
-                            text: root.is_ua ? "QR для підключення" : "QR for connection";
-                            color: #FFFFFF;
-                            font-family: "PT Sans";
-                            font-size: 16px;
-                        }
                         Image {
-                            x: 76px; y: 36px; width: 168px; height: 168px;
+                            x: 76px; y: 22px; width: 168px; height: 168px;
                             source: root.wifi_qr_image;
                         }
                         Text {
-                            x: 16px; y: 206px; width: 288px; height: 32px;
+                            x: 16px; y: 196px; width: 288px; height: 24px;
                             text: root.wifi_qr_hint;
                             color: #A1A1AA;
                             font-family: "PT Sans";
@@ -2387,10 +2381,10 @@ export component AppWindow inherits Window {
                             vertical-alignment: center;
                         }
                         Rectangle {
-                            x: 126px; y: 232px; width: 68px; height: 16px;
+                            x: 100px; y: 222px; width: 120px; height: 28px;
                             background: #27272A;
-                            border-radius: 8px;
-                            Text { text: "Close"; color: #FFFFFF; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
+                            border-radius: 10px;
+                            Text { text: root.is_ua ? "Закрити" : "Close"; color: #FFFFFF; font-size: 15px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea { width: parent.width; height: parent.height; clicked => { root.wifi_qr_toggle(); } }
                         }
                     }
@@ -3730,4 +3724,3 @@ export component AppWindow inherits Window {
 
 
 }
-

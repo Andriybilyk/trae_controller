@@ -1,7 +1,8 @@
-﻿#include "net/remote_access.h"
+#include "net/remote_access.h"
 
 #include "app/device_commands.h"
 #include "kiln_control/thermal_control.h"
+#include "kiln_config/fs_utils.h"
 #include "net/wifi_connection.h"
 #include "nvs.h"
 #include "esp_log.h"
@@ -96,50 +97,13 @@ static bool is_tls_uri(const char *uri) {
     return std::strncmp(uri, "mqtts://", 8) == 0 || std::strncmp(uri, "wss://", 6) == 0;
 }
 
-static bool read_file_to_string(const char *path, std::string &out) {
-    out.clear();
-    if (!path || !path[0]) return false;
-    FILE *f = std::fopen(path, "rb");
-    if (!f) return false;
-    if (std::fseek(f, 0, SEEK_END) != 0) {
-        std::fclose(f);
-        return false;
-    }
-    long size = std::ftell(f);
-    if (size <= 0) {
-        std::fclose(f);
-        return false;
-    }
-    if (std::fseek(f, 0, SEEK_SET) != 0) {
-        std::fclose(f);
-        return false;
-    }
-    out.resize((size_t)size);
-    const size_t n = std::fread(out.data(), 1, out.size(), f);
-    std::fclose(f);
-    if (n != out.size()) {
-        out.clear();
-        return false;
-    }
-    return true;
-}
-
-static bool write_string_to_file(const char *path, const std::string &data) {
-    if (!path || !path[0]) return false;
-    FILE *f = std::fopen(path, "wb");
-    if (!f) return false;
-    const size_t n = std::fwrite(data.data(), 1, data.size(), f);
-    std::fclose(f);
-    return n == data.size();
-}
-
 static bool load_ca_cert_from_fs() {
-    std::string pem;
-    if (!read_file_to_string(CA_CERT_PATH, pem)) {
+    const std::string pem = kiln_fs_read_text(CA_CERT_PATH);
+    if (pem.empty()) {
         s_ca_cert_pem.clear();
         return false;
     }
-    s_ca_cert_pem = std::move(pem);
+    s_ca_cert_pem = pem;
     return true;
 }
 
@@ -593,7 +557,7 @@ bool remote_access_set_ca_pem(const char *pem) {
         cert.find("END CERTIFICATE") == std::string::npos) {
         return false;
     }
-    if (!write_string_to_file(CA_CERT_PATH, cert)) return false;
+    if (!kiln_fs_write_text_atomic(CA_CERT_PATH, cert)) return false;
     s_ca_cert_pem = cert;
     s_needs_reconnect = true;
     return true;
@@ -607,7 +571,6 @@ bool remote_access_clear_ca_pem(void) {
 }
 
 bool remote_access_has_ca_pem(void) {
-    std::string pem;
-    return read_file_to_string(CA_CERT_PATH, pem) && !pem.empty();
+    return !kiln_fs_read_text(CA_CERT_PATH).empty();
 }
 

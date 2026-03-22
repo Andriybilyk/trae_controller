@@ -12,7 +12,10 @@
 #include "mdns.h"
 #include <cstring>
 #include <atomic>
+#include <string>
 
+#include "app/device_commands.h"
+#include "cJSON.h"
 #include "kiln_config/config.h"
 #include "kiln_control/thermal_control.h"
 #include "kiln_hal_heater/heater_hal.h"
@@ -21,11 +24,13 @@
 #include "net/wifi_server.h"
 #include "net/remote_access.h"
 #include "drivers/fan_driver.h"
+#include "kiln_config/config_store.h"
+#include "kiln_config/fs_utils.h"
 
 static const char *TAG = "MAIN";
 static constexpr uint32_t UI_TASK_STACK_BYTES = 32768;
 static constexpr uint64_t UI_HEARTBEAT_TIMEOUT_MS = 4000;
-static constexpr uint64_t NET_HEARTBEAT_TIMEOUT_MS = 4000;
+static constexpr uint64_t NET_HEARTBEAT_TIMEOUT_MS = 15000;
 
 static TaskHandle_t s_ui_task = nullptr;
 static std::atomic<uint64_t> s_server_heartbeat_ms{0};
@@ -78,6 +83,7 @@ static void control_task(void *arg) {
 
     uint64_t lastLog = 0;
     bool watchdog_latched = false;
+    uint64_t last_net_stall_log_ms = 0;
 
     while (true) {
         (void)esp_task_wdt_reset();
@@ -96,15 +102,21 @@ static void control_task(void *arg) {
                                  (now > net_hb) &&
                                  ((now - net_hb) > NET_HEARTBEAT_TIMEOUT_MS);
 
-        if (!watchdog_latched && (ui_stalled || net_stalled)) {
+        if (net_stalled && !ui_stalled) {
+            if (now - last_net_stall_log_ms >= 5000) {
+                ESP_LOGW("CTRL_TASK", "NET heartbeat stalled (ignoring), now=%llu hb=%llu", (unsigned long long)now, (unsigned long long)net_hb);
+                last_net_stall_log_ms = now;
+            }
+            s_server_heartbeat_ms.store(now, std::memory_order_relaxed);
+        }
+
+        if (!watchdog_latched && ui_stalled) {
             watchdog_latched = true;
             heater_hal_all_off();
             if (ui_stalled && net_stalled) {
                 thermalCtrl.emergencyStop("Watchdog: UI+NET stalled");
             } else if (ui_stalled) {
                 thermalCtrl.emergencyStop("Watchdog: UI stalled");
-            } else {
-                thermalCtrl.emergencyStop("Watchdog: NET stalled");
             }
             ESP_LOGE("CTRL_TASK", "Watchdog tripped, heater forced OFF");
         }
@@ -153,6 +165,8 @@ extern "C" void app_main(void) {
     // Confirm OTA update if we booted successfully
     esp_ota_mark_app_valid_cancel_rollback();
 
+    ESP_LOGI(TAG, "Reset reason: %d", (int)esp_reset_reason());
+
     esp_task_wdt_config_t twdt_config = {};
     twdt_config.timeout_ms = 12000;
     twdt_config.idle_core_mask = 0;
@@ -193,6 +207,7 @@ extern "C" void app_main(void) {
         }
     } else {
         ESP_LOGI(TAG, "LittleFS Mounted");
+        kiln_config_restore_json_config_file();
         // Verify index.html exists
         FILE* f = fopen("/littlefs/index.html", "r");
         if (f == NULL) {
@@ -223,6 +238,47 @@ extern "C" void app_main(void) {
                 fwrite(empty, 1, strlen(empty), hf);
                 fclose(hf);
             }
+        }
+
+        const std::string cfg = kiln_fs_read_text(CONFIG_FILE, false);
+        if (!cfg.empty()) {
+            cJSON *root = cJSON_Parse(cfg.c_str());
+            if (root && cJSON_IsObject(root)) {
+                device_commands::FanConfig fan_cfg = device_commands::current_fan_config();
+
+                const cJSON *fanManual = cJSON_GetObjectItem(root, "fan_manual");
+                if (cJSON_IsBool(fanManual)) fan_cfg.manual = cJSON_IsTrue(fanManual);
+                const cJSON *fanAuto = cJSON_GetObjectItem(root, "fan_auto");
+                if (cJSON_IsBool(fanAuto)) fan_cfg.auto_enabled = cJSON_IsTrue(fanAuto);
+                const cJSON *fanPower = cJSON_GetObjectItem(root, "fan_power");
+                if (cJSON_IsNumber(fanPower)) {
+                    int v = (int)fanPower->valuedouble;
+                    if (v < 0) v = 0;
+                    if (v > 100) v = 100;
+                    fan_cfg.power = (uint8_t)v;
+                }
+                const cJSON *fanTMin = cJSON_GetObjectItem(root, "fan_temp_min_c");
+                if (cJSON_IsNumber(fanTMin)) fan_cfg.temp_min_c = (float)fanTMin->valuedouble;
+                const cJSON *fanTMax = cJSON_GetObjectItem(root, "fan_temp_max_c");
+                if (cJSON_IsNumber(fanTMax)) fan_cfg.temp_max_c = (float)fanTMax->valuedouble;
+                const cJSON *fanPMin = cJSON_GetObjectItem(root, "fan_power_min");
+                if (cJSON_IsNumber(fanPMin)) {
+                    int v = (int)fanPMin->valuedouble;
+                    if (v < 0) v = 0;
+                    if (v > 100) v = 100;
+                    fan_cfg.power_min = (uint8_t)v;
+                }
+                const cJSON *fanPMax = cJSON_GetObjectItem(root, "fan_power_max");
+                if (cJSON_IsNumber(fanPMax)) {
+                    int v = (int)fanPMax->valuedouble;
+                    if (v < 0) v = 0;
+                    if (v > 100) v = 100;
+                    fan_cfg.power_max = (uint8_t)v;
+                }
+
+                device_commands::apply_fan_config(fan_cfg);
+            }
+            if (root) cJSON_Delete(root);
         }
     }
 
