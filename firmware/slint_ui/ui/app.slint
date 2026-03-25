@@ -200,7 +200,7 @@ component KbKeyRow {
 
 
 
-export enum View { Dashboard, Schedules, Editor, Settings, Calibration }
+export enum View { Dashboard, Schedules, Editor, RunningEditor, Settings, Calibration }
 
 
 export struct ScheduleRow {
@@ -294,7 +294,7 @@ export component AppWindow inherits Window {
 
     property <color> c_warn: #F59E0B;
 
-    property <color> c_danger: #FF3B30;
+    property <color> c_danger: #DC2626;
 
     // Status styling (based on status_label coming from firmware: IDLE/RAMP/ERROR/...).
 
@@ -307,6 +307,8 @@ export component AppWindow inherits Window {
     in-out property <View> view: View.Dashboard;
 
     in-out property <bool> show_stop_confirm: false;
+    in-out property <bool> show_skip_confirm: false;
+    in-out property <bool> show_running_edit_confirm: false;
 
     in-out property <bool> is_ua: false;
 
@@ -325,6 +327,7 @@ export component AppWindow inherits Window {
 
 
     in-out property <int> target: 0;
+    in-out property <int> active_segment_target: 0;
 
 
 
@@ -419,6 +422,7 @@ export component AppWindow inherits Window {
     in-out property <bool> fan_manual: false;
     in-out property <int> fan_power: 0;
     in-out property <int> autotune_target_c: 600;
+    in-out property <int> schedule_target_max_c: 1300;
     in-out property <[WifiNetworkRow]> wifi_networks;
     in-out property <bool> wifi_picker_visible: false;
     in-out property <bool> wifi_scan_busy: false;
@@ -431,6 +435,9 @@ export component AppWindow inherits Window {
     in-out property <string> command_feedback: "";
     in-out property <bool> command_feedback_ok: true;
     in-out property <bool> command_feedback_visible: false;
+    in-out property <int> running_edit_add_temp: 0;
+    in-out property <int> running_edit_add_time: 0;
+    in-out property <int> running_edit_rate: 100;
 
     callback toggle_language();
 
@@ -445,6 +452,8 @@ export component AppWindow inherits Window {
 
 
     callback open_library();
+    callback open_selected_program();
+    callback open_running_editor();
 
 
 
@@ -493,6 +502,16 @@ export component AppWindow inherits Window {
 
 
     callback stop_cancel();
+    callback skip_step();
+    callback skip_confirm();
+    callback skip_cancel();
+    callback running_edit_back();
+    callback running_edit_apply();
+    callback running_edit_confirm();
+    callback running_edit_cancel();
+    callback running_edit_temp_changed(string);
+    callback running_edit_time_changed(string);
+    callback running_edit_rate_changed(string);
 
 
 
@@ -509,6 +528,7 @@ export component AppWindow inherits Window {
     callback fan_power_changed(int);
     callback autotune_start(int);
     callback autotune_stop();
+    callback clear_fault();
     callback wifi_open_picker();
     callback wifi_disconnect();
     callback wifi_qr_toggle();
@@ -654,7 +674,9 @@ export component AppWindow inherits Window {
         Text {
             x: 16px; y: 14px;
             width: parent.width - 64px;
-            text: root.fault_reason == "" ? "FAULT" : ("FAULT: " + root.fault_reason);
+            text: root.fault_reason == ""
+                ? (root.is_ua ? "ПОМИЛКА" : "FAULT")
+                : ((root.is_ua ? "ПОМИЛКА: " : "FAULT: ") + root.fault_reason);
             color: #FFFFFF;
             font-family: "PT Sans";
             font-size: 14px;
@@ -779,11 +801,11 @@ export component AppWindow inherits Window {
 
 
 
-                    x: 16px; y: 18px;
+                    x: 16px; y: 12px;
 
 
 
-                    text: root.is_ua ? "ПОТОЧНА Т-РА" : "CURRENT TEMP";
+                    text: root.is_ua ? "ПОТОЧНА\nТЕМПЕРАТУРА" : "CURRENT\nTEMPERATURE";
 
 
 
@@ -795,11 +817,11 @@ export component AppWindow inherits Window {
 
 
 
-                    font-size: 14px;
+                    font-size: 12px;
 
 
 
-                    letter-spacing: 1px;
+                    letter-spacing: 0.5px;
 
 
 
@@ -808,8 +830,14 @@ export component AppWindow inherits Window {
 
 
                 Rectangle {
-                    x: 148px; y: 12px;
-                    width: root.status_label == "ERROR" ? 78px : 70px;
+                    x: root.is_ua ? 120px : 148px; y: 12px;
+                    width: root.is_ua
+                        ? (root.status_label == "IDLE" ? 106px
+                           : root.status_label == "COOL" ? 106px
+                           : root.status_label == "COMPLETE" ? 98px
+                           : root.status_label == "ERROR" ? 86px
+                           : 82px)
+                        : (root.status_label == "ERROR" ? 78px : 70px);
                     height: 26px;
                     background: root.status_bg;
                     border-color: root.status_fg;
@@ -817,10 +845,20 @@ export component AppWindow inherits Window {
                     border-radius: 13px;
 
                     Text {
-                        text: root.status_label;
+                        text: root.is_ua
+                            ? (root.status_label == "IDLE" ? "ОЧІКУВАННЯ"
+                              : root.status_label == "PREHEAT" ? "ПІДІГРІВ"
+                              : root.status_label == "RAMP" ? "НАГРІВ"
+                              : root.status_label == "HOLD" ? "ВИТРИМКА"
+                              : root.status_label == "COOL" ? "ОХОЛОДЖЕННЯ"
+                              : root.status_label == "COMPLETE" ? "ЗАВЕРШЕНО"
+                              : root.status_label == "ERROR" ? "ПОМИЛКА"
+                              : root.status_label == "TUNING" ? "АВТОНАЛ."
+                              : root.status_label)
+                            : root.status_label;
                         color: root.status_fg;
                         font-family: "PT Sans";
-                        font-size: 14px;
+                        font-size: root.is_ua ? 12px : 14px;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -832,7 +870,7 @@ export component AppWindow inherits Window {
 
 
 
-                    x: 16px; y: 52px;
+                    x: 16px; y: 60px;
 
 
 
@@ -848,7 +886,7 @@ export component AppWindow inherits Window {
 
 
 
-                    font-size: 58px;
+                    font-size: 64px;
 
 
 
@@ -864,7 +902,7 @@ export component AppWindow inherits Window {
 
 
 
-                    x: 150px; y: 58px;
+                    x: 168px; y: 70px;
 
 
 
@@ -879,7 +917,7 @@ export component AppWindow inherits Window {
 
 
 
-                    font-size: 26px;
+                    font-size: 30px;
 
 
 
@@ -1283,11 +1321,20 @@ export component AppWindow inherits Window {
 
 
 
+                        Rectangle {
+                            x: 10px; y: 6px;
+                            width: 200px; height: 102px;
+                            border-radius: 12px;
+                            background: #18181B;
+                            border-color: #27272A;
+                            border-width: 1px;
+                        }
+
                         Text {
 
 
 
-                            x: 0px; y: 18px;
+                            x: 0px; y: 14px;
 
 
 
@@ -1319,7 +1366,7 @@ export component AppWindow inherits Window {
 
 
 
-                            x: 0px; y: 44px;
+                            x: 0px; y: 36px;
 
 
 
@@ -1355,7 +1402,7 @@ export component AppWindow inherits Window {
 
 
 
-                            x: 0px; y: 78px;
+                            x: 0px; y: 66px;
 
 
 
@@ -1363,7 +1410,7 @@ export component AppWindow inherits Window {
 
 
 
-                            text: "Ramp to " + root.target + "oC";
+                            text: root.is_ua ? ("Ціль " + root.active_segment_target + "°C") : ("Target " + root.active_segment_target + "°C");
 
 
 
@@ -1381,6 +1428,22 @@ export component AppWindow inherits Window {
 
                         }
 
+                        Rectangle {
+                            x: 10px; y: 116px;
+                            width: 200px; height: 30px;
+                            border-radius: 10px;
+                            background: root.c_danger;
+                            Text {
+                                text: root.is_ua ? "Пропустити крок" : "Skip Step";
+                                color: #FFFFFF;
+                                font-family: "PT Sans";
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.skip_step(); } }
+                        }
+
 
 
                     }
@@ -1391,7 +1454,13 @@ export component AppWindow inherits Window {
 
 
 
-                width: parent.width; height: parent.height; clicked => { root.open_library(); } }
+                width: parent.width; height: parent.height; clicked => {
+                    if (root.selected_schedule_name != "") {
+                        root.open_selected_program();
+                    } else {
+                        root.open_library();
+                    }
+                } }
 
 
 
@@ -1417,8 +1486,8 @@ export component AppWindow inherits Window {
                     Rectangle {
                         visible: !root.is_idle;
                         x: 0px; y: 0px;
-                        width: 220px; height: 94px;
-                        background: #FF3B30;
+                        width: 106px; height: 94px;
+                        background: root.c_danger;
                         border-radius: 16px;
 
                         StopIcon { x: (parent.width - self.width) / 2; y: 20px; color: #FFFFFF; width: 18px; height: 18px; }
@@ -1679,7 +1748,7 @@ export component AppWindow inherits Window {
 
 
 
-                        x: 114px; y: 0px; visible: root.is_idle;
+                        x: 114px; y: 0px; visible: true;
 
 
                         width: 106px; height: 94px;
@@ -1730,7 +1799,7 @@ export component AppWindow inherits Window {
 
 
 
-                            text: root.is_ua ? "Програми" : "Programs";
+                            text: !root.is_idle ? (root.is_ua ? "Редагувати" : "Edit") : (root.is_ua ? "Програми" : "Programs");
 
 
 
@@ -1762,7 +1831,13 @@ export component AppWindow inherits Window {
 
 
 
-                width: parent.width; height: parent.height; clicked => { root.open_library(); } }
+                width: parent.width; height: parent.height; clicked => {
+                    if (!root.is_idle) {
+                        root.open_running_editor();
+                    } else {
+                        root.open_library();
+                    }
+                } }
 
 
 
@@ -2090,6 +2165,73 @@ export component AppWindow inherits Window {
         }
 
 
+        if (root.view == View.RunningEditor) : Rectangle {
+                x: 0px; y: 0px; width: 480px; height: 280px;
+                background: #000000;
+
+                HorizontalBox {
+                    x: 14px; y: 10px;
+                    spacing: 6px;
+                    ThermometerIcon { color: #10B981; }
+                    Text {
+                        text: root.is_ua ? "Редагування випалу" : "Firing Edit";
+                        color: #FFFFFF;
+                        font-family: "PT Sans";
+                        font-size: 18px;
+                    }
+                }
+
+                Rectangle {
+                    x: 420px; y: 8px; width: 40px; height: 28px;
+                    background: #27272A;
+                    border-radius: 10px;
+                    Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.running_edit_back(); } }
+                }
+
+                Rectangle {
+                    x: 14px; y: 46px; width: 452px; height: 58px;
+                    background: #111118;
+                    border-color: #27272A;
+                    border-width: 1px;
+                    border-radius: 12px;
+                    Text { x: 14px; y: 8px; text: root.is_ua ? "Швидкість нагріву (°C/хв)" : "Ramp rate (°C/min)"; color: #A1A1AA; font-size: 13px; }
+                    Text { x: 14px; y: 28px; text: root.running_edit_rate; color: #FFFFFF; font-size: 18px; font-weight: 700; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.kb_open("run_rate", -1, root.running_edit_rate); } }
+                }
+
+                Rectangle {
+                    x: 14px; y: 112px; width: 452px; height: 58px;
+                    background: #111118;
+                    border-color: #27272A;
+                    border-width: 1px;
+                    border-radius: 12px;
+                    Text { x: 14px; y: 8px; text: root.is_ua ? "Додати температуру (°C)" : "Add temperature (°C)"; color: #A1A1AA; font-size: 13px; }
+                    Text { x: 14px; y: 28px; text: root.running_edit_add_temp; color: #FFFFFF; font-size: 18px; font-weight: 700; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.kb_open("run_temp", -1, root.running_edit_add_temp); } }
+                }
+
+                Rectangle {
+                    x: 14px; y: 178px; width: 452px; height: 58px;
+                    background: #111118;
+                    border-color: #27272A;
+                    border-width: 1px;
+                    border-radius: 12px;
+                    Text { x: 14px; y: 8px; text: root.is_ua ? "Додати час (хв)" : "Add hold time (min)"; color: #A1A1AA; font-size: 13px; }
+                    Text { x: 14px; y: 28px; text: root.running_edit_add_time; color: #FFFFFF; font-size: 18px; font-weight: 700; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.kb_open("run_time", -1, root.running_edit_add_time); } }
+                }
+
+                Rectangle {
+                    x: 304px; y: 242px; width: 162px; height: 28px;
+                    background: #10B981;
+                    border-radius: 10px;
+                    Text { text: root.is_ua ? "Зберегти" : "Apply"; color: #000000; font-family: "PT Sans"; font-size: 14px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.running_edit_apply(); } }
+                }
+        }
+
+        
 
         // Settings View
         if (root.view == View.Settings) : Rectangle {
@@ -2403,6 +2545,57 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
+
+                        Rectangle {
+                        width: 426px; height: 64px;
+                        background: #0F0F0F;
+                        border-color: #27272A;
+                        border-width: 1px;
+                        border-radius: 12px;
+
+                        Text {
+                            x: 12px; y: 8px;
+                            text: root.is_ua ? "Поточна помилка" : "Current fault";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 14px;
+                        }
+
+                        Text {
+                            x: 12px; y: 28px; width: 402px; height: 30px;
+                            text: root.fault_active
+                                ? (root.fault_reason == "" ? (root.is_ua ? "Помилка без опису" : "Fault without details") : root.fault_reason)
+                                : (root.is_ua ? "Немає активної помилки" : "No active fault");
+                            color: root.fault_active ? #FCA5A5 : #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 12px;
+                            overflow: elide;
+                            horizontal-alignment: left;
+                            vertical-alignment: center;
+                        }
+                        }
+
+                        Rectangle {
+                        width: 426px; height: 46px;
+                        background: root.fault_active ? #7F1D1D : #18181B;
+                        border-radius: 12px;
+                        Text {
+                            text: root.is_ua ? "Скинути помилку" : "Clear Fault";
+                            color: root.fault_active ? #FFFFFF : #71717A;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        TouchArea {
+                            width: parent.width; height: parent.height;
+                            clicked => {
+                                if (root.fault_active) {
+                                    root.clear_fault();
+                                }
+                            }
+                        }
+                        }
 
                         Rectangle {
                         width: 426px; height: 46px;
@@ -2796,14 +2989,14 @@ export component AppWindow inherits Window {
                                 width: 32px; height: 32px;
 
 
-                                background: #27272A;
+                                background: (!root.is_idle && i == root.step_index) ? #10B981 : #27272A;
 
 
 
                                 border-radius: 16px;
 
 
-                                Text { text: (i + 1); color: #A1A1AA; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
+                                Text { text: (i + 1); color: (!root.is_idle && i == root.step_index) ? #000000 : #A1A1AA; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
 
 
                             }
@@ -3399,11 +3592,7 @@ export component AppWindow inherits Window {
 
         }
 
-
-
     }
-
-
 
     // Stop modal
 
@@ -3555,7 +3744,21 @@ export component AppWindow inherits Window {
                     ? (root.is_ua ? "Температура" : "Target")
                     : root.kb_field == "hold"
                         ? (root.is_ua ? "Витримка" : "Hold")
-                        : (root.is_ua ? "Вентилятор %" : "Fan %");
+                        : root.kb_field == "fan"
+                            ? (root.is_ua ? "Вентилятор %" : "Fan %")
+                            : root.kb_field == "autotune"
+                                ? (root.is_ua ? "Автоналаштування" : "Autotune")
+                                : root.kb_field == "run_rate"
+                                    ? (root.is_ua ? "Нова швидкість" : "New rate")
+                                    : root.kb_field == "run_temp"
+                                        ? (root.is_ua ? "Додати температуру" : "Add temperature")
+                                        : root.kb_field == "run_time"
+                                            ? (root.is_ua ? "Додати час" : "Add time")
+                                : root.kb_field == "name"
+                                    ? (root.is_ua ? "Назва програми" : "Program name")
+                                    : root.kb_field == "wifi_pass"
+                                        ? (root.is_ua ? "Пароль Wi‑Fi" : "Wi-Fi password")
+                                        : "";
             color: #A1A1AA;
             font-family: "PT Sans";
             font-size: 14px;
@@ -3598,6 +3801,79 @@ export component AppWindow inherits Window {
 
         KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 4 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #7F1D1D; label: root.is_ua ? "Скас." : "Cancel"; font_size: 14px; pressed(v) => { root.kb_key("CANCEL"); } }
         KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 4 * (parent.kh + 6px); width: parent.kw + parent.kg + parent.kw; height: parent.kh; background: #10B981; text_color: #000000; label: "OK"; font_size: 20px; pressed(v) => { root.kb_key("OK"); } }
+    }
+
+    if (root.show_skip_confirm) : Rectangle {
+            x: 0px; y: 0px; width: 480px; height: 320px;
+            background: #000000B3;
+            z: 5100;
+            Rectangle {
+                x: 72px; y: 72px; width: 336px; height: 168px;
+                background: #0B0B0B;
+                border-color: #3F3F46;
+                border-width: 1px;
+                border-radius: 16px;
+                Text {
+                    x: 0px; y: 24px; width: parent.width;
+                    text: root.is_ua ? "Пропустити крок?" : "Skip step?";
+                    color: #FFFFFF;
+                    font-family: "PT Sans";
+                    font-size: 20px;
+                    horizontal-alignment: center;
+                }
+                Rectangle {
+                    x: 18px; y: 104px; width: 140px; height: 44px;
+                    background: #27272A; border-radius: 10px;
+                    Text { text: root.is_ua ? "Скасувати" : "Cancel"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.skip_cancel(); } }
+                }
+                Rectangle {
+                    x: 178px; y: 104px; width: 140px; height: 44px;
+                    background: root.c_danger; border-radius: 10px;
+                    Text { text: root.is_ua ? "Підтвердити" : "Confirm"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.skip_confirm(); } }
+                }
+            }
+    }
+
+    if (root.show_running_edit_confirm) : Rectangle {
+            x: 0px; y: 0px; width: 480px; height: 320px;
+            background: #000000B3;
+            z: 5100;
+            Rectangle {
+                x: 58px; y: 64px; width: 364px; height: 186px;
+                background: #0B0B0B;
+                border-color: #3F3F46;
+                border-width: 1px;
+                border-radius: 16px;
+                Text {
+                    x: 0px; y: 24px; width: parent.width;
+                    text: root.is_ua ? "Застосувати зміни?" : "Apply changes?";
+                    color: #FFFFFF;
+                    font-family: "PT Sans";
+                    font-size: 20px;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    x: 18px; y: 60px; width: parent.width - 36px;
+                    text: root.is_ua ? "Температура, швидкість і час буде змінено для поточного випалу." : "Temperature, rate and hold time will be updated for current firing.";
+                    color: #A1A1AA;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                }
+                Rectangle {
+                    x: 22px; y: 124px; width: 152px; height: 44px;
+                    background: #27272A; border-radius: 10px;
+                    Text { text: root.is_ua ? "Скасувати" : "Cancel"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.running_edit_cancel(); } }
+                }
+                Rectangle {
+                    x: 190px; y: 124px; width: 152px; height: 44px;
+                    background: #10B981; border-radius: 10px;
+                    Text { text: root.is_ua ? "Зберегти" : "Save"; color: #000000; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.running_edit_confirm(); } }
+                }
+            }
     }
 
     if (root.show_stop_confirm) : Rectangle {
@@ -3699,7 +3975,7 @@ export component AppWindow inherits Window {
 
 
 
-                    text: "Are you sure you want to abort the process?";
+                    text: root.is_ua ? "Ви впевнені, що хочете перервати процес?" : "Are you sure you want to abort the process?";
 
 
 
@@ -3735,7 +4011,7 @@ export component AppWindow inherits Window {
 
 
 
-                    Text { text: "Cancel"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: root.is_ua ? "Скасувати" : "Cancel"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
 
 
 
@@ -3767,7 +4043,7 @@ export component AppWindow inherits Window {
 
 
 
-                    Text { text: "STOP"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: root.is_ua ? "ЗУПИНИТИ" : "STOP"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
 
 
 

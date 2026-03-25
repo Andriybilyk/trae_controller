@@ -67,18 +67,28 @@ public:
     void skipCurrentStep();
     void addTemperatureToTarget(float tempToAdd);
     void addTimeToHold(float minutesToAdd);
+    void setCurrentRampRate(float rateCPerMin);
     bool setTemperatureOffset(float offsetC);
     float getTemperatureOffset();
     bool setUserMaxTemperatureC(float maxC);
     float getUserMaxTemperatureC();
+    float getLoadedScheduleMaxTargetC();
+    bool setAutotuneTargetC(float targetC);
+    float getAutotuneTargetC();
 
     struct AutoTuneStatus {
         bool active;
         bool heaterOn;
         float setpointC;
         int cycles;
+        int valid_cycles;
+        int total_cycles;
         float ku;
         float pu_s;
+        float period_cv;
+        float amp_cv;
+        float quality;
+        float confidence;
         double kp;
         double ki;
         double kd;
@@ -119,6 +129,7 @@ private:
     double runtimeKp, runtimeKi, runtimeKd;
     float temperatureOffsetC;
     float userMaxTempC;
+    float autotuneTargetC;
 
     // Telemetry
     uint32_t thermoLastRaw;
@@ -163,6 +174,7 @@ private:
     struct ScheduleStep {
         int type; // 0=RAMP, 1=HOLD
         float value; // Temp or Time(min)
+        float rate; // C/min for RAMP
     };
     std::vector<ScheduleStep> activeSchedule;
     uint64_t stepStartTime;
@@ -200,6 +212,12 @@ private:
         float ampC[6] = {0.0f};
         float ku = 0.0f;
         float pu_s = 0.0f;
+        float periodCv = 0.0f;
+        float ampCv = 0.0f;
+        float quality = 0.0f;
+        float confidence = 0.0f;
+        int validCycles = 0;
+        int totalCycles = 0;
         char lastError[96] = {0};
     } tune;
 

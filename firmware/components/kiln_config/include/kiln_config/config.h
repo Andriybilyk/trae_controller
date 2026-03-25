@@ -89,6 +89,22 @@
 #define FAN_PIN             GPIO_NUM_8
 #define BUZZER_PIN          GPIO_NUM_48
 
+#ifndef RTC_I2C_PORT
+#define RTC_I2C_PORT        0
+#endif
+#ifndef RTC_I2C_SDA
+#define RTC_I2C_SDA         GPIO_NUM_6
+#endif
+#ifndef RTC_I2C_SCL
+#define RTC_I2C_SCL         GPIO_NUM_7
+#endif
+#ifndef RTC_I2C_FREQ_HZ
+#define RTC_I2C_FREQ_HZ     100000
+#endif
+#ifndef RTC_DS3231_ADDR
+#define RTC_DS3231_ADDR     0x68
+#endif
+
 // --- General Config ---
 #define FIRMWARE_VERSION    "2.5.1"
 #define DEVICE_NAME         "Trae Kiln Controller"

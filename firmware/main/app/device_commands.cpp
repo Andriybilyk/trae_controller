@@ -2,20 +2,45 @@
 
 #include "drivers/display_driver.h"
 #include "drivers/fan_driver.h"
+#include "drivers/rtc_ds3231.h"
 #include "kiln_control/thermal_control.h"
 
 #include "cJSON.h"
 
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 
 namespace device_commands {
 static constexpr uint8_t kFanMinOnPercent = 60;
 
 static CommandResult check_start_interlocks() {
+    const SafetyStats safety = thermalCtrl.getSafetyStats();
+    if (safety.faultActive) {
+        thermalCtrl.stop("Start blocked: fault active");
+        return {ResultCode::FaultActive};
+    }
     if (!thermalCtrl.isSensorHealthy()) {
         thermalCtrl.stop("Start blocked: sensor invalid");
         return {ResultCode::SensorInvalid};
+    }
+    const FanConfig fan = current_fan_config();
+    if ((fan.manual && fan.power == 0) || (!fan.auto_enabled && !fan.manual)) {
+        thermalCtrl.stop("Start blocked: fan unsafe config");
+        return {ResultCode::FanUnsafe};
+    }
+    const float maxC = thermalCtrl.getUserMaxTemperatureC();
+    const float scheduleMax = thermalCtrl.getLoadedScheduleMaxTargetC();
+    if (scheduleMax > 0.0f && scheduleMax > maxC + 0.5f) {
+        thermalCtrl.stop("Start blocked: schedule exceeds maxC");
+        return {ResultCode::ScheduleOverMaxTemp};
+    }
+    const std::time_t now = std::time(nullptr);
+    bool rtc_valid = false;
+    (void)rtc_ds3231_is_clock_valid(&rtc_valid);
+    if (now < 1704067200 && !rtc_valid) {
+        thermalCtrl.stop("Start blocked: RTC/system clock not set");
+        return {ResultCode::ClockNotSet};
     }
     if (!display_driver_is_touch_calibrated()) {
         thermalCtrl.stop("Start blocked: touch calibration required");
@@ -94,6 +119,12 @@ CommandResult add_temp(double delta_c) {
 CommandResult add_time(double delta_minutes) {
     if (!std::isfinite(delta_minutes)) return {ResultCode::InvalidPayload};
     thermalCtrl.addTimeToHold(delta_minutes);
+    return {ResultCode::Ok};
+}
+
+CommandResult set_rate(double rate_c_per_min) {
+    if (!std::isfinite(rate_c_per_min) || rate_c_per_min <= 0.0) return {ResultCode::InvalidPayload};
+    thermalCtrl.setCurrentRampRate((float)rate_c_per_min);
     return {ResultCode::Ok};
 }
 

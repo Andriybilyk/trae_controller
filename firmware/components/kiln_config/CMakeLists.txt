@@ -3,6 +3,6 @@ idf_component_register(
         "config_store.cpp"
         "fs_utils.cpp"
     INCLUDE_DIRS "include"
-    REQUIRES driver
-    PRIV_REQUIRES nvs_flash
+    REQUIRES driver esp_driver_gpio
+    PRIV_REQUIRES nvs_flash cjson
 )

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <inttypes.h>
+#include <limits>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -90,6 +91,7 @@ ThermalController::ThermalController() {
     runtimeKd = Kd;
     temperatureOffsetC = 0.0f;
     userMaxTempC = (float)MAX_TEMP_SAFETY;
+    autotuneTargetC = 600.0f;
 
     loadedScheduleName.clear();
 
@@ -504,6 +506,11 @@ void ThermalController::loadRuntimeSettingsLocked() {
         const float v = (float)maxC->valuedouble;
         userMaxTempC = std::max(100.0f, std::min((float)MAX_TEMP_SAFETY, v));
     }
+    const cJSON *autotuneTarget = cJSON_GetObjectItem(root, "autotune_target_c");
+    if (cJSON_IsNumber(autotuneTarget)) {
+        const float v = (float)autotuneTarget->valuedouble;
+        autotuneTargetC = std::max(100.0f, std::min(1200.0f, v));
+    }
 
     const cJSON *pidObj = cJSON_GetObjectItem(root, "pid");
     if (cJSON_IsObject(pidObj)) {
@@ -531,6 +538,8 @@ void ThermalController::persistRuntimeSettingsLocked() {
 
     cJSON_DeleteItemFromObject(root, "temp_offset_c");
     cJSON_AddNumberToObject(root, "temp_offset_c", (double)temperatureOffsetC);
+    cJSON_DeleteItemFromObject(root, "autotune_target_c");
+    cJSON_AddNumberToObject(root, "autotune_target_c", (double)autotuneTargetC);
 
     cJSON *pidObj = cJSON_GetObjectItem(root, "pid");
     if (!cJSON_IsObject(pidObj)) {
@@ -568,6 +577,7 @@ void ThermalController::saveRecoveryStateLocked() {
         cJSON_AddStringToObject(s, "type", step.type == 0 ? "ramp" : "hold");
         if (step.type == 0) {
             cJSON_AddNumberToObject(s, "target", step.value);
+            cJSON_AddNumberToObject(s, "rate", step.rate);
         } else {
             cJSON_AddNumberToObject(s, "holdTime", step.value);
         }
@@ -607,10 +617,13 @@ void ThermalController::loadRecoveryStateLocked() {
             const cJSON *typeItem = cJSON_GetObjectItem(step, "type");
             std::string type = (cJSON_IsString(typeItem) && typeItem->valuestring) ? typeItem->valuestring : "ramp";
             s.type = (type == "hold") ? 1 : 0;
+            s.rate = 9999.0f;
             
             if (s.type == 0) { // RAMP
                 const cJSON *targetItem = cJSON_GetObjectItem(step, "target");
                 s.value = cJSON_IsNumber(targetItem) ? (float)targetItem->valuedouble : 0.0f;
+                const cJSON *rateItem = cJSON_GetObjectItem(step, "rate");
+                if (cJSON_IsNumber(rateItem)) s.rate = (float)rateItem->valuedouble;
             } else { // HOLD
                 const cJSON *holdTimeItem = cJSON_GetObjectItem(step, "holdTime");
                 s.value = cJSON_IsNumber(holdTimeItem) ? (float)holdTimeItem->valuedouble : 0.0f;
@@ -698,6 +711,36 @@ float ThermalController::getUserMaxTemperatureC() {
     return v;
 }
 
+float ThermalController::getLoadedScheduleMaxTargetC() {
+    if (!mutex) return 0.0f;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    float maxTarget = 0.0f;
+    for (const auto &step : activeSchedule) {
+        if (step.type == 0) {
+            maxTarget = std::max(maxTarget, step.value);
+        }
+    }
+    xSemaphoreGiveRecursive(mutex);
+    return maxTarget;
+}
+
+bool ThermalController::setAutotuneTargetC(float targetC) {
+    if (!mutex) return false;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    autotuneTargetC = std::max(100.0f, std::min(1200.0f, targetC));
+    persistRuntimeSettingsLocked();
+    xSemaphoreGiveRecursive(mutex);
+    return true;
+}
+
+float ThermalController::getAutotuneTargetC() {
+    if (!mutex) return 600.0f;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    const float v = autotuneTargetC;
+    xSemaphoreGiveRecursive(mutex);
+    return v;
+}
+
 ThermalController::AutoTuneStatus ThermalController::getAutotuneStatus() {
     AutoTuneStatus s{};
     if (!mutex) return s;
@@ -706,8 +749,14 @@ ThermalController::AutoTuneStatus ThermalController::getAutotuneStatus() {
     s.heaterOn = tune.heaterOn;
     s.setpointC = tune.setpointC;
     s.cycles = tune.periods;
+    s.valid_cycles = tune.validCycles;
+    s.total_cycles = tune.totalCycles;
     s.ku = tune.ku;
     s.pu_s = tune.pu_s;
+    s.period_cv = tune.periodCv;
+    s.amp_cv = tune.ampCv;
+    s.quality = tune.quality;
+    s.confidence = tune.confidence;
     s.kp = runtimeKp;
     s.ki = runtimeKi;
     s.kd = runtimeKd;
@@ -769,6 +818,8 @@ bool ThermalController::startAutotune(float setpointC) {
     tune.heaterOn = true;
     const float max_allowed = std::max(50.0f, std::min((float)MAX_TEMP_SAFETY - 25.0f, userMaxTempC - 25.0f));
     tune.setpointC = std::max(50.0f, std::min(max_allowed, setpointC));
+    autotuneTargetC = tune.setpointC;
+    persistRuntimeSettingsLocked();
     tune.hysteresisC = 5.0f;
     tune.startMs = (uint64_t)(esp_timer_get_time() / 1000ULL);
     tune.lastSwitchMs = tune.startMs;
@@ -860,9 +911,10 @@ void ThermalController::autotuneLoopLocked(uint64_t now_ms) {
 
             if (tune.lastOnMs != 0) {
                 const uint64_t period = now_ms - tune.lastOnMs;
-                if (period >= 5000) {
-                    const float amp = std::max(0.1f, (tune.lastHigh - tune.lastLow) * 0.5f);
-                    if (tune.periods < 6) {
+                if (period > 0) {
+                    const float amp = (tune.lastHigh - tune.lastLow) * 0.5f;
+                    tune.totalCycles++;
+                    if (period >= 5000 && amp > 0.1f && tune.periods < 6) {
                         tune.periodMs[tune.periods] = (uint32_t)period;
                         tune.ampC[tune.periods] = amp;
                         tune.periods++;
@@ -891,14 +943,21 @@ void ThermalController::autotuneFinalizeLocked(uint64_t now_ms) {
     (void)now_ms;
     double pu_ms_sum = 0;
     double amp_sum = 0;
+    double pu_sq_sum = 0;
+    double amp_sq_sum = 0;
     int n = 0;
     for (int i = 1; i < tune.periods; i++) { // skip first cycle (often noisy)
         if (tune.periodMs[i] > 0 && tune.ampC[i] > 0.1f) {
-            pu_ms_sum += (double)tune.periodMs[i];
-            amp_sum += (double)tune.ampC[i];
+            const double p = (double)tune.periodMs[i];
+            const double a = (double)tune.ampC[i];
+            pu_ms_sum += p;
+            amp_sum += a;
+            pu_sq_sum += p * p;
+            amp_sq_sum += a * a;
             n++;
         }
     }
+    tune.validCycles = n;
     if (n < 3) {
         append_event_log("AUTOTUNE_FAIL", "insufficient data");
         heater_hal_all_off();
@@ -913,6 +972,18 @@ void ThermalController::autotuneFinalizeLocked(uint64_t now_ms) {
 
     const double pu_ms = pu_ms_sum / (double)n;
     const double a = amp_sum / (double)n;
+    const double pu_var = std::max(0.0, (pu_sq_sum / (double)n) - (pu_ms * pu_ms));
+    const double amp_var = std::max(0.0, (amp_sq_sum / (double)n) - (a * a));
+    const double pu_std = std::sqrt(pu_var);
+    const double amp_std = std::sqrt(amp_var);
+    const double period_cv = pu_ms > 1e-6 ? (pu_std / pu_ms) : 1.0;
+    const double amp_cv = a > 1e-6 ? (amp_std / a) : 1.0;
+    const double quality_01 = std::max(0.0, std::min(1.0, 1.0 - (0.6 * period_cv + 0.4 * amp_cv)));
+    const int total_cycles = std::max(1, tune.totalCycles);
+    const double valid_ratio = (double)n / (double)total_cycles;
+    const double sensor_factor = isSensorHealthy() ? 1.0 : 0.7;
+    const double confidence_01 = std::max(0.0, std::min(1.0, 0.5 * valid_ratio + 0.4 * quality_01 + 0.1 * sensor_factor));
+
     const double d = 50.0; // relay amplitude (0..100% => +/-50%)
     const double pi = 3.14159265358979323846;
     const double ku = (4.0 * d) / (pi * a);
@@ -933,6 +1004,10 @@ void ThermalController::autotuneFinalizeLocked(uint64_t now_ms) {
 
     tune.ku = (float)ku;
     tune.pu_s = (float)pu_s;
+    tune.periodCv = (float)period_cv;
+    tune.ampCv = (float)amp_cv;
+    tune.quality = (float)(quality_01 * 100.0);
+    tune.confidence = (float)(confidence_01 * 100.0);
 
     heater_hal_all_off();
     tune.active = false;
@@ -941,7 +1016,8 @@ void ThermalController::autotuneFinalizeLocked(uint64_t now_ms) {
     state.targetTemp = 0.0f;
 
     char done[96];
-    snprintf(done, sizeof(done), "Autotune OK kp=%.2f ki=%.3f kd=%.2f", runtimeKp, runtimeKi, runtimeKd);
+    snprintf(done, sizeof(done), "Autotune OK kp=%.2f ki=%.3f kd=%.2f Q=%.0f%% C=%.0f%%",
+             runtimeKp, runtimeKi, runtimeKd, (double)tune.quality, (double)tune.confidence);
     state.errorMsg = done;
     append_event_log("AUTOTUNE", "done");
 
@@ -977,8 +1053,17 @@ void ThermalController::processSchedule() {
 
     if (step.type == 0) { // RAMP
         const float target = std::min(step.value, userMaxTempC);
+        float rate = step.rate;
+        if (!std::isfinite(rate) || rate <= 0.0f) rate = 9999.0f;
+        const float elapsed_min = (float)elapsed / 60.0f;
+        float rampTarget = target;
+        if (target >= stepStartTemp) {
+            rampTarget = std::min(target, stepStartTemp + rate * elapsed_min);
+        } else {
+            rampTarget = std::max(target, stepStartTemp - rate * elapsed_min);
+        }
         state.status = (state.currentTemp > target + 2.0f) ? KILN_COOLING : KILN_RUNNING;
-        state.targetTemp = target;
+        state.targetTemp = rampTarget;
         setpoint = state.targetTemp;
         state.timeRemaining = -1;
         
@@ -1087,6 +1172,37 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     const int totalSteps = state.totalSteps;
     const int completedSteps = std::max(0, std::min(state.currentStep, state.totalSteps));
 
+    double err_sq_sum = 0.0;
+    double abs_err_sum = 0.0;
+    double overshoot_max = 0.0;
+    double overshoot_temp_sum = 0.0;
+    int overshoot_count = 0;
+    double target_max = 0.0;
+    for (const HistoryPoint &p : historyPoints) {
+        const double target = (double)p.target;
+        const double temp = (double)p.temp;
+        const double err = temp - target;
+        err_sq_sum += err * err;
+        abs_err_sum += std::fabs(err);
+        target_max = std::max(target_max, target);
+        if (target > 1.0 && err > 0.0) {
+            overshoot_count++;
+            overshoot_temp_sum += err;
+            overshoot_max = std::max(overshoot_max, err);
+        }
+    }
+    const double sample_count = historyPoints.empty() ? 0.0 : (double)historyPoints.size();
+    const double err_rms = sample_count > 0.0 ? std::sqrt(err_sq_sum / sample_count) : 0.0;
+    const double err_mae = sample_count > 0.0 ? (abs_err_sum / sample_count) : 0.0;
+    const double overshoot_avg = overshoot_count > 0 ? (overshoot_temp_sum / (double)overshoot_count) : 0.0;
+    const double overshoot_pct_max = target_max > 1.0 ? (overshoot_max * 100.0 / target_max) : 0.0;
+    const double duration_h = duration_s > 0 ? ((double)duration_s / 3600.0) : 0.0;
+    const double energy_index = duration_h * (std::max(1.0, target_max) / 100.0);
+    const double q_err = std::max(0.0, std::min(1.0, 1.0 - (err_rms / 35.0)));
+    const double q_over = std::max(0.0, std::min(1.0, 1.0 - (overshoot_pct_max / 12.0)));
+    const double q_fault = kiln_fault_is_active() ? 0.4 : 1.0;
+    const double quality_score = std::max(0.0, std::min(100.0, (0.6 * q_err + 0.3 * q_over + 0.1 * q_fault) * 100.0));
+
     cJSON *summary = cJSON_CreateObject();
     cJSON_AddStringToObject(summary, "id", historyId.c_str());
     cJSON_AddStringToObject(summary, "scheduleName", loadedScheduleName.c_str());
@@ -1098,6 +1214,16 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     else cJSON_AddNullToObject(summary, "peakTemp");
     cJSON_AddNumberToObject(summary, "totalSteps", (double)totalSteps);
     cJSON_AddNumberToObject(summary, "completedSteps", (double)completedSteps);
+    cJSON *kpi = cJSON_CreateObject();
+    cJSON_AddNumberToObject(kpi, "tracking_error_rms", err_rms);
+    cJSON_AddNumberToObject(kpi, "tracking_error_mae", err_mae);
+    cJSON_AddNumberToObject(kpi, "overshoot_max", overshoot_max);
+    cJSON_AddNumberToObject(kpi, "overshoot_avg", overshoot_avg);
+    cJSON_AddNumberToObject(kpi, "overshoot_pct_max", overshoot_pct_max);
+    cJSON_AddNumberToObject(kpi, "energy_index", energy_index);
+    cJSON_AddNumberToObject(kpi, "quality_score", quality_score);
+    cJSON_AddNumberToObject(kpi, "samples", sample_count);
+    cJSON_AddItemToObject(summary, "kpi", kpi);
 
     // Update list file
     cJSON *arr = nullptr;
@@ -1202,10 +1328,13 @@ void ThermalController::loadSchedule(const std::string& scheduleJson) {
         const cJSON *typeItem = cJSON_GetObjectItem(step, "type");
         std::string type = (cJSON_IsString(typeItem) && typeItem->valuestring) ? typeItem->valuestring : "ramp";
         s.type = (type == "hold") ? 1 : 0;
+        s.rate = 9999.0f;
         
         if (s.type == 0) { // RAMP
             const cJSON *targetItem = cJSON_GetObjectItem(step, "target");
             s.value = cJSON_IsNumber(targetItem) ? (float)targetItem->valuedouble : 0.0f;
+            const cJSON *rateItem = cJSON_GetObjectItem(step, "rate");
+            if (cJSON_IsNumber(rateItem)) s.rate = (float)rateItem->valuedouble;
         } else { // HOLD
             const cJSON *holdTimeItem = cJSON_GetObjectItem(step, "holdTime");
             s.value = cJSON_IsNumber(holdTimeItem) ? (float)holdTimeItem->valuedouble : 0.0f; // Using 'holdTime' for HOLD
@@ -1443,6 +1572,21 @@ void ThermalController::addTemperatureToTarget(float tempToAdd) {
         ESP_LOGW(TAG, "Attempted to add temperature but kiln is not firing.");
     }
 
+    xSemaphoreGiveRecursive(mutex);
+}
+
+void ThermalController::setCurrentRampRate(float rateCPerMin) {
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    if (state.isFiring && state.currentStep < activeSchedule.size()) {
+        if (activeSchedule[state.currentStep].type == 0 && std::isfinite(rateCPerMin) && rateCPerMin > 0.0f) {
+            activeSchedule[state.currentStep].rate = rateCPerMin;
+            ESP_LOGI(TAG, "Updated current RAMP rate to %.2f C/min", (double)rateCPerMin);
+        } else {
+            ESP_LOGW(TAG, "Attempted to set ramp rate but current step is not RAMP or payload invalid.");
+        }
+    } else {
+        ESP_LOGW(TAG, "Attempted to set ramp rate but kiln is not firing.");
+    }
     xSemaphoreGiveRecursive(mutex);
 }
 

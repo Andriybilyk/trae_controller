@@ -12,6 +12,10 @@ enum class ResultCode {
     NoSchedule,
     SensorInvalid,
     TouchNotCalibrated,
+    FaultActive,
+    FanUnsafe,
+    ScheduleOverMaxTemp,
+    ClockNotSet,
 };
 
 struct CommandResult {
@@ -37,6 +41,7 @@ CommandResult stop(const char *reason);
 CommandResult skip();
 CommandResult add_temp(double delta_c);
 CommandResult add_time(double delta_minutes);
+CommandResult set_rate(double rate_c_per_min);
 
 FanConfig current_fan_config();
 void apply_fan_config(const FanConfig &cfg);

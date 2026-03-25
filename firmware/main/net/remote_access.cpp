@@ -11,7 +11,7 @@
 #include "esp_random.h"
 #include "mqtt_client.h"
 #include "esp_timer.h"
-#include "mbedtls/md.h"
+#include "psa/crypto.h"
 
 #include "cJSON.h"
 
@@ -299,13 +299,35 @@ static void handle_remote_command(const char *payload, int len) {
                                      param_for_signature(cmd_name);
 
         uint8_t mac[32] = {0};
-        const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-        if (!md || mbedtls_md_hmac(md,
-                                   reinterpret_cast<const unsigned char *>(s_cfg.auth_key),
-                                   std::strlen(s_cfg.auth_key),
-                                   reinterpret_cast<const unsigned char *>(material.data()),
-                                   material.size(),
-                                   mac) != 0) {
+        size_t mac_len = 0;
+        if (psa_crypto_init() != PSA_SUCCESS) {
+            out_msg = "auth_internal_error";
+            return false;
+        }
+        psa_key_attributes_t attrs = PSA_KEY_ATTRIBUTES_INIT;
+        psa_set_key_usage_flags(&attrs, PSA_KEY_USAGE_SIGN_HASH);
+        psa_set_key_algorithm(&attrs, PSA_ALG_HMAC(PSA_ALG_SHA_256));
+        psa_set_key_type(&attrs, PSA_KEY_TYPE_HMAC);
+        psa_set_key_bits(&attrs, 8u * (uint32_t)std::strlen(s_cfg.auth_key));
+        psa_key_id_t key = 0;
+        psa_status_t p = psa_import_key(&attrs,
+                                        reinterpret_cast<const uint8_t *>(s_cfg.auth_key),
+                                        std::strlen(s_cfg.auth_key),
+                                        &key);
+        psa_reset_key_attributes(&attrs);
+        if (p != PSA_SUCCESS) {
+            out_msg = "auth_internal_error";
+            return false;
+        }
+        p = psa_mac_compute(key,
+                            PSA_ALG_HMAC(PSA_ALG_SHA_256),
+                            reinterpret_cast<const uint8_t *>(material.data()),
+                            material.size(),
+                            mac,
+                            sizeof(mac),
+                            &mac_len);
+        (void)psa_destroy_key(key);
+        if (p != PSA_SUCCESS || mac_len != 32) {
             out_msg = "auth_internal_error";
             return false;
         }
@@ -573,4 +595,3 @@ bool remote_access_clear_ca_pem(void) {
 bool remote_access_has_ca_pem(void) {
     return !kiln_fs_read_text(CA_CERT_PATH).empty();
 }
-

@@ -35,8 +35,16 @@ void slint_bridge_get_state(slint_kiln_state_t *out);
 bool slint_bridge_start_schedule_json(const char *json);
 bool slint_bridge_load_schedule_json(const char *json);
 void slint_bridge_stop(void);
+void slint_bridge_skip_step(void);
+void slint_bridge_add_temp(float delta_c);
+void slint_bridge_add_time(float delta_minutes);
+bool slint_bridge_set_rate(float rate_c_per_min);
 bool slint_bridge_start_autotune(float target_c);
 void slint_bridge_stop_autotune(void);
+float slint_bridge_get_user_max_temp_c(void);
+float slint_bridge_get_autotune_target_c(void);
+bool slint_bridge_set_autotune_target_c(float target_c);
+bool slint_bridge_clear_fault(void);
 
 void slint_bridge_set_fan_manual(bool enabled);
 void slint_bridge_set_fan_power(int32_t percent);

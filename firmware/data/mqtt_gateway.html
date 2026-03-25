@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MQTT Web Gateway</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+    iframe { width: 100vw; height: 100vh; border: 0; background: #000; display: block; }
+  </style>
+</head>
+<body>
+  <iframe id="mirrorFrame" title="Controller Mirror UI"></iframe>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    let src = (params.get("src") || "").trim();
+    if (!src) src = `${location.origin}/`;
+    if (!/^https?:\/\//i.test(src)) src = `https://${src}`;
+    document.getElementById("mirrorFrame").src = src;
+  </script>
+</body>
+</html>

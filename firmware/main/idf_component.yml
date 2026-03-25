@@ -1,5 +1,6 @@
 dependencies:
   joltwallet/littlefs: ^1.20.4
   espressif/cjson: ^1.7.19~1
+  espressif/mqtt: "*"
   atanisoft/esp_lcd_touch_xpt2046: ^1.0.6
   espressif/mdns: ^1.5.0

@@ -392,33 +392,89 @@ const Dashboard = () => {
       
       {/* LEFT SIDEBAR: SCHEDULE LIBRARY (Desktop Only) */}
       <div className="hidden md:flex w-72 flex-col gap-3 shrink-0 bg-kiln-card border border-kiln-border rounded-xl p-3 shadow-lg overflow-hidden">
-          <h2 className="text-lg font-bold text-white mb-2 px-2 flex items-center gap-2">
-              <Sliders size={20} className="text-kiln-accent" />
-              {t.schedules.library}
-          </h2>
-          
-          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {!schedules || schedules.length === 0 ? (
-                  <div className="text-zinc-500 text-sm p-4 text-center">No schedules found</div>
-              ) : (
-                  schedules.map(s => (
-                  <div 
-                      key={s.id}
-                      onClick={() => setSelectedScheduleId(s.id)}
-                      className={`p-3 rounded-xl cursor-pointer border transition-all relative group ${selectedScheduleId === s.id 
-                          ? 'bg-zinc-800 border-kiln-accent shadow-[0_0_0_1px_rgba(16,185,129,1)]' 
-                          : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}
-                  >
-                      <div className="font-bold text-white text-sm mb-1 pr-6 truncate">{s.name}</div>
-                      <div className="text-xs text-zinc-500">{getScheduleStepCount(s)} {t.schedules.steps} | {s.type || t.schedules.custom}</div>
-                      {selectedScheduleId === s.id && (
-                          <div className="absolute top-4 right-4 text-kiln-accent">
-                              <Check size={16} />
-                          </div>
-                      )}
-                  </div>
-              )))}
+          <button
+              onClick={() => { setIsScheduleMenuOpen(true); refreshSchedules(); }}
+              className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-left hover:border-zinc-700 transition-colors"
+          >
+              <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2 flex items-center gap-2">
+                  <Sliders size={14} className="text-kiln-accent" />
+                  {t.dashboard.selectSchedule}
+              </div>
+              <div className="text-sm font-bold text-white truncate">
+                  {activeSchedule?.name || t.dashboard.selectSchedule}
+              </div>
+              <div className="text-[11px] text-zinc-500 mt-1">
+                  {activeSchedule ? `${getScheduleStepCount(activeSchedule)} ${t.schedules.steps}` : t.schedules.selectToEdit}
+              </div>
+          </button>
+
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2">
+                  {t.dashboard.currentTemp}
+              </div>
+              <div className="text-3xl font-bold text-white tracking-tight leading-none">
+                  {(status.temp || 0).toFixed(1)}
+                  <span className="text-lg text-zinc-500 ml-1">°C</span>
+              </div>
+              <div className="mt-2 text-xs font-semibold">
+                  <span className="text-zinc-500 mr-2">{t.dashboard.status || 'Status'}:</span>
+                  <span className={isIdle ? 'text-zinc-400' : 'text-kiln-accent'}>
+                      {(t.status as Record<string, string>)[status.status] || status.status}
+                  </span>
+              </div>
           </div>
+
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2">
+                  {t.dashboard.segment}
+              </div>
+              <div className="text-xl font-bold text-purple-400 leading-none">
+                  {getSegmentInfo()}
+              </div>
+          </div>
+
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2">
+                  {t.dashboard.timeRemaining}
+              </div>
+              <div className="text-xl font-bold text-white leading-none">
+                  {formatTimeRemaining(status)}
+              </div>
+          </div>
+
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 flex items-center gap-3">
+              <button
+                  onClick={toggleFanPower}
+                  disabled={fanBusy}
+                  className="p-2 rounded-md"
+                  title={isFanEnabled ? 'Fan ON' : 'Fan OFF'}
+              >
+                  <Wind size={30} className={isFanEnabled ? 'text-emerald-400' : 'text-zinc-500'} />
+              </button>
+              <div className="flex-1 text-right">
+                  <div className="text-lg font-bold text-white tabular-nums leading-none">{fanSpeed}%</div>
+                  <div className="text-[10px] text-zinc-500 mt-1">PCB {Number(status.pcbTemp ?? 0).toFixed(1)}°C</div>
+              </div>
+              <div className="flex flex-row items-center gap-2">
+                  <button
+                      onClick={() => nudgeFanManual(-5)}
+                      disabled={fanBusy}
+                      className="w-8 h-8 rounded-md bg-zinc-800 text-zinc-200 text-xl leading-none active:scale-95"
+                      title="Decrease fan power"
+                  >
+                      -
+                  </button>
+                  <button
+                      onClick={() => nudgeFanManual(5)}
+                      disabled={fanBusy}
+                      className="w-8 h-8 rounded-md bg-zinc-800 text-zinc-200 text-xl leading-none active:scale-95"
+                      title="Increase fan power"
+                  >
+                      +
+                  </button>
+              </div>
+          </div>
+
       </div>
 
       {/* RIGHT CONTENT: DASHBOARD & CONTROLS */}
@@ -656,7 +712,7 @@ const Dashboard = () => {
             <div className={`absolute -right-10 -top-10 w-64 h-64 bg-kiln-accent/5 rounded-full blur-3xl pointer-events-none transition-opacity duration-700 ${!isIdle ? 'opacity-100' : 'opacity-0'}`} />
         </div>
 
-        <div className="md:col-span-2 lg:col-span-2 grid grid-cols-2 gap-3 auto-rows-[6rem]">
+        <div className="md:hidden md:col-span-2 lg:col-span-2 grid grid-cols-2 gap-3 auto-rows-[6rem]">
           <StatCard 
               title={t.dashboard.timeRemaining} 
               value={formatTimeRemaining(status)} 

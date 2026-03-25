@@ -18,6 +18,7 @@
 #include "lwip/sys.h"
 #include "cJSON.h"
 #include "kiln_config/config.h"
+#include "drivers/rtc_ds3231.h"
 
 #include <time.h>
 #include <stdlib.h>
@@ -36,6 +37,10 @@ static std::string scan_result_json;
 static bool s_scan_in_progress = false;
 static bool s_sntp_started = false;
 
+static void sntp_time_sync_cb(struct timeval *) {
+    (void)rtc_ds3231_sync_from_system_time();
+}
+
 static void sntp_start_if_needed(void) {
     if (s_sntp_started) return;
     s_sntp_started = true;
@@ -45,6 +50,7 @@ static void sntp_start_if_needed(void) {
 
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, SNTP_SERVER_1);
+    sntp_set_time_sync_notification_cb(sntp_time_sync_cb);
     esp_sntp_init();
     ESP_LOGI(TAG, "SNTP started (server=%s, TZ=%s)", SNTP_SERVER_1, TIMEZONE_TZ);
 }

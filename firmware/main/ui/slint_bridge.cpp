@@ -22,6 +22,19 @@
 static std::atomic<uint64_t> s_ui_heartbeat_ms{0};
 static constexpr const char *UI_PREF_NS = "ui_pref";
 static constexpr const char *UI_PREF_LANG_KEY = "lang";
+static std::atomic<bool> s_fault_clear_inflight{false};
+static std::atomic<uint64_t> s_last_fault_clear_ms{0};
+
+static void fault_clear_worker_task(void *) {
+    const bool cleared = thermalCtrl.clearFault();
+    if (cleared) {
+        wifiServer.notifyCommandResult("fault_clear", {device_commands::ResultCode::Ok}, "cleared", "slint");
+    } else {
+        wifiServer.notifyCommandResult("fault_clear", {device_commands::ResultCode::InvalidPayload}, "clear_rejected", "slint");
+    }
+    s_fault_clear_inflight.store(false, std::memory_order_release);
+    vTaskDelete(nullptr);
+}
 
 static bool notify_slint_command(const char *action,
                                  const device_commands::CommandResult &res,
@@ -78,6 +91,22 @@ extern "C" void slint_bridge_stop(void) {
     (void)notify_slint_command("stop", device_commands::stop("User Button"), "stopped");
 }
 
+extern "C" void slint_bridge_skip_step(void) {
+    (void)notify_slint_command("skip", device_commands::skip(), "ok");
+}
+
+extern "C" void slint_bridge_add_temp(float delta_c) {
+    (void)notify_slint_command("add_temp", device_commands::add_temp((double)delta_c), "ok");
+}
+
+extern "C" void slint_bridge_add_time(float delta_minutes) {
+    (void)notify_slint_command("add_time", device_commands::add_time((double)delta_minutes), "ok");
+}
+
+extern "C" bool slint_bridge_set_rate(float rate_c_per_min) {
+    return notify_slint_command("set_rate", device_commands::set_rate((double)rate_c_per_min), "ok");
+}
+
 extern "C" bool slint_bridge_start_autotune(float target_c) {
     const bool ok = thermalCtrl.startAutotune(target_c);
     if (ok) {
@@ -93,6 +122,47 @@ extern "C" void slint_bridge_stop_autotune(void) {
     thermalCtrl.stopAutotune("Autotune stopped");
     wifiServer.notifyAutotuneState("stop");
     wifiServer.notifyCommandResult("autotune_stop", {device_commands::ResultCode::Ok}, "stopped", "slint");
+}
+
+extern "C" float slint_bridge_get_user_max_temp_c(void) {
+    return thermalCtrl.getUserMaxTemperatureC();
+}
+
+extern "C" float slint_bridge_get_autotune_target_c(void) {
+    return thermalCtrl.getAutotuneTargetC();
+}
+
+extern "C" bool slint_bridge_set_autotune_target_c(float target_c) {
+    return thermalCtrl.setAutotuneTargetC(target_c);
+}
+
+extern "C" bool slint_bridge_clear_fault(void) {
+    const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    const uint64_t last_ms = s_last_fault_clear_ms.load(std::memory_order_relaxed);
+    if ((now_ms > last_ms) && (now_ms - last_ms < 800)) {
+        wifiServer.notifyCommandResult("fault_clear", {device_commands::ResultCode::InvalidPayload}, "busy", "slint");
+        return false;
+    }
+    bool expected = false;
+    if (!s_fault_clear_inflight.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+        wifiServer.notifyCommandResult("fault_clear", {device_commands::ResultCode::InvalidPayload}, "busy", "slint");
+        return false;
+    }
+    s_last_fault_clear_ms.store(now_ms, std::memory_order_relaxed);
+    const BaseType_t task_ok = xTaskCreate(
+        fault_clear_worker_task,
+        "fault_clear",
+        4096,
+        nullptr,
+        tskIDLE_PRIORITY + 1,
+        nullptr
+    );
+    if (task_ok != pdPASS) {
+        s_fault_clear_inflight.store(false, std::memory_order_release);
+        wifiServer.notifyCommandResult("fault_clear", {device_commands::ResultCode::InvalidPayload}, "busy", "slint");
+        return false;
+    }
+    return true;
 }
 
 extern "C" void slint_bridge_set_fan_manual(bool enabled) {

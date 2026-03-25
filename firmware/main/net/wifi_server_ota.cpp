@@ -1,6 +1,6 @@
 #include "net/wifi_server.h"
 
-#include "mbedtls/sha256.h"
+#include "psa/crypto.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -76,9 +76,17 @@ esp_err_t WiFiServerManager::api_ota_update_handler(httpd_req_t *req) {
         return ESP_FAIL;
     }
 
-    mbedtls_sha256_context sha_ctx;
-    mbedtls_sha256_init(&sha_ctx);
-    mbedtls_sha256_starts(&sha_ctx, 0);
+    if (psa_crypto_init() != PSA_SUCCESS) {
+        (void)esp_ota_abort(ota_handle);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    psa_hash_operation_t hash_op = PSA_HASH_OPERATION_INIT;
+    if (psa_hash_setup(&hash_op, PSA_ALG_SHA_256) != PSA_SUCCESS) {
+        (void)esp_ota_abort(ota_handle);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
 
     std::string chunk;
     chunk.resize(4096);
@@ -89,16 +97,21 @@ esp_err_t WiFiServerManager::api_ota_update_handler(httpd_req_t *req) {
         if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
         if (r <= 0) {
             (void)esp_ota_abort(ota_handle);
-            mbedtls_sha256_free(&sha_ctx);
+            (void)psa_hash_abort(&hash_op);
             httpd_resp_send_500(req);
             return ESP_FAIL;
         }
 
-        mbedtls_sha256_update(&sha_ctx, (const unsigned char*)chunk.data(), (size_t)r);
+        if (psa_hash_update(&hash_op, (const uint8_t*)chunk.data(), (size_t)r) != PSA_SUCCESS) {
+            (void)esp_ota_abort(ota_handle);
+            (void)psa_hash_abort(&hash_op);
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
         err = esp_ota_write(ota_handle, chunk.data(), (size_t)r);
         if (err != ESP_OK) {
             (void)esp_ota_abort(ota_handle);
-            mbedtls_sha256_free(&sha_ctx);
+            (void)psa_hash_abort(&hash_op);
             httpd_resp_send_500(req);
             return ESP_FAIL;
         }
@@ -106,8 +119,12 @@ esp_err_t WiFiServerManager::api_ota_update_handler(httpd_req_t *req) {
     }
 
     uint8_t digest[32] = {0};
-    mbedtls_sha256_finish(&sha_ctx, digest);
-    mbedtls_sha256_free(&sha_ctx);
+    size_t digest_len = 0;
+    if (psa_hash_finish(&hash_op, digest, sizeof(digest), &digest_len) != PSA_SUCCESS || digest_len != 32) {
+        (void)esp_ota_abort(ota_handle);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
     const std::string actual_hex = sha256_to_hex(digest);
     if (actual_hex != expected_hex) {
         (void)esp_ota_abort(ota_handle);

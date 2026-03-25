@@ -24,6 +24,8 @@
 #include "net/wifi_server.h"
 #include "net/remote_access.h"
 #include "drivers/fan_driver.h"
+#include "drivers/buzzer_driver.h"
+#include "drivers/rtc_ds3231.h"
 #include "kiln_config/config_store.h"
 #include "kiln_config/fs_utils.h"
 
@@ -84,12 +86,25 @@ static void control_task(void *arg) {
     uint64_t lastLog = 0;
     bool watchdog_latched = false;
     uint64_t last_net_stall_log_ms = 0;
+    int prev_step = -1;
+    bool prev_firing = false;
+    KilnStatus prev_status = KILN_IDLE;
 
     while (true) {
         (void)esp_task_wdt_reset();
         thermalCtrl.loop();
         const KilnState st = thermalCtrl.getState();
         fan_driver_update_from_temperature(board_temp_read_c(), st.isFiring);
+        buzzer_driver_tick();
+        if (prev_firing && st.isFiring && st.currentStep != prev_step && st.currentStep >= 0) {
+            buzzer_driver_beep_segment();
+        }
+        if (prev_status != KILN_COMPLETE && st.status == KILN_COMPLETE) {
+            buzzer_driver_beep_complete();
+        }
+        prev_step = st.currentStep;
+        prev_firing = st.isFiring;
+        prev_status = st.status;
 
         const uint64_t now = esp_timer_get_time() / 1000ULL; // ms
         const uint64_t ui_hb = slint_bridge_get_ui_heartbeat_ms();
@@ -183,11 +198,18 @@ extern "C" void app_main(void) {
 
     ESP_LOGI(TAG, "TRAE KILN CONTROLLER STARTING...");
     board_temp_init();
+    (void)rtc_ds3231_init();
+    if (rtc_ds3231_apply_time_to_system()) {
+        ESP_LOGI(TAG, "Time restored from DS3231");
+    } else {
+        ESP_LOGW(TAG, "DS3231 time not available yet");
+    }
 
     // Init fan PWM (manual override from UI; default OFF).
     fan_driver_init();
     fan_driver_set_manual(false);
     fan_driver_set_power_percent(0);
+    buzzer_driver_init();
 
     // Init LittleFS
     esp_vfs_littlefs_conf_t conf = {};

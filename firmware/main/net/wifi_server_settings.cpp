@@ -69,6 +69,10 @@ esp_err_t WiFiServerManager::api_settings_get_handler(httpd_req_t *req) {
         cJSON_DeleteItemFromObject(root, "maxC");
         cJSON_AddNumberToObject(root, "maxC", 1300.0);
     }
+    cJSON_DeleteItemFromObject(root, "autotune_target_c");
+    cJSON_AddNumberToObject(root, "autotune_target_c", (double)thermalCtrl.getAutotuneTargetC());
+    cJSON_DeleteItemFromObject(root, "autotuneTargetC");
+    cJSON_AddNumberToObject(root, "autotuneTargetC", (double)thermalCtrl.getAutotuneTargetC());
 
     char *rendered = cJSON_PrintUnformatted(root);
     std::string output = rendered ? rendered : "{}";
@@ -166,6 +170,14 @@ esp_err_t WiFiServerManager::api_settings_set_handler(httpd_req_t *req) {
             (void)thermalCtrl.setUserMaxTemperatureC((float)v);
         }
     }
+    {
+        double v = 0.0;
+        if (get_number_like_local(incoming, "autotune_target_c", v) ||
+            get_number_like_local(incoming, "autotuneTargetC", v) ||
+            get_number_like_local(incoming, "autotune_target", v)) {
+            (void)thermalCtrl.setAutotuneTargetC((float)v);
+        }
+    }
 
     device_commands::FanConfig fan_cfg = device_commands::current_fan_config();
     const cJSON *fanManual = cJSON_GetObjectItem(incoming, "fan_manual");
@@ -224,6 +236,10 @@ esp_err_t WiFiServerManager::api_settings_set_handler(httpd_req_t *req) {
 
     cJSON_DeleteItemFromObject(root, "temp_offset_c");
     cJSON_AddNumberToObject(root, "temp_offset_c", (double)thermalCtrl.getTemperatureOffset());
+    cJSON_DeleteItemFromObject(root, "autotune_target_c");
+    cJSON_AddNumberToObject(root, "autotune_target_c", (double)thermalCtrl.getAutotuneTargetC());
+    cJSON_DeleteItemFromObject(root, "autotuneTargetC");
+    cJSON_AddNumberToObject(root, "autotuneTargetC", (double)thermalCtrl.getAutotuneTargetC());
 
     char *rendered = cJSON_PrintUnformatted(root);
     const std::string out = rendered ? rendered : "{}";

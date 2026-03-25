@@ -18,6 +18,9 @@ if not "%IDF_PATH%"=="" (
   if exist "%IDF_PATH%\export.bat" set "EXPORT_BAT=%IDF_PATH%\export.bat"
 )
 
+if "%EXPORT_BAT%"=="" if exist "C:\esp\.espressif\v6.0\esp-idf\export.bat" set "EXPORT_BAT=C:\esp\.espressif\v6.0\esp-idf\export.bat"
+if "%EXPORT_BAT%"=="" if exist "C:\esp\v6.0\esp-idf\export.bat" set "EXPORT_BAT=C:\esp\v6.0\esp-idf\export.bat"
+if "%EXPORT_BAT%"=="" if exist "C:\Espressif\frameworks\esp-idf-v6.0\export.bat" set "EXPORT_BAT=C:\Espressif\frameworks\esp-idf-v6.0\export.bat"
 if "%EXPORT_BAT%"=="" if exist "C:\Espressif\frameworks\esp-idf-v5.5.3\export.bat" set "EXPORT_BAT=C:\Espressif\frameworks\esp-idf-v5.5.3\export.bat"
 if "%EXPORT_BAT%"=="" if exist "C:\Espressif\frameworks\esp-idf-v5.5\export.bat" set "EXPORT_BAT=C:\Espressif\frameworks\esp-idf-v5.5\export.bat"
 if "%EXPORT_BAT%"=="" if exist "C:\esp\v5.5.3\esp-idf\export.bat" set "EXPORT_BAT=C:\esp\v5.5.3\esp-idf\export.bat"
@@ -32,7 +35,7 @@ if "%EXPORT_BAT%"=="" (
 
 if "%EXPORT_BAT%"=="" (
   echo ESP-IDF export.bat not found.
-  echo Install ESP-IDF 5.x and/or set IDF_PATH, then retry.
+  echo Install ESP-IDF 6.x/5.x and/or set IDF_PATH, then retry.
   exit /b 1
 )
 

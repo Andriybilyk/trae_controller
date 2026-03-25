@@ -129,23 +129,23 @@
     <div class="container">
         <div class="header">
             <div class="logo">TRAE KILN</div>
-            <h2>Wi-Fi Setup</h2>
-            <p style="color: #666; font-size: 0.9rem;">Pick your network and connect controller</p>
+            <h2>Налаштування Wi‑Fi</h2>
+            <p style="color: #666; font-size: 0.9rem;">Оберіть мережу та підключіть контролер</p>
         </div>
 
-        <button id="scan-btn" onclick="scanNetworks()">Scan Networks</button>
+        <button id="scan-btn" onclick="scanNetworks()">Пошук мереж</button>
         <ul id="network-list" class="network-list"></ul>
 
         <form action="/save_wifi" method="POST" onsubmit="return validateForm()">
             <div class="form-group">
-                <label for="ssid">Network Name (SSID)</label>
-                <input type="text" id="ssid" name="ssid" placeholder="Type or choose from list" required>
+                <label for="ssid">Назва мережі (SSID)</label>
+                <input type="text" id="ssid" name="ssid" placeholder="Введіть або оберіть зі списку" required>
             </div>
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="Wi-Fi password">
+                <label for="password">Пароль</label>
+                <input type="password" id="password" name="password" placeholder="Пароль Wi‑Fi">
             </div>
-            <button type="submit" id="connect-btn">Connect</button>
+            <button type="submit" id="connect-btn">Підключити</button>
         </form>
 
         <div class="footer">
@@ -168,7 +168,7 @@
             unique.sort((a, b) => b.rssi - a.rssi);
 
             if (unique.length === 0) {
-                list.innerHTML = '<li class="network-item" style="justify-content:center;">No networks found</li>';
+                list.innerHTML = '<li class="network-item" style="justify-content:center;">Мереж не знайдено</li>';
                 return;
             }
 
@@ -235,7 +235,7 @@
             const btn = document.getElementById('scan-btn');
 
             btn.disabled = true;
-            btn.innerHTML = '<div class="spinner"></div> Scanning...';
+            btn.innerHTML = '<div class="spinner"></div> Сканування...';
             list.style.display = 'block';
             list.innerHTML = '';
 
@@ -253,32 +253,32 @@
                 .catch(err => {
                     console.error(err);
                     if (attempt < 2) {
-                        list.innerHTML = '<li class="network-item" style="justify-content:center;">Retrying scan...</li>';
+                        list.innerHTML = '<li class="network-item" style="justify-content:center;">Повторне сканування...</li>';
                         setTimeout(() => scanNetworks(attempt + 1), 900);
                         return;
                     }
-                    list.innerHTML = '<li class="network-item" style="color:red; justify-content:center;">Scan error. Tap Scan again.</li>';
+                    list.innerHTML = '<li class="network-item" style="color:red; justify-content:center;">Помилка сканування. Натисніть «Пошук мереж» ще раз.</li>';
                 })
                 .finally(() => {
                     btn.disabled = false;
-                    btn.innerHTML = 'Scan Networks';
+                    btn.innerHTML = 'Пошук мереж';
                 });
         }
 
         function validateForm() {
             const btn = document.getElementById('connect-btn');
             btn.disabled = true;
-            btn.innerHTML = '<div class="spinner"></div> Connecting...';
+            btn.innerHTML = '<div class="spinner"></div> Підключення...';
             
             // Allow form submission, but intercept the result visually to redirect to the new mDNS host
             setTimeout(() => {
                 document.body.innerHTML = `
                     <div class="container" style="text-align: center; margin-top: 50px;">
-                        <h2>Connecting to Wi-Fi...</h2>
+                        <h2>Підключення до Wi‑Fi...</h2>
                         <div class="spinner" style="width: 40px; height: 40px; border-width: 5px; margin: 20px auto;"></div>
-                        <p>The kiln is restarting and connecting to your network.</p>
-                        <p>You will be redirected automatically in 15 seconds.</p>
-                        <p>If not, go to <a href="http://kiln.local">http://kiln.local</a></p>
+                        <p>Піч перезапускається та підключається до вашої мережі.</p>
+                        <p>Автоматичне перенаправлення через 15 секунд.</p>
+                        <p>Якщо ні — перейдіть за адресою <a href="http://kiln.local">http://kiln.local</a></p>
                     </div>
                 `;
                 setTimeout(() => {

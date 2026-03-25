@@ -81,8 +81,16 @@ extern "C" {
     fn slint_bridge_start_schedule_json(json: *const c_char) -> bool;
     fn slint_bridge_load_schedule_json(json: *const c_char) -> bool;
     fn slint_bridge_stop();
+    fn slint_bridge_skip_step();
+    fn slint_bridge_add_temp(delta_c: f32);
+    fn slint_bridge_add_time(delta_minutes: f32);
+    fn slint_bridge_set_rate(rate_c_per_min: f32) -> bool;
     fn slint_bridge_start_autotune(target_c: f32) -> bool;
     fn slint_bridge_stop_autotune();
+    fn slint_bridge_get_user_max_temp_c() -> f32;
+    fn slint_bridge_get_autotune_target_c() -> f32;
+    fn slint_bridge_set_autotune_target_c(target_c: f32) -> bool;
+    fn slint_bridge_clear_fault() -> bool;
 
     fn slint_bridge_set_fan_manual(enabled: bool);
     fn slint_bridge_set_fan_power(percent: i32);
@@ -217,6 +225,71 @@ fn format_minutes_to_hm(minutes: i32) -> String {
     format!("{:02}:{:02}", hours, mins)
 }
 
+fn translate_fault_reason(reason: &str, is_ua: bool) -> String {
+    if !is_ua {
+        return reason.to_string();
+    }
+    match reason {
+        "Autotune sensor fault" => "Помилка сенсора під час автоналаштування".to_string(),
+        "Autotune timeout" => "Автоналаштування: таймаут".to_string(),
+        "Autotune insufficient data" => "Автоналаштування: недостатньо даних".to_string(),
+        "Sensor comm/no-data" => "Немає даних від сенсора".to_string(),
+        "Sensor open" => "Обрив сенсора".to_string(),
+        "Sensor short" => "Коротке замикання сенсора".to_string(),
+        "Sensor NaN/open" => "Некоректне значення сенсора".to_string(),
+        "Sensor out of range" => "Температура поза діапазоном".to_string(),
+        "Sensor spike/out of range" => "Стрибок температури сенсора".to_string(),
+        "Sensor stuck" => "Сенсор не змінює покази".to_string(),
+        "Sensor not stable yet" => "Сенсор ще не стабілізувався".to_string(),
+        "Sensor comm fault" => "Помилка зв'язку з сенсором".to_string(),
+        "Sensor open fault" => "Обрив сенсора".to_string(),
+        "Sensor short fault" => "Коротке замикання сенсора".to_string(),
+        "Temperature read timeout" => "Таймаут зчитування температури".to_string(),
+        "Temperature runaway" => "Аварійний перегрів".to_string(),
+        "Unknown fault" => "Невідома помилка".to_string(),
+        _ => reason.to_string(),
+    }
+}
+
+fn translate_command_message(message: &str, is_ua: bool) -> String {
+    if !is_ua {
+        return message.to_string();
+    }
+    match message {
+        "ok" => "успішно".to_string(),
+        "error" => "помилка".to_string(),
+        "internal" => "внутрішня помилка".to_string(),
+        "started" => "запущено".to_string(),
+        "stopped" => "зупинено".to_string(),
+        "loaded" => "завантажено".to_string(),
+        "cleared" => "скинуто".to_string(),
+        "clear_rejected" => "скидання відхилено".to_string(),
+        "busy" => "зачекайте, команда виконується".to_string(),
+        "invalid_payload" => "Некоректні дані".to_string(),
+        "invalid_schedule" => "Некоректна програма".to_string(),
+        "no_schedule" => "Програму не завантажено".to_string(),
+        "sensor_invalid" => "Сенсор недійсний".to_string(),
+        "touch_not_calibrated" => "Тач не відкалібрований".to_string(),
+        "fault_active" => "Активна помилка".to_string(),
+        "fan_unsafe" => "Небезпечна конфігурація вентилятора".to_string(),
+        "schedule_over_max_temp" => "Програма перевищує maxC".to_string(),
+        "clock_not_set" => "Годинник RTC/системний час не встановлено".to_string(),
+        "rate_limited" => "Забагато запитів".to_string(),
+        "Sensor invalid" => "Сенсор недійсний".to_string(),
+        "Invalid payload" => "Некоректні дані".to_string(),
+        "Invalid schedule" => "Некоректна програма".to_string(),
+        "No schedule loaded" => "Програму не завантажено".to_string(),
+        "Touch not calibrated" => "Тач не відкалібрований".to_string(),
+        "Fault active" => "Активна помилка".to_string(),
+        "Fan configuration unsafe" => "Небезпечна конфігурація вентилятора".to_string(),
+        "Schedule exceeds max temperature" => "Програма перевищує maxC".to_string(),
+        "RTC/system clock not set" => "Годинник RTC/системний час не встановлено".to_string(),
+        "Too many requests" => "Забагато запитів".to_string(),
+        "Internal error" => "Внутрішня помилка".to_string(),
+        _ => message.to_string(),
+    }
+}
+
 fn load_schedules() -> Vec<ScheduleFile> {
     let path = "/littlefs/schedules.json";
     let Ok(data) = std::fs::read_to_string(path) else {
@@ -299,6 +372,58 @@ fn to_schedule_steps(existing: &[ScheduleStepFile], editor_steps: &[EditorStepRo
         out.push(step);
     }
     out
+}
+
+fn schedule_effective_target_for_step(steps: &[ScheduleStepFile], step_index: usize, fallback: i32) -> i32 {
+    if steps.is_empty() {
+        return fallback;
+    }
+    let idx = step_index.min(steps.len().saturating_sub(1));
+    for j in (0..=idx).rev() {
+        if let Some(t) = steps[j].target {
+            return t;
+        }
+    }
+    fallback
+}
+
+fn running_segment_target(schedule: &ScheduleFile, step_index: i32, fallback: i32) -> i32 {
+    if step_index < 0 {
+        return fallback;
+    }
+    schedule_effective_target_for_step(&schedule.steps, step_index as usize, fallback)
+}
+
+fn apply_runtime_step_delta(old_steps: &[ScheduleStepFile], new_steps: &[ScheduleStepFile], step_index: usize) {
+    if old_steps.is_empty() || new_steps.is_empty() || step_index >= old_steps.len() || step_index >= new_steps.len() {
+        return;
+    }
+    let old_step = &old_steps[step_index];
+    let new_step = &new_steps[step_index];
+
+    let old_target = schedule_effective_target_for_step(old_steps, step_index, 0);
+    let new_target = schedule_effective_target_for_step(new_steps, step_index, old_target);
+    let d_target = new_target - old_target;
+    if d_target != 0 {
+        unsafe { slint_bridge_add_temp(d_target as f32) };
+    }
+
+    if new_step.step_type != "hold" {
+        let old_rate = old_step.rate.unwrap_or(0);
+        let new_rate = new_step.rate.unwrap_or(old_rate);
+        if new_rate > 0 && new_rate != old_rate {
+            let _ = unsafe { slint_bridge_set_rate(new_rate as f32) };
+        }
+    }
+
+    if new_step.step_type == "hold" {
+        let old_hold = old_step.hold_time.unwrap_or(0);
+        let new_hold = new_step.hold_time.unwrap_or(old_hold);
+        let d_hold = new_hold - old_hold;
+        if d_hold != 0 {
+            unsafe { slint_bridge_add_time(d_hold as f32) };
+        }
+    }
 }
 
 fn make_safe_id(name: &str) -> String {
@@ -435,6 +560,17 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
     ui.set_temp(shown_temp);
     ui.set_temp_label(format!("{:.1}", shown_temp).into());
     ui.set_target(state.target_temp as i32);
+    let fallback_target = state.target_temp.round() as i32;
+    let segment_target = if let Some(idx) = app_state.selected_index {
+        if let Some(schedule) = app_state.schedules.get(idx) {
+            running_segment_target(schedule, state.current_step, fallback_target)
+        } else {
+            fallback_target
+        }
+    } else {
+        fallback_target
+    };
+    ui.set_active_segment_target(segment_target);
     ui.set_status_label(status_label.into());
     ui.set_is_idle(is_idle);
     ui.set_step_index(state.current_step as i32);
@@ -446,14 +582,14 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
         fault_reason = c_buf_to_string(&state.error_msg);
     }
     let prev_fault_active = ui.get_fault_active();
-    let prev_fault_reason = ui.get_fault_reason().to_string();
     if !state.fault_active {
         ui.set_fault_popup_hidden(false);
-    } else if !prev_fault_active || prev_fault_reason != fault_reason {
+    } else if !prev_fault_active {
         ui.set_fault_popup_hidden(false);
     }
     ui.set_fault_active(state.fault_active);
-    ui.set_fault_reason(fault_reason.into());
+    let is_ua = ui.get_is_ua();
+    ui.set_fault_reason(translate_fault_reason(&fault_reason, is_ua).into());
 
     let wifi_ok = unsafe { slint_bridge_wifi_is_connected() };
     ui.set_wifi_ok(wifi_ok);
@@ -465,6 +601,17 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
         "http://192.168.4.1".to_string()
     };
     ui.set_wifi_server_url(server_url.into());
+    let initial_max_temp = unsafe { slint_bridge_get_user_max_temp_c() };
+    let initial_max_temp = if initial_max_temp.is_finite() {
+        initial_max_temp.clamp(100.0, 1300.0) as i32
+    } else {
+        1300
+    };
+    ui.set_schedule_target_max_c(initial_max_temp);
+    let initial_autotune_target = unsafe { slint_bridge_get_autotune_target_c() };
+    if initial_autotune_target.is_finite() {
+        ui.set_autotune_target_c(initial_autotune_target.clamp(100.0, 1200.0) as i32);
+    }
 }
 
 fn apply_command_result_to_ui(ui: &AppWindow, cmd: SlintCommandResult, is_ua: bool) {
@@ -472,6 +619,7 @@ fn apply_command_result_to_ui(ui: &AppWindow, cmd: SlintCommandResult, is_ua: bo
     if message.is_empty() {
         message = if cmd.ok { "ok".to_string() } else { "error".to_string() };
     }
+    message = translate_command_message(&message, is_ua);
     let action = c_buf_to_string(&cmd.action);
     let prefix = if is_ua { "Команда" } else { "Command" };
     let label = if action.is_empty() {
@@ -774,7 +922,14 @@ pub extern "C" fn slint_ui_run() {
     ui.set_is_ua(lang_is_ua);
     ui.set_wifi_networks(ModelRc::new(VecModel::from(Vec::<WifiNetworkRow>::new())));
     ui.set_wifi_qr_image(build_qr_image(&format!("WIFI:T:nopass;S:{};;", CONTROLLER_AP_SSID)));
-    ui.set_wifi_qr_hint("Scan to join controller Wi-Fi".into());
+    ui.set_wifi_qr_hint(
+        if lang_is_ua {
+            "Відскануйте, щоб підключитися до Wi‑Fi контролера"
+        } else {
+            "Scan to join controller Wi-Fi"
+        }
+        .into(),
+    );
 
     let mut state = AppState {
         schedules: load_schedules(),
@@ -808,6 +963,8 @@ pub extern "C" fn slint_ui_run() {
     let calib_state: Rc<RefCell<TouchCalibration>> = Rc::new(RefCell::new(TouchCalibration::default()));
     let start_cooldown_at = Rc::new(RefCell::new(Instant::now() - Duration::from_secs(5)));
     let stop_cooldown_at = Rc::new(RefCell::new(Instant::now() - Duration::from_secs(5)));
+    let clear_fault_cooldown_at = Rc::new(RefCell::new(Instant::now() - Duration::from_secs(5)));
+    let clear_fault_inflight = Rc::new(RefCell::new(false));
     let kb_key_last = Rc::new(RefCell::new((String::new(), Instant::now() - Duration::from_secs(5))));
     let wifi_scan_in_progress = Rc::new(RefCell::new(false));
 
@@ -819,6 +976,50 @@ pub extern "C" fn slint_ui_run() {
             ui.set_view(View::Schedules);
             let state = app_state.borrow();
             refresh_schedule_model(&ui, &state);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_open_selected_program(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let mut state = app_state.borrow_mut();
+            if let Some(idx) = state.selected_index {
+                if idx < state.schedules.len() {
+                    state.editing_index = Some(idx);
+                    let schedule = state.schedules[idx].clone();
+                    state.editor_steps = to_editor_steps(&schedule);
+                    ui.set_selected_schedule_name(schedule.name.clone().into());
+                    refresh_editor_model(&ui, &state);
+                    ui.set_view(View::Editor);
+                } else {
+                    ui.set_view(View::Schedules);
+                }
+            } else {
+                ui.set_view(View::Schedules);
+            }
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_open_running_editor(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let mut state = app_state.borrow_mut();
+            if let Some(idx) = state.selected_index {
+                if idx < state.schedules.len() {
+                    state.editing_index = Some(idx);
+                    let schedule = state.schedules[idx].clone();
+                    state.editor_steps = to_editor_steps(&schedule);
+                    ui.set_selected_schedule_name(schedule.name.clone().into());
+                    refresh_editor_model(&ui, &state);
+                    ui.set_view(View::Editor);
+                    return;
+                }
+            }
+            ui.set_view(View::Schedules);
         });
     }
 
@@ -884,6 +1085,9 @@ pub extern "C" fn slint_ui_run() {
             let clamped = target.clamp(100, 1200);
             ui.set_autotune_target_c(clamped);
             unsafe {
+                let _ = slint_bridge_set_autotune_target_c(clamped as f32);
+            }
+            unsafe {
                 let _ = slint_bridge_start_autotune(clamped as f32);
             }
         });
@@ -892,6 +1096,32 @@ pub extern "C" fn slint_ui_run() {
     {
         ui.on_autotune_stop(move || {
             unsafe { slint_bridge_stop_autotune() };
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let clear_fault_cooldown_at = clear_fault_cooldown_at.clone();
+        let clear_fault_inflight = clear_fault_inflight.clone();
+        ui.on_clear_fault(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            {
+                let mut inflight = clear_fault_inflight.borrow_mut();
+                if *inflight {
+                    return;
+                }
+                let mut last = clear_fault_cooldown_at.borrow_mut();
+                if last.elapsed() < Duration::from_millis(700) {
+                    return;
+                }
+                *inflight = true;
+                *last = Instant::now();
+            }
+            let ok = unsafe { slint_bridge_clear_fault() };
+            *clear_fault_inflight.borrow_mut() = false;
+            if ok {
+                ui.set_fault_popup_hidden(false);
+            }
         });
     }
 
@@ -972,6 +1202,31 @@ pub extern "C" fn slint_ui_run() {
 
     {
         let ui_weak = ui_weak.clone();
+        ui.on_skip_step(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_show_skip_confirm(true);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_skip_cancel(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_show_skip_confirm(false);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_skip_confirm(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            unsafe { slint_bridge_skip_step(); }
+            ui.set_show_skip_confirm(false);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
         let stop_cooldown_at = stop_cooldown_at.clone();
         ui.on_stop_confirm(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
@@ -984,6 +1239,53 @@ pub extern "C" fn slint_ui_run() {
             }
             unsafe { slint_bridge_stop() };
             ui.set_show_stop_confirm(false);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_running_edit_back(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_view(View::Dashboard);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_running_edit_apply(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_show_running_edit_confirm(true);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_running_edit_cancel(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_show_running_edit_confirm(false);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_running_edit_confirm(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let d_temp = ui.get_running_edit_add_temp() as f32;
+            let d_time = ui.get_running_edit_add_time() as f32;
+            let rate = ui.get_running_edit_rate() as f32;
+            if rate > 0.0 {
+                let _ = unsafe { slint_bridge_set_rate(rate) };
+            }
+            if d_temp != 0.0 {
+                unsafe { slint_bridge_add_temp(d_temp); }
+            }
+            if d_time != 0.0 {
+                unsafe { slint_bridge_add_time(d_time); }
+            }
+            ui.set_show_running_edit_confirm(false);
+            ui.set_running_edit_add_temp(0);
+            ui.set_running_edit_add_time(0);
+            ui.set_view(View::Dashboard);
         });
     }
 
@@ -1075,6 +1377,10 @@ pub extern "C" fn slint_ui_run() {
             ui.set_kb_visible(false);
             let mut state = app_state.borrow_mut();
             if let Some(idx) = state.editing_index {
+                let was_firing = !ui.get_is_idle();
+                let current_step = ui.get_step_index().max(0) as usize;
+                let selected_for_run = state.selected_index;
+                let old_steps = state.schedules.get(idx).map(|s| s.steps.clone()).unwrap_or_default();
                 let name = ui.get_selected_schedule_name().to_string();
                 let steps = to_schedule_steps(&state.schedules[idx].steps, &state.editor_steps);
                 if let Some(schedule) = state.schedules.get_mut(idx) {
@@ -1089,9 +1395,18 @@ pub extern "C" fn slint_ui_run() {
                     }
                 }
                 let _ = save_schedules(&state.schedules);
+                if was_firing && selected_for_run == Some(idx) {
+                    if let Some(updated) = state.schedules.get(idx) {
+                        apply_runtime_step_delta(&old_steps, &updated.steps, current_step);
+                    }
+                }
                 unsafe { slint_bridge_notify_schedules_changed() };
                 refresh_schedule_model(&ui, &state);
-                ui.set_view(View::Schedules);
+                ui.set_view(if was_firing && selected_for_run == Some(idx) {
+                    View::Dashboard
+                } else {
+                    View::Schedules
+                });
             }
         });
     }
@@ -1256,12 +1571,16 @@ pub extern "C" fn slint_ui_run() {
                 return;
             }
 
+            let schedule_target_max = ui.get_schedule_target_max_c().clamp(100, 1300);
             let (min, max, max_len) = match field.as_str() {
                 "rate" => (0, 9999, 4usize),
-                "target" => (0, 2000, 4usize),
+                "target" => (0, schedule_target_max, 4usize),
                 "hold" => (0, 999, 3usize),
                 "fan" => (0, 100, 3usize),
                 "autotune" => (100, 1200, 4usize),
+                "run_rate" => (1, 9999, 4usize),
+                "run_temp" => (-300, 300, 4usize),
+                "run_time" => (-300, 300, 4usize),
                 _ => (0, 9999, 5usize),
             };
 
@@ -1305,13 +1624,46 @@ pub extern "C" fn slint_ui_run() {
                     } else if field == "autotune" {
                         let parsed = parse_int_with_clamp(&value, min, max, ui.get_autotune_target_c());
                         ui.set_autotune_target_c(parsed);
+                        unsafe {
+                            let _ = slint_bridge_set_autotune_target_c(parsed as f32);
+                        }
+                    } else if field == "run_rate" {
+                        let parsed = parse_int_with_clamp(&value, min, max, ui.get_running_edit_rate());
+                        ui.set_running_edit_rate(parsed);
+                    } else if field == "run_temp" {
+                        let parsed = parse_int_with_clamp(&value, min, max, ui.get_running_edit_add_temp());
+                        ui.set_running_edit_add_temp(parsed);
+                    } else if field == "run_time" {
+                        let parsed = parse_int_with_clamp(&value, min, max, ui.get_running_edit_add_time());
+                        ui.set_running_edit_add_time(parsed);
                     }
                     ui.set_kb_visible(false);
                 }
-                digit if digit.len() == 1 && digit.chars().all(|c| c.is_ascii_digit()) => {
+                digit if digit.len() == 1 && (digit.chars().all(|c| c.is_ascii_digit()) || digit == "-") => {
                     let mut v = ui.get_kb_value().to_string();
+                    if digit == "-" {
+                        if !matches!(field.as_str(), "run_temp" | "run_time") {
+                            return;
+                        }
+                        if v.starts_with('-') {
+                            v = v.trim_start_matches('-').to_string();
+                        } else if v.is_empty() || v == "0" {
+                            v = "-".to_string();
+                        } else {
+                            v = format!("-{}", v);
+                        }
+                        ui.set_kb_value(v.into());
+                        return;
+                    }
                     if v == "0" {
                         v.clear();
+                    }
+                    if v == "-" {
+                        if v.len() < max_len {
+                            v.push_str(digit);
+                            ui.set_kb_value(v.into());
+                        }
+                        return;
                     }
                     if v.len() < max_len {
                         v.push_str(digit);
@@ -1538,6 +1890,14 @@ pub extern "C" fn slint_ui_run() {
             {
                 let mut state = app_state.borrow_mut();
                 apply_state_to_ui(&ui, s, &mut state);
+            }
+            let max_temp = unsafe { slint_bridge_get_user_max_temp_c() };
+            if max_temp.is_finite() {
+                ui.set_schedule_target_max_c(max_temp.clamp(100.0, 1300.0) as i32);
+            }
+            let autotune_target = unsafe { slint_bridge_get_autotune_target_c() };
+            if autotune_target.is_finite() {
+                ui.set_autotune_target_c(autotune_target.clamp(100.0, 1200.0) as i32);
             }
             let wifi_ok = ui.get_wifi_ok();
             let url = ui.get_wifi_server_url().to_string();

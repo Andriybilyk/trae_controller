@@ -493,8 +493,8 @@ static esp_err_t touch_init(void) {
     if (s_touch) return ESP_OK;
 
     esp_lcd_panel_io_spi_config_t io_cfg{};
-    io_cfg.cs_gpio_num = (int)TOUCH_CS;
-    io_cfg.dc_gpio_num = (int)GPIO_NUM_NC;
+    io_cfg.cs_gpio_num = (gpio_num_t)TOUCH_CS;
+    io_cfg.dc_gpio_num = (gpio_num_t)GPIO_NUM_NC;
     io_cfg.spi_mode = s_touch_spi_mode;
     io_cfg.pclk_hz = (unsigned int)s_touch_spi_hz;
     io_cfg.trans_queue_depth = 3;

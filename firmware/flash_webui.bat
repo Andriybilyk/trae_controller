@@ -17,13 +17,17 @@ if not "%IDF_PATH%"=="" (
   if exist "%IDF_PATH%\export.ps1" set "EXPORT_PS1=%IDF_PATH%\export.ps1"
 )
 
+if "%EXPORT_PS1%"=="" if exist "C:\esp\.espressif\v6.0\esp-idf\export.ps1" set "EXPORT_PS1=C:\esp\.espressif\v6.0\esp-idf\export.ps1"
+if "%EXPORT_PS1%"=="" if exist "C:\esp\v6.0\esp-idf\export.ps1" set "EXPORT_PS1=C:\esp\v6.0\esp-idf\export.ps1"
+if "%EXPORT_PS1%"=="" if exist "C:\Espressif\frameworks\esp-idf-v6.0\export.ps1" set "EXPORT_PS1=C:\Espressif\frameworks\esp-idf-v6.0\export.ps1"
 if "%EXPORT_PS1%"=="" if exist "C:\Espressif\frameworks\esp-idf-v5.5.3\export.ps1" set "EXPORT_PS1=C:\Espressif\frameworks\esp-idf-v5.5.3\export.ps1"
 if "%EXPORT_PS1%"=="" if exist "C:\Espressif\frameworks\esp-idf-v5.5\export.ps1" set "EXPORT_PS1=C:\Espressif\frameworks\esp-idf-v5.5\export.ps1"
+if "%EXPORT_PS1%"=="" if exist "%USERPROFILE%\esp\esp-idf-v6.0\export.ps1" set "EXPORT_PS1=%USERPROFILE%\esp\esp-idf-v6.0\export.ps1"
 if "%EXPORT_PS1%"=="" if exist "%USERPROFILE%\esp\esp-idf-v5.5.3\export.ps1" set "EXPORT_PS1=%USERPROFILE%\esp\esp-idf-v5.5.3\export.ps1"
 
 if "%EXPORT_PS1%"=="" (
   echo ESP-IDF export.ps1 not found.
-  echo Install ESP-IDF 5.x and/or set IDF_PATH, then retry.
+  echo Install ESP-IDF 6.x/5.x and/or set IDF_PATH, then retry.
   exit /b 1
 )
 

@@ -15,7 +15,6 @@
 #include "kiln_config/config_store.h"
 #include "kiln_config/fs_utils.h"
 #include "cJSON.h"
-#include "mbedtls/sha256.h"
 #include <string>
 #include <cctype>
 #include <algorithm>
@@ -25,6 +24,7 @@
 #include <cstdlib>
 #include <unistd.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 static const char *TAG = "SERVER";
 static constexpr uint32_t STATE_SCHEMA_VERSION = 1;
@@ -32,6 +32,9 @@ static constexpr uint32_t START_RATE_LIMIT_MS = 700;
 static constexpr uint32_t STOP_RATE_LIMIT_MS = 400;
 static constexpr uint32_t SKIP_RATE_LIMIT_MS = 400;
 static constexpr uint32_t TUNE_RATE_LIMIT_MS = 150;
+static constexpr const char *AUDIT_LOG_FILE = "/littlefs/logs/audit.log";
+static constexpr const char *AUDIT_LOG_PREV_FILE = "/littlefs/logs/audit.log.1";
+static constexpr size_t AUDIT_LOG_MAX_BYTES = 128 * 1024;
 
 static const char *result_code_to_str(device_commands::ResultCode code);
 static const char *result_message(device_commands::ResultCode code);
@@ -40,6 +43,62 @@ static void copy_text_field(char *dst, size_t dst_len, const char *src) {
     dst[0] = '\0';
     if (!src) return;
     std::snprintf(dst, dst_len, "%s", src);
+}
+
+static bool is_critical_audit_action(const char *action) {
+    if (!action || !action[0]) return false;
+    return std::strcmp(action, "start") == 0 ||
+           std::strcmp(action, "stop") == 0 ||
+           std::strcmp(action, "fault_clear") == 0 ||
+           std::strcmp(action, "autotune_start") == 0 ||
+           std::strcmp(action, "autotune_stop") == 0;
+}
+
+static void rotate_audit_log_if_needed() {
+    const size_t size = kiln_fs_file_size(AUDIT_LOG_FILE);
+    if (size < AUDIT_LOG_MAX_BYTES) return;
+    SemaphoreHandle_t m = kiln_config_fs_mutex();
+    if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
+    (void)unlink(AUDIT_LOG_PREV_FILE);
+    (void)rename(AUDIT_LOG_FILE, AUDIT_LOG_PREV_FILE);
+    if (m) xSemaphoreGiveRecursive(m);
+}
+
+static void append_audit_log_entry(const char *kind,
+                                   const char *action,
+                                   const char *source,
+                                   bool ok,
+                                   const char *code,
+                                   const char *message) {
+    (void)mkdir(LOGS_DIR, 0777);
+    rotate_audit_log_if_needed();
+
+    cJSON *doc = cJSON_CreateObject();
+    cJSON_AddNumberToObject(doc, "ts_ms", (double)(esp_timer_get_time() / 1000ULL));
+    cJSON_AddStringToObject(doc, "kind", kind && kind[0] ? kind : "unknown");
+    cJSON_AddStringToObject(doc, "action", action && action[0] ? action : "unknown");
+    cJSON_AddStringToObject(doc, "source", source && source[0] ? source : "unknown");
+    cJSON_AddBoolToObject(doc, "ok", ok);
+    cJSON_AddStringToObject(doc, "code", code && code[0] ? code : (ok ? "ok" : "error"));
+    cJSON_AddStringToObject(doc, "message", message && message[0] ? message : "");
+
+    char *rendered = cJSON_PrintUnformatted(doc);
+    cJSON_Delete(doc);
+    if (!rendered) return;
+
+    SemaphoreHandle_t m = kiln_config_fs_mutex();
+    if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
+    FILE *f = std::fopen(AUDIT_LOG_FILE, "a");
+    if (f) {
+        std::fwrite(rendered, 1, std::strlen(rendered), f);
+        std::fwrite("\n", 1, 1, f);
+        std::fflush(f);
+        const int fd = fileno(f);
+        if (fd >= 0) (void)fsync(fd);
+        std::fclose(f);
+    }
+    if (m) xSemaphoreGiveRecursive(m);
+    free(rendered);
 }
 
 WiFiServerManager::WiFiServerManager() {
@@ -489,6 +548,9 @@ void WiFiServerManager::setupRoutes() {
     httpd_uri_t api_add_time_uri = make_uri("/api/addTime", HTTP_POST, api_add_time_handler);
     httpd_register_uri_handler(server, &api_add_time_uri);
 
+    httpd_uri_t api_set_rate_uri = make_uri("/api/setRate", HTTP_POST, api_set_rate_handler);
+    httpd_register_uri_handler(server, &api_set_rate_uri);
+
     httpd_uri_t api_fan_get_uri = make_uri("/api/fan", HTTP_GET, api_fan_get_handler);
     httpd_register_uri_handler(server, &api_fan_get_uri);
 
@@ -516,11 +578,20 @@ void WiFiServerManager::setupRoutes() {
     httpd_uri_t api_settings_set_uri = make_uri("/api/settings", HTTP_POST, api_settings_set_handler);
     httpd_register_uri_handler(server, &api_settings_set_uri);
 
-    httpd_uri_t settings_get_uri = make_uri("/settings", HTTP_GET, api_settings_get_handler);
+    httpd_uri_t settings_get_uri = make_uri("/settings", HTTP_GET, index_handler);
     httpd_register_uri_handler(server, &settings_get_uri);
 
     httpd_uri_t settings_set_uri = make_uri("/settings", HTTP_POST, api_settings_set_handler);
     httpd_register_uri_handler(server, &settings_set_uri);
+
+    httpd_uri_t api_backup_export_uri = make_uri("/api/backup", HTTP_GET, api_backup_export_handler);
+    httpd_register_uri_handler(server, &api_backup_export_uri);
+
+    httpd_uri_t api_backup_import_uri = make_uri("/api/backup/import", HTTP_POST, api_backup_import_handler);
+    httpd_register_uri_handler(server, &api_backup_import_uri);
+
+    httpd_uri_t api_diag_bundle_uri = make_uri("/api/diagnostics/bundle", HTTP_GET, api_diagnostics_bundle_handler);
+    httpd_register_uri_handler(server, &api_diag_bundle_uri);
 
     httpd_uri_t api_remote_get_uri = make_uri("/api/remote", HTTP_GET, api_remote_get_handler);
     httpd_register_uri_handler(server, &api_remote_get_uri);
@@ -597,7 +668,7 @@ void WiFiServerManager::setupRoutes() {
     httpd_uri_t manifest_uri = make_uri("/manifest.json", HTTP_GET, manifest_handler);
     httpd_register_uri_handler(server, &manifest_uri);
 
-    httpd_uri_t bootstrap_uri = make_uri("/bootstrap.js", HTTP_GET, static_asset_handler);
+    httpd_uri_t bootstrap_uri = make_uri("/bootstrap.js*", HTTP_GET, static_asset_handler);
     httpd_register_uri_handler(server, &bootstrap_uri);
 
     httpd_uri_t touch_calib_uri = make_uri("/touch_calibration.html", HTTP_GET, static_asset_handler);
@@ -609,9 +680,6 @@ void WiFiServerManager::setupRoutes() {
     httpd_uri_t assets_uri = make_uri("/assets/*", HTTP_GET, static_asset_handler);
     httpd_register_uri_handler(server, &assets_uri);
 
-    httpd_uri_t index_uri = make_uri("/*", HTTP_GET, index_handler);
-    httpd_register_uri_handler(server, &index_uri);
-
     if (isAPMode) {
         httpd_uri_t generate_204 = make_uri("/generate_204", HTTP_GET, redirect_handler);
         httpd_register_uri_handler(server, &generate_204);
@@ -619,9 +687,18 @@ void WiFiServerManager::setupRoutes() {
         httpd_register_uri_handler(server, &gen_204);
         httpd_uri_t hotspot_detect = make_uri("/hotspot-detect.html", HTTP_GET, redirect_handler);
         httpd_register_uri_handler(server, &hotspot_detect);
+        httpd_uri_t hotspotdetect = make_uri("/hotspotdetect.html", HTTP_GET, redirect_handler);
+        httpd_register_uri_handler(server, &hotspotdetect);
         httpd_uri_t ncsi = make_uri("/ncsi.txt", HTTP_GET, redirect_handler);
         httpd_register_uri_handler(server, &ncsi);
+        httpd_uri_t connecttest = make_uri("/connecttest.txt", HTTP_GET, redirect_handler);
+        httpd_register_uri_handler(server, &connecttest);
+        httpd_uri_t fwlink = make_uri("/fwlink", HTTP_GET, redirect_handler);
+        httpd_register_uri_handler(server, &fwlink);
     }
+
+    httpd_uri_t index_uri = make_uri("/*", HTTP_GET, index_handler);
+    httpd_register_uri_handler(server, &index_uri);
 }
 
 esp_err_t WiFiServerManager::api_fault_clear_handler(httpd_req_t *req) {
@@ -749,8 +826,14 @@ static cJSON *build_device_state_doc() {
     cJSON_AddBoolToObject(t, "heater_on", tune.heaterOn);
     cJSON_AddNumberToObject(t, "setpoint_c", (double)tune.setpointC);
     cJSON_AddNumberToObject(t, "cycles", (double)tune.cycles);
+    cJSON_AddNumberToObject(t, "valid_cycles", (double)tune.valid_cycles);
+    cJSON_AddNumberToObject(t, "total_cycles", (double)tune.total_cycles);
     cJSON_AddNumberToObject(t, "ku", (double)tune.ku);
     cJSON_AddNumberToObject(t, "pu_s", (double)tune.pu_s);
+    cJSON_AddNumberToObject(t, "period_cv", (double)tune.period_cv);
+    cJSON_AddNumberToObject(t, "amp_cv", (double)tune.amp_cv);
+    cJSON_AddNumberToObject(t, "quality", (double)tune.quality);
+    cJSON_AddNumberToObject(t, "confidence", (double)tune.confidence);
     cJSON_AddNumberToObject(t, "kp", (double)tune.kp);
     cJSON_AddNumberToObject(t, "ki", (double)tune.ki);
     cJSON_AddNumberToObject(t, "kd", (double)tune.kd);
@@ -837,6 +920,9 @@ void WiFiServerManager::notifyCommandResult(const char *action,
         copy_text_field(lastCommandResult.code, sizeof(lastCommandResult.code), code);
         copy_text_field(lastCommandResult.message, sizeof(lastCommandResult.message), message);
     }
+    if (is_critical_audit_action(action)) {
+        append_audit_log_entry("command", action, source, ok, code, message);
+    }
 
     if (!server) return;
 
@@ -914,6 +1000,7 @@ void WiFiServerManager::notifySettingsChanged(const char *action) {
         settingsRevision.store(1, std::memory_order_relaxed);
         rev = 1;
     }
+    append_audit_log_entry("settings", action && action[0] ? action : "settings", "api", true, "ok", "settings_changed");
     if (!server) return;
 
     cJSON *doc = cJSON_CreateObject();
@@ -946,10 +1033,16 @@ void WiFiServerManager::notifySettingsChanged(const char *action) {
 }
 
 void WiFiServerManager::notifyAutotuneState(const char *action) {
-    if (!server) return;
-
     const ThermalController::AutoTuneStatus tune = thermalCtrl.getAutotuneStatus();
     const SafetyStats safety = thermalCtrl.getSafetyStats();
+    if (action && action[0]) {
+        char msg[128];
+        std::snprintf(msg, sizeof(msg),
+                      "active=%d,setpoint=%.1f,cycles=%d,fault=%d",
+                      tune.active ? 1 : 0, (double)tune.setpointC, tune.cycles, safety.faultActive ? 1 : 0);
+        append_audit_log_entry("autotune", action, "state", !safety.faultActive, safety.faultActive ? "fault" : "ok", msg);
+    }
+    if (!server) return;
 
     cJSON *doc = cJSON_CreateObject();
     cJSON_AddStringToObject(doc, "event", "autotune_state");
@@ -964,8 +1057,14 @@ void WiFiServerManager::notifyAutotuneState(const char *action) {
     cJSON_AddBoolToObject(t, "heater_on", tune.heaterOn);
     cJSON_AddNumberToObject(t, "setpoint_c", (double)tune.setpointC);
     cJSON_AddNumberToObject(t, "cycles", (double)tune.cycles);
+    cJSON_AddNumberToObject(t, "valid_cycles", (double)tune.valid_cycles);
+    cJSON_AddNumberToObject(t, "total_cycles", (double)tune.total_cycles);
     cJSON_AddNumberToObject(t, "ku", (double)tune.ku);
     cJSON_AddNumberToObject(t, "pu_s", (double)tune.pu_s);
+    cJSON_AddNumberToObject(t, "period_cv", (double)tune.period_cv);
+    cJSON_AddNumberToObject(t, "amp_cv", (double)tune.amp_cv);
+    cJSON_AddNumberToObject(t, "quality", (double)tune.quality);
+    cJSON_AddNumberToObject(t, "confidence", (double)tune.confidence);
     cJSON_AddNumberToObject(t, "kp", (double)tune.kp);
     cJSON_AddNumberToObject(t, "ki", (double)tune.ki);
     cJSON_AddNumberToObject(t, "kd", (double)tune.kd);
@@ -1392,6 +1491,10 @@ static const char *result_code_to_str(device_commands::ResultCode code) {
         case device_commands::ResultCode::NoSchedule: return "no_schedule";
         case device_commands::ResultCode::SensorInvalid: return "sensor_invalid";
         case device_commands::ResultCode::TouchNotCalibrated: return "touch_not_calibrated";
+        case device_commands::ResultCode::FaultActive: return "fault_active";
+        case device_commands::ResultCode::FanUnsafe: return "fan_unsafe";
+        case device_commands::ResultCode::ScheduleOverMaxTemp: return "schedule_over_max_temp";
+        case device_commands::ResultCode::ClockNotSet: return "clock_not_set";
         default: return "internal";
     }
 }
@@ -1404,6 +1507,10 @@ static const char *result_message(device_commands::ResultCode code) {
         case device_commands::ResultCode::NoSchedule: return "No schedule loaded";
         case device_commands::ResultCode::SensorInvalid: return "Sensor invalid";
         case device_commands::ResultCode::TouchNotCalibrated: return "Touch not calibrated";
+        case device_commands::ResultCode::FaultActive: return "Fault active";
+        case device_commands::ResultCode::FanUnsafe: return "Fan configuration unsafe";
+        case device_commands::ResultCode::ScheduleOverMaxTemp: return "Schedule exceeds max temperature";
+        case device_commands::ResultCode::ClockNotSet: return "RTC/system clock not set";
         default: return "Internal error";
     }
 }
@@ -1459,6 +1566,12 @@ static void send_command_result(httpd_req_t *req,
             send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
             break;
         case device_commands::ResultCode::TouchNotCalibrated:
+            send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
+            break;
+        case device_commands::ResultCode::FaultActive:
+        case device_commands::ResultCode::FanUnsafe:
+        case device_commands::ResultCode::ScheduleOverMaxTemp:
+        case device_commands::ResultCode::ClockNotSet:
             send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
             break;
         default:
@@ -1596,6 +1709,31 @@ esp_err_t WiFiServerManager::api_add_time_handler(httpd_req_t *req) {
         return ESP_OK;
     }
     send_command_result(req, device_commands::add_time(delta), "ok", "add_time");
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_set_rate_handler(httpd_req_t *req) {
+    if (!check_rate_limit(wifiServer.lastAddTimeCommandMs, TUNE_RATE_LIMIT_MS, req)) {
+        return ESP_OK;
+    }
+    std::string body;
+    body.resize((size_t)req->content_len);
+    size_t off = 0;
+    while (off < body.size()) {
+        const int r = httpd_req_recv(req, body.data() + off, body.size() - off);
+        if (r <= 0) {
+            if (r == HTTPD_SOCK_ERR_TIMEOUT) continue;
+            send_command_result(req, {device_commands::ResultCode::InvalidPayload}, "ok", "set_rate");
+            return ESP_OK;
+        }
+        off += (size_t)r;
+    }
+    double rate = 0.0;
+    if (!parse_numeric_delta_from_body(body, "rate", rate)) {
+        send_command_result(req, {device_commands::ResultCode::InvalidPayload}, "ok", "set_rate");
+        return ESP_OK;
+    }
+    send_command_result(req, device_commands::set_rate(rate), "ok", "set_rate");
     return ESP_OK;
 }
 

@@ -4,6 +4,7 @@
 
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "cJSON.h"
 
 #include <cstdio>
 
@@ -11,6 +12,7 @@ static SemaphoreHandle_t s_fs_mutex = xSemaphoreCreateRecursiveMutex();
 
 static constexpr const char *NVS_NS = "kiln";
 static constexpr const char *NVS_KEY = "config_json";
+static constexpr int CONFIG_SCHEMA_VERSION = 2;
 
 SemaphoreHandle_t kiln_config_fs_mutex() {
     return s_fs_mutex;
@@ -82,20 +84,77 @@ static bool nvs_save_string(const std::string &s) {
     return err1 == ESP_OK && err2 == ESP_OK;
 }
 
+static std::string migrate_config_json_schema(const std::string &json, bool *changed_out = nullptr) {
+    bool changed = false;
+    cJSON *root = nullptr;
+    if (!json.empty()) root = cJSON_ParseWithLength(json.c_str(), json.size());
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
+        root = cJSON_CreateObject();
+        changed = true;
+    }
+
+    int ver = 1;
+    const cJSON *sv = cJSON_GetObjectItem(root, "schema_version");
+    if (cJSON_IsNumber(sv)) ver = (int)sv->valuedouble;
+    if (ver < 1) ver = 1;
+
+    if (ver < 2) {
+        const cJSON *offset = cJSON_GetObjectItem(root, "offset");
+        if (cJSON_IsNumber(offset) && !cJSON_IsNumber(cJSON_GetObjectItem(root, "temp_offset_c"))) {
+            cJSON_AddNumberToObject(root, "temp_offset_c", offset->valuedouble);
+            changed = true;
+        }
+        const cJSON *at = cJSON_GetObjectItem(root, "autotuneTargetC");
+        if (cJSON_IsNumber(at) && !cJSON_IsNumber(cJSON_GetObjectItem(root, "autotune_target_c"))) {
+            cJSON_AddNumberToObject(root, "autotune_target_c", at->valuedouble);
+            changed = true;
+        }
+        const cJSON *at2 = cJSON_GetObjectItem(root, "autotune_target");
+        if (cJSON_IsNumber(at2) && !cJSON_IsNumber(cJSON_GetObjectItem(root, "autotune_target_c"))) {
+            cJSON_AddNumberToObject(root, "autotune_target_c", at2->valuedouble);
+            changed = true;
+        }
+        ver = 2;
+        changed = true;
+    }
+
+    cJSON_DeleteItemFromObject(root, "schema_version");
+    cJSON_AddNumberToObject(root, "schema_version", (double)CONFIG_SCHEMA_VERSION);
+
+    char *rendered = cJSON_PrintUnformatted(root);
+    std::string out = rendered ? rendered : "{}";
+    if (rendered) free(rendered);
+    cJSON_Delete(root);
+    if (changed_out) *changed_out = changed;
+    return out;
+}
+
 std::string kiln_config_load_json_config() {
     SemaphoreHandle_t m = kiln_config_fs_mutex();
     if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
     std::string file = read_file_to_string_locked(CONFIG_FILE);
     if (m) xSemaphoreGiveRecursive(m);
-    if (!file.empty()) return file;
-    return nvs_load_string();
+    if (!file.empty()) {
+        bool migrated = false;
+        std::string out = migrate_config_json_schema(file, &migrated);
+        if (migrated) (void)kiln_config_save_json_config(out);
+        return out;
+    }
+    std::string nvs = nvs_load_string();
+    if (nvs.empty()) return {};
+    bool migrated = false;
+    std::string out = migrate_config_json_schema(nvs, &migrated);
+    if (migrated) (void)kiln_config_save_json_config(out);
+    return out;
 }
 
 bool kiln_config_save_json_config(const std::string &json) {
-    (void)nvs_save_string(json);
+    const std::string migrated = migrate_config_json_schema(json, nullptr);
+    (void)nvs_save_string(migrated);
     SemaphoreHandle_t m = kiln_config_fs_mutex();
     if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
-    const bool ok = write_string_to_file_locked(CONFIG_FILE, json);
+    const bool ok = write_string_to_file_locked(CONFIG_FILE, migrated);
     if (m) xSemaphoreGiveRecursive(m);
     return ok;
 }
@@ -103,6 +162,7 @@ bool kiln_config_save_json_config(const std::string &json) {
 void kiln_config_restore_json_config_file() {
     const std::string json = nvs_load_string();
     if (json.empty()) return;
+    const std::string migrated = migrate_config_json_schema(json, nullptr);
     SemaphoreHandle_t m = kiln_config_fs_mutex();
     if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
     FILE *f = fopen(CONFIG_FILE, "r");
@@ -111,6 +171,6 @@ void kiln_config_restore_json_config_file() {
         if (m) xSemaphoreGiveRecursive(m);
         return;
     }
-    (void)write_string_to_file_locked(CONFIG_FILE, json);
+    (void)write_string_to_file_locked(CONFIG_FILE, migrated);
     if (m) xSemaphoreGiveRecursive(m);
 }

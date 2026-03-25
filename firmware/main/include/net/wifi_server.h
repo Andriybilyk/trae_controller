@@ -63,6 +63,7 @@ private:
     static esp_err_t api_skip_handler(httpd_req_t *req);
     static esp_err_t api_add_temp_handler(httpd_req_t *req);
     static esp_err_t api_add_time_handler(httpd_req_t *req);
+    static esp_err_t api_set_rate_handler(httpd_req_t *req);
     static esp_err_t api_fan_get_handler(httpd_req_t *req);
     static esp_err_t api_fan_set_handler(httpd_req_t *req);
     static esp_err_t api_ota_update_handler(httpd_req_t *req);
@@ -97,6 +98,9 @@ private:
     static esp_err_t api_history_list_handler(httpd_req_t *req);
     static esp_err_t api_history_clear_handler(httpd_req_t *req);
     static esp_err_t api_history_detail_handler(httpd_req_t *req);
+    static esp_err_t api_backup_export_handler(httpd_req_t *req);
+    static esp_err_t api_backup_import_handler(httpd_req_t *req);
+    static esp_err_t api_diagnostics_bundle_handler(httpd_req_t *req);
     static esp_err_t api_remote_get_handler(httpd_req_t *req);
     static esp_err_t api_remote_set_handler(httpd_req_t *req);
     static esp_err_t manifest_handler(httpd_req_t *req);
