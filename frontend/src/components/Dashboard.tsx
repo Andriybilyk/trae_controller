@@ -1,9 +1,9 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
-import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check } from 'lucide-react';
+import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check, Plus, Trash2, Save } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
-import { useSchedules, Schedule } from '../contexts/SchedulesContext';
+import { useSchedules, Schedule, Step } from '../contexts/SchedulesContext';
 import { useDeviceState } from '../contexts/DeviceStateContext';
 import toast from 'react-hot-toast';
 import { ConfirmModal } from './ConfirmModal';
@@ -103,7 +103,7 @@ interface FanControl {
 
 const Dashboard = () => {
   const { t, language } = useLanguage();
-  const { schedules, getScheduleDetails, refreshSchedules } = useSchedules();
+  const { schedules, getScheduleDetails, refreshSchedules, saveSchedule, deleteSchedule } = useSchedules();
   const { state: deviceState } = useDeviceState();
   
   const [status, setStatus] = useState<StatusData>({ 
@@ -170,6 +170,23 @@ const Dashboard = () => {
 
   // Derived active schedule
   const activeSchedule = schedules.find(s => s.id === selectedScheduleId);
+
+  useEffect(() => {
+      if (!schedules.length) return;
+      if (selectedScheduleId && schedules.some(s => s.id === selectedScheduleId)) return;
+
+      const rememberedId = localStorage.getItem('kiln:selectedScheduleId') || '';
+      const rememberedExists = rememberedId && schedules.some(s => s.id === rememberedId);
+      const nextId = rememberedExists ? rememberedId : schedules[0].id;
+      if (nextId && nextId !== selectedScheduleId) {
+          setSelectedScheduleId(nextId);
+      }
+  }, [schedules, selectedScheduleId]);
+
+  useEffect(() => {
+      if (!selectedScheduleId) return;
+      localStorage.setItem('kiln:selectedScheduleId', selectedScheduleId);
+  }, [selectedScheduleId]);
 
   // Helper to calculate target profile points
   const getTargetProfile = (schedule: Schedule | undefined) => {
@@ -255,6 +272,8 @@ const Dashboard = () => {
   const [confirmBusy, setConfirmBusy] = useState<null | 'stop_firing' | 'stop_autotune'>(null);
   const [showAddTimeModal, setShowAddTimeModal] = useState(false);
   const [showAddTempModal, setShowAddTempModal] = useState(false);
+  const [rowEdits, setRowEdits] = useState<Record<number, { rate: string; target: string; hold: string }>>({});
+  const [segmentSaveBusy, setSegmentSaveBusy] = useState(false);
 
   const handleStopFiring = async () => {
       setShowStopConfirm(true);
@@ -387,11 +406,160 @@ const Dashboard = () => {
       return "--:--";
   };
 
+  const getScheduleRows = () => {
+      const steps = activeSchedule?.steps || [];
+      const rows: { rate: number; target: number; hold: number; rampStepIndex: number; holdStepIndex: number | null }[] = [];
+      let i = 0;
+      while (i < steps.length) {
+          const step: any = steps[i];
+          if (step?.type === 'ramp') {
+              const target = Number(step.target || 0);
+              let hold = 0;
+              let holdStepIndex: number | null = null;
+              if (i + 1 < steps.length) {
+                  const next: any = steps[i + 1];
+                  if (next?.type === 'hold' && Math.abs(Number(next.target || 0) - target) < 1) {
+                      hold = Number(next.holdTime || 0);
+                      holdStepIndex = i + 1;
+                      i += 1;
+                  }
+              }
+              rows.push({
+                  rate: Number(step.rate || 0),
+                  target,
+                  hold,
+                  rampStepIndex: i - (holdStepIndex !== null ? 1 : 0),
+                  holdStepIndex
+              });
+          } else if (step?.type === 'hold') {
+              rows.push({
+                  rate: 0,
+                  target: Number(step.target || 0),
+                  hold: Number(step.holdTime || 0),
+                  rampStepIndex: i,
+                  holdStepIndex: i
+              });
+          }
+          i += 1;
+      }
+      return rows;
+  };
+
+  const scheduleRows = getScheduleRows();
+
+  useEffect(() => {
+      const next: Record<number, { rate: string; target: string; hold: string }> = {};
+      scheduleRows.forEach((row, idx) => {
+          next[idx] = { rate: String(row.rate), target: String(row.target), hold: String(row.hold) };
+      });
+      setRowEdits(next);
+  }, [selectedScheduleId, scheduleRows.length, status.step, status.status]);
+
+  const saveSegments = async () => {
+      if (!activeSchedule || segmentSaveBusy) return;
+      try {
+          setSegmentSaveBusy(true);
+          const draftRows = Object.keys(rowEdits)
+              .map(k => Number(k))
+              .filter(k => Number.isFinite(k))
+              .sort((a, b) => a - b)
+              .map(k => rowEdits[k]);
+
+          if (isIdle) {
+              const rows = draftRows.length > 0
+                  ? draftRows.map(edit => ({
+                      rate: Number(edit.rate),
+                      target: Number(edit.target),
+                      hold: Number(edit.hold)
+                  }))
+                  : scheduleRows.map(row => ({ rate: row.rate, target: row.target, hold: row.hold }));
+
+              const newSteps: Step[] = [];
+              rows.forEach((r, idx) => {
+                  const rate = Math.max(0, Math.min(9999, Number.isFinite(r.rate) ? r.rate : 0));
+                  const target = Math.max(0, Math.min(1320, Number.isFinite(r.target) ? r.target : 0));
+                  const hold = Math.max(0, Math.min(9999, Number.isFinite(r.hold) ? r.hold : 0));
+                  newSteps.push({ id: Date.now() + idx * 2, type: 'ramp', rate, target });
+                  if (hold > 0) {
+                      newSteps.push({ id: Date.now() + idx * 2 + 1, type: 'hold', target, holdTime: hold });
+                  }
+              });
+
+              const ok = await saveSchedule({
+                  ...activeSchedule,
+                  steps: newSteps,
+                  stepsCount: newSteps.length
+              });
+              if (ok) {
+                  await getScheduleDetails(activeSchedule);
+                  toast.success(t.schedules.saveBtn || "Saved");
+              }
+          } else {
+              const currentStepZeroBased = Math.max(0, (status.step || 1) - 1);
+              for (let index = 0; index < scheduleRows.length; index += 1) {
+                  const row = scheduleRows[index];
+                  if (row.rampStepIndex < currentStepZeroBased) continue;
+                  const edit = rowEdits[index];
+                  if (!edit) continue;
+                  const nextTarget = Number(edit.target);
+                  const nextHold = Number(edit.hold);
+                  if (!Number.isFinite(nextTarget) || !Number.isFinite(nextHold)) continue;
+
+                  const tempDelta = Math.round(nextTarget - row.target);
+                  const holdDelta = Math.round(nextHold - row.hold);
+                  if (tempDelta !== 0) await submitAddTemp(tempDelta, row.rampStepIndex);
+                  if (holdDelta !== 0 && row.holdStepIndex !== null) await submitAddTime(holdDelta, row.holdStepIndex);
+              }
+              toast.success(t.schedules.saveBtn || "Saved");
+          }
+      } catch {
+          toast.error("Update failed");
+      } finally {
+          setSegmentSaveBusy(false);
+      }
+  };
+
+  const addSegmentDraft = () => {
+      if (!isIdle) return;
+      const keys = Object.keys(rowEdits).map(k => Number(k)).filter(k => Number.isFinite(k));
+      const maxIndex = keys.length > 0 ? Math.max(...keys) : -1;
+      const last = maxIndex >= 0 ? rowEdits[maxIndex] : null;
+      const nextIndex = maxIndex + 1;
+      const nextTarget = last ? Number(last.target || '25') + 100 : 125;
+      setRowEdits(prev => ({
+          ...prev,
+          [nextIndex]: { rate: '100', target: String(nextTarget), hold: '0' }
+      }));
+  };
+
+  const removeSegmentDraft = (index: number) => {
+      if (!isIdle) return;
+      const rows = Object.keys(rowEdits)
+          .map(k => Number(k))
+          .filter(k => Number.isFinite(k))
+          .sort((a, b) => a - b)
+          .filter(k => k !== index)
+          .map(k => rowEdits[k]);
+      const next: Record<number, { rate: string; target: string; hold: string }> = {};
+      rows.forEach((r, i) => { next[i] = r; });
+      setRowEdits(next);
+  };
+
+  const deleteActiveProgram = async () => {
+      if (!activeSchedule || !isIdle) return;
+      const ok = confirm((t.schedules.deleteConfirmMessage as string) || "Delete selected program?");
+      if (!ok) return;
+      const deleted = await deleteSchedule(activeSchedule);
+      if (deleted) setSelectedScheduleId("");
+  };
+
+  const currentStepZeroBased = Math.max(0, (status.step || 1) - 1);
+
   return (
-    <div className="flex h-full gap-6 p-4 md:p-6 max-w-[1600px] mx-auto overflow-hidden flex-col md:flex-row">
+    <div className="flex min-h-full gap-6 p-4 md:p-6 max-w-[1600px] mx-auto flex-col md:flex-row">
       
       {/* LEFT SIDEBAR: SCHEDULE LIBRARY (Desktop Only) */}
-      <div className="hidden md:flex w-72 flex-col gap-3 shrink-0 bg-kiln-card border border-kiln-border rounded-xl p-3 shadow-lg overflow-hidden">
+      <div className="hidden md:flex w-96 lg:w-[28rem] flex-col gap-3 shrink-0 bg-kiln-card border border-kiln-border rounded-xl p-3 shadow-lg overflow-y-auto no-scrollbar">
           <button
               onClick={() => { setIsScheduleMenuOpen(true); refreshSchedules(); }}
               className="w-full bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 text-left hover:border-zinc-700 transition-colors"
@@ -408,21 +576,58 @@ const Dashboard = () => {
               </div>
           </button>
 
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
-              <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2">
+          <div className="bg-gradient-to-br from-zinc-900/90 to-zinc-800/70 border border-zinc-700 rounded-xl p-6 shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+              <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-400 mb-3">
                   {t.dashboard.currentTemp}
               </div>
-              <div className="text-3xl font-bold text-white tracking-tight leading-none">
-                  {(status.temp || 0).toFixed(1)}
-                  <span className="text-lg text-zinc-500 ml-1">°C</span>
+              <div className="flex items-end justify-between gap-3 mb-3">
+                  <div className="text-7xl font-bold text-white tracking-tight leading-none tabular-nums">
+                      {(status.temp || 0).toFixed(1)}
+                      <span className="text-xl text-zinc-500 ml-1">°C</span>
+                  </div>
+                  <div className="text-right">
+                      <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">
+                          {t.dashboard.targetTemp || 'Target'}
+                      </div>
+                      <div className="text-4xl font-bold text-emerald-300 leading-none tabular-nums">
+                          {(status.target || 0).toFixed(0)}
+                          <span className="text-sm text-zinc-500 ml-1">°C</span>
+                      </div>
+                  </div>
               </div>
-              <div className="mt-2 text-xs font-semibold">
-                  <span className="text-zinc-500 mr-2">{t.dashboard.status || 'Status'}:</span>
-                  <span className={isIdle ? 'text-zinc-400' : 'text-kiln-accent'}>
+              <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-zinc-500 font-semibold">{t.dashboard.status || 'Status'}:</span>
+                  <span className={`px-2 py-1 rounded-md text-xs font-bold tracking-wide ${isIdle ? 'bg-zinc-800 text-zinc-300' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}`}>
                       {(t.status as Record<string, string>)[status.status] || status.status}
                   </span>
               </div>
           </div>
+
+          {isIdle ? (
+              <button
+                  onClick={handleStartFiring}
+                  disabled={!activeSchedule}
+                  className={`w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl transition-colors text-sm font-bold whitespace-nowrap ${activeSchedule ? 'bg-kiln-accent text-black hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
+              >
+                  <Play size={16} fill={activeSchedule ? "black" : "currentColor"} />
+                  {activeSchedule ? t.dashboard.startFiring : t.dashboard.selectSchedule}
+              </button>
+          ) : (
+              <div className="flex flex-col gap-2">
+                  <button
+                      onClick={handleStopFiring}
+                      className="w-full flex items-center justify-center gap-2 px-5 py-3 bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                  >
+                      <Square size={16} fill="white" /> {t.dashboard.stopFiring}
+                  </button>
+                  <button
+                      onClick={handleSkip}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs font-bold text-zinc-300 transition-colors border border-zinc-700"
+                  >
+                      <Play size={14} className="fill-current" /> {t.dashboard.skip}
+                  </button>
+              </div>
+          )}
 
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-3">
               <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2">
@@ -478,7 +683,7 @@ const Dashboard = () => {
       </div>
 
       {/* RIGHT CONTENT: DASHBOARD & CONTROLS */}
-      <div className="flex-1 flex flex-col gap-6 overflow-y-auto pb-20 md:pb-0 relative no-scrollbar md:scrollbar-default">
+      <div className="flex-1 flex flex-col gap-6 pb-20 md:pb-0 relative min-h-0">
       
       {/* Mobile Schedule Selector (Sticky Top) */}
       <div className="md:hidden sticky top-0 z-30 bg-kiln-bg/95 backdrop-blur-sm pb-2 pt-1">
@@ -551,13 +756,7 @@ const Dashboard = () => {
               </button>
           ) : (
               <div className="flex flex-col gap-2">
-                  <div className="grid grid-cols-3 gap-2">
-                      <button onClick={handleAddTimeClick} className="py-2.5 bg-zinc-800 rounded-lg text-[10px] font-bold text-zinc-300 flex flex-col items-center justify-center gap-1 border border-zinc-700 active:bg-zinc-700">
-                          <Clock size={16} /> {t.dashboard.addTime}
-                      </button>
-                      <button onClick={handleAddTempClick} className="py-2.5 bg-zinc-800 rounded-lg text-[10px] font-bold text-zinc-300 flex flex-col items-center justify-center gap-1 border border-zinc-700 active:bg-zinc-700">
-                          <Thermometer size={16} /> {t.dashboard.addTemp}
-                      </button>
+                  <div className="grid grid-cols-1 gap-2">
                       <button onClick={handleSkip} className="py-2.5 bg-zinc-800 rounded-lg text-[10px] font-bold text-zinc-300 flex flex-col items-center justify-center gap-1 border border-zinc-700 active:bg-zinc-700">
                           <Play size={16} className="fill-current" /> {t.dashboard.skip}
                       </button>
@@ -685,7 +884,7 @@ const Dashboard = () => {
       )}
 
       {/* Stat Cards Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="md:hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
         {/* MEGA CARD: Temp & Status */}
         <div className="bg-kiln-card border border-kiln-border rounded-xl p-5 shadow-lg shadow-black/20 relative overflow-hidden md:col-span-2 lg:col-span-4 flex flex-col md:flex-row items-center justify-between group min-h-28 lg:min-h-[12.75rem] gap-3 md:gap-0">
             <div className="relative z-10 text-center md:text-left">
@@ -785,61 +984,7 @@ const Dashboard = () => {
       )}
 
       {/* Main Chart Section */}
-      <div className="flex-1 bg-kiln-card border border-kiln-border rounded-xl shadow-lg shadow-black/20 flex flex-col overflow-hidden min-h-[400px]">
-        {/* Header */}
-        <div className="p-5 border-b border-kiln-border flex flex-col md:flex-row justify-between items-center gap-4 bg-kiln-card/50">
-            <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    {t.dashboard.firingProfile}
-                </h2>
-                <div className="flex items-center gap-3">
-                    <span className={`text-sm font-bold ${status.pcbTemp && status.pcbTemp > 50 ? 'text-red-500 animate-pulse' : 'text-zinc-500'}`}>
-                        PCB: {status.pcbTemp?.toFixed(1)}°C
-                    </span>
-                    <div className={`px-3 py-1 rounded-full text-xs font-bold ${!isIdle ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-zinc-800 text-zinc-400'}`}>
-                        {status.status}
-                    </div>
-                </div>
-            </div>
-            
-            <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
-                 {/* On-the-fly controls */}
-                 {!isIdle && (
-                    <div className="hidden md:flex items-center gap-1.5 mr-2 border-r border-zinc-700 pr-2 shrink-0">
-                        <button onClick={handleAddTimeClick} className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors border border-zinc-700 whitespace-nowrap">
-                            <Clock size={13} /> {t.dashboard.addTime}
-                        </button>
-                        <button onClick={handleAddTempClick} className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors border border-zinc-700 whitespace-nowrap">
-                            <Thermometer size={13} /> {t.dashboard.addTemp}
-                        </button>
-                        <button onClick={handleSkip} className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 flex items-center gap-1.5 transition-colors border border-zinc-700 whitespace-nowrap">
-                            <Play size={13} className="fill-current" /> {t.dashboard.skip}
-                        </button>
-                    </div>
-                 )}
-
-                 <div className="relative shrink-0 hidden md:block">
-                     {isIdle ? (
-                         <button 
-                            onClick={handleStartFiring}
-                            disabled={!activeSchedule}
-                            className={`flex items-center gap-2 px-5 py-2 rounded-lg transition-colors text-sm font-bold whitespace-nowrap ${activeSchedule ? 'bg-kiln-accent text-black hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
-                         >
-                            <Play size={16} fill={activeSchedule ? "black" : "currentColor"} /> 
-                            {activeSchedule ? t.dashboard.startFiring : t.dashboard.selectSchedule}
-                         </button>
-                     ) : (
-                         <button 
-                            onClick={handleStopFiring}
-                            className="flex items-center gap-2 px-5 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(239,68,68,0.2)] whitespace-nowrap"
-                         >
-                            <Square size={16} fill="white" /> {t.dashboard.stopFiring}
-                         </button>
-                     )}
-                 </div>
-            </div>
-        </div>
-
+      <div className="bg-kiln-card border border-kiln-border rounded-xl shadow-lg shadow-black/20 flex flex-col overflow-hidden min-h-[320px]">
         {/* Chart */}
         <div className="flex-1 p-6 relative">
             <Line options={{
@@ -881,6 +1026,106 @@ const Dashboard = () => {
                 {t.dashboard.setpoint}
             </div>
         </div>
+      </div>
+
+      <div className="hidden md:flex flex-col bg-kiln-bg rounded-xl">
+          <div className="mb-4 flex flex-row justify-between items-center gap-2 shrink-0 px-1">
+              <div className="w-full flex items-center gap-2">
+                  <div className="text-3xl font-bold text-white truncate">
+                      {activeSchedule?.name || t.dashboard.selectSchedule}
+                  </div>
+              </div>
+              <div className="flex gap-2 w-auto">
+                  <button
+                      onClick={saveSegments}
+                      disabled={!activeSchedule || segmentSaveBusy}
+                      className="flex items-center justify-center gap-2 bg-kiln-accent hover:bg-emerald-400 text-black px-3 py-2 rounded-lg font-bold text-xs shadow-lg shadow-emerald-900/20 whitespace-nowrap disabled:bg-zinc-700 disabled:text-zinc-400"
+                  >
+                      <Save size={14} /> {segmentSaveBusy ? "..." : (t.schedules.saveBtn || "Save")}
+                  </button>
+                  <button
+                      onClick={deleteActiveProgram}
+                      disabled={!activeSchedule || !isIdle}
+                      className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 disabled:text-zinc-700 disabled:bg-zinc-900/50"
+                  >
+                      <Trash2 size={16} />
+                  </button>
+              </div>
+          </div>
+
+          <div className="hidden md:flex gap-6 mb-2 px-6 py-3 bg-zinc-800/50 rounded-lg text-xs font-bold text-zinc-400 uppercase tracking-widest border border-zinc-800 shrink-0">
+              <div className="w-10 text-center">#</div>
+              <div className="flex-1 grid grid-cols-9 gap-6">
+                  <div className="col-span-3 text-center">{t.schedules.rate}</div>
+                  <div className="col-span-3 text-center">{t.schedules.targetTemp}</div>
+                  <div className="col-span-3 text-center">{t.schedules.time}</div>
+              </div>
+              <div className="w-10"></div>
+          </div>
+
+          <div className="space-y-3 pb-2 md:max-h-[58vh] md:overflow-y-auto md:pr-2 no-scrollbar md:scrollbar-default">
+              {Object.keys(rowEdits).length > 0 ? (
+                  Object.keys(rowEdits).map(k => Number(k)).sort((a, b) => a - b).map((index) => {
+                      const row = rowEdits[index];
+                      const liveRow = scheduleRows[index];
+                      const editable = isIdle || (liveRow && liveRow.rampStepIndex >= currentStepZeroBased);
+                      const isCurrentSegment = !isIdle && !!liveRow && (liveRow.rampStepIndex === currentStepZeroBased || liveRow.holdStepIndex === currentStepZeroBased);
+                      return (
+                          <div key={`row-${index}`} className={`flex flex-row items-center gap-6 p-4 bg-kiln-card border rounded-xl transition-colors ${isCurrentSegment ? 'border-emerald-400/70 bg-emerald-500/10 shadow-[0_0_0_1px_rgba(16,185,129,0.25)]' : 'border-kiln-border hover:border-zinc-700'}`}>
+                              <div className={`w-10 flex justify-center font-mono font-bold text-lg ${isCurrentSegment ? 'text-emerald-300' : 'text-zinc-500'}`}>{index + 1}</div>
+                              <div className="flex-1 grid grid-cols-9 gap-6 items-center w-full">
+                                  <div className="col-span-3 relative">
+                                      <input
+                                          type="number"
+                                          value={isIdle ? row.rate : String(liveRow?.rate ?? row.rate)}
+                                          onChange={(e) => isIdle && setRowEdits(prev => ({ ...prev, [index]: { rate: e.target.value, target: prev[index]?.target ?? row.target, hold: prev[index]?.hold ?? row.hold } }))}
+                                          disabled={!isIdle}
+                                          className="bg-zinc-900/50 border-zinc-800 rounded-lg pl-3 pr-14 py-2 text-white font-mono w-full focus:border-kiln-accent text-center text-lg disabled:opacity-90"
+                                      />
+                                      <span className="absolute right-3 bottom-2.5 text-zinc-600 text-[10px] font-bold pointer-events-none">°C/год</span>
+                                  </div>
+                                  <div className="col-span-3 relative">
+                                      <input
+                                          type="number"
+                                          value={editable ? row.target : String(liveRow?.target ?? row.target)}
+                                          onChange={(e) => setRowEdits(prev => ({ ...prev, [index]: { rate: prev[index]?.rate ?? row.rate, target: e.target.value, hold: prev[index]?.hold ?? row.hold } }))}
+                                          disabled={!editable}
+                                          className="bg-zinc-900/50 border-zinc-800 rounded-lg pl-3 pr-8 py-2 text-white font-mono w-full focus:border-kiln-accent text-center text-lg font-bold disabled:opacity-90"
+                                      />
+                                      <span className="absolute right-3 bottom-2.5 text-zinc-600 text-[10px] font-bold pointer-events-none">°C</span>
+                                  </div>
+                                  <div className="col-span-3 relative">
+                                      <input
+                                          type="number"
+                                          value={editable ? row.hold : String(liveRow?.hold ?? row.hold)}
+                                          onChange={(e) => setRowEdits(prev => ({ ...prev, [index]: { rate: prev[index]?.rate ?? row.rate, target: prev[index]?.target ?? row.target, hold: e.target.value } }))}
+                                          disabled={!editable}
+                                          className="bg-zinc-900/50 border-zinc-800 rounded-lg pl-3 pr-8 py-2 text-white font-mono w-full focus:border-kiln-accent text-center text-lg disabled:opacity-90"
+                                      />
+                                      <span className="absolute right-3 bottom-2.5 text-zinc-600 text-[10px] font-bold pointer-events-none">хв</span>
+                                  </div>
+                              </div>
+                              <button onClick={() => removeSegmentDraft(index)} disabled={!isIdle} className="w-10 p-2 text-zinc-600 hover:text-red-500 disabled:text-zinc-800">
+                                  <Trash2 size={18}/>
+                              </button>
+                          </div>
+                      );
+                  })
+              ) : (
+                  <div className="w-full py-8 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-500 text-center font-bold">
+                      {t.dashboard.selectSchedule}
+                  </div>
+              )}
+
+              {isIdle && (
+                  <button
+                      onClick={addSegmentDraft}
+                      className="w-full py-4 border-2 border-dashed border-zinc-800 rounded-xl text-zinc-500 hover:text-kiln-accent hover:border-kiln-accent hover:bg-kiln-accent/5 transition-all font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+                  >
+                      <Plus size={20} /> {t.schedules.addSegment || "Add Segment"}
+                  </button>
+              )}
+          </div>
       </div>
       {/* Schedule Selection Modal (Mobile) - MOVED TO ROOT */}
       {isScheduleMenuOpen && (

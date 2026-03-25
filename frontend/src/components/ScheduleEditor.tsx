@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Plus, Trash2, Save, Play } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSchedules, Schedule, Step } from '../contexts/SchedulesContext';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -19,6 +20,7 @@ interface EditorStep {
 
 const ScheduleEditor = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const fixDegree = (v: string) => v.replace(/\uFFFD/g, '°');
   const { schedules, isLoading, saveSchedule, deleteSchedule, getScheduleDetails } = useSchedules();
   
@@ -151,7 +153,14 @@ const ScheduleEditor = () => {
 
   const handleSelectSchedule = (s: Schedule) => {
       setSelectedScheduleId(s.id);
+      localStorage.setItem('kiln:selectedScheduleId', s.id);
       setShowMobileLibrary(false);
+  };
+
+  const handlePlaySchedule = (s: Schedule) => {
+      setSelectedScheduleId(s.id);
+      localStorage.setItem('kiln:selectedScheduleId', s.id);
+      navigate('/');
   };
 
   const handleAddSegment = () => {
@@ -303,8 +312,22 @@ const ScheduleEditor = () => {
           <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar md:scrollbar-default">
               {schedules && schedules.map(s => (
                   <div key={s.id} onClick={() => handleSelectSchedule(s)} className={`p-4 rounded-xl cursor-pointer border ${selectedScheduleId === s.id ? 'bg-zinc-800 border-kiln-accent' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600'}`}>
-                      <div className="font-bold text-sm text-white truncate">{s.name}</div>
-                      <div className="text-xs text-zinc-500">{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.steps}</div>
+                      <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                              <div className="font-bold text-sm text-white truncate">{s.name}</div>
+                              <div className="text-xs text-zinc-500">{s.steps ? s.steps.length : (s.stepsCount || 0)} {t.schedules.steps}</div>
+                          </div>
+                          <button
+                              onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePlaySchedule(s);
+                              }}
+                              className="w-11 h-11 rounded-full bg-kiln-accent text-black flex items-center justify-center hover:bg-emerald-400 transition-colors shadow-[0_0_12px_rgba(16,185,129,0.35)] shrink-0"
+                              title={t.dashboard.startFiring || 'Open on dashboard'}
+                          >
+                              <Play size={18} className="fill-black ml-0.5" />
+                          </button>
+                      </div>
                   </div>
               ))}
           </div>

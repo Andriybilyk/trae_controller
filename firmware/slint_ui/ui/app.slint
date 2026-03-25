@@ -309,6 +309,8 @@ export component AppWindow inherits Window {
     in-out property <bool> show_stop_confirm: false;
     in-out property <bool> show_skip_confirm: false;
     in-out property <bool> show_running_edit_confirm: false;
+    in-out property <bool> boot_splash_visible: true;
+    in-out property <bool> standby_visible: false;
 
     in-out property <bool> is_ua: false;
 
@@ -3873,6 +3875,90 @@ export component AppWindow inherits Window {
                     Text { text: root.is_ua ? "Зберегти" : "Save"; color: #000000; horizontal-alignment: center; vertical-alignment: center; }
                     TouchArea { width: parent.width; height: parent.height; clicked => { root.running_edit_confirm(); } }
                 }
+            }
+    }
+
+    if (root.standby_visible && !root.boot_splash_visible) : Rectangle {
+            x: 0px; y: 0px; width: 480px; height: 320px;
+            background: #05070B;
+            z: 5150;
+
+            Text {
+                x: 0px; y: 42px; width: 480px; height: 34px;
+                text: "Kiln PRO";
+                color: #FFFFFF;
+                font-family: "PT Sans";
+                font-size: 28px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                x: 198px; y: 82px;
+                width: 84px; height: 84px;
+                background: #00D084;
+                border-radius: 22px;
+                Text {
+                    x: 0px; y: 0px; width: parent.width; height: parent.height;
+                    text: "\u{ef55}";
+                    color: #000000;
+                    font-family: "Material Icons";
+                    font-size: 62px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Text {
+                x: 0px; y: 182px; width: 480px; height: 82px;
+                text: root.temp_label + "°C";
+                color: #FFFFFF;
+                font-family: "PT Sans";
+                font-size: 76px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            TouchArea {
+                width: parent.width;
+                height: parent.height;
+                clicked => { root.standby_visible = false; }
+            }
+    }
+
+    if (root.boot_splash_visible) : Rectangle {
+            x: 0px; y: 0px; width: 480px; height: 320px;
+            background: #05070B;
+            z: 5200;
+
+            Rectangle {
+                x: 154px; y: 76px;
+                width: 172px; height: 172px;
+                background: #00D084;
+                border-radius: 34px;
+
+                Text {
+                    x: 0px; y: 0px; width: parent.width; height: parent.height;
+                    text: "\u{ef55}";
+                    color: #000000;
+                    font-family: "Material Icons";
+                    font-size: 124px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            Text {
+                x: 0px; y: 258px; width: 480px; height: 48px;
+                text: "KilnPro";
+                color: #FFFFFF;
+                font-family: "PT Sans";
+                font-size: 48px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
             }
     }
 

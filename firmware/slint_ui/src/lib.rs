@@ -14,6 +14,7 @@ const TOUCH_HOLD_DEADZONE_PX: i32 = 1;
 const TOUCH_FILTER_NUM: i32 = 1;
 const TOUCH_FILTER_DEN: i32 = 2;
 const TOUCH_FAST_MOVE_PX: i32 = 6;
+const STANDBY_TIMEOUT_MS: u64 = 60_000;
 
 slint::include_modules!();
 
@@ -918,6 +919,15 @@ pub extern "C" fn slint_ui_run() {
 
     let ui = AppWindow::new().expect("Failed to create UI");
     ui.window().show().unwrap_or(());
+    ui.set_boot_splash_visible(true);
+    {
+        let ui_weak = ui.as_weak();
+        Timer::single_shot(Duration::from_millis(2200), move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_boot_splash_visible(false);
+            }
+        });
+    }
     let lang_is_ua = unsafe { slint_bridge_get_language_is_ua() };
     ui.set_is_ua(lang_is_ua);
     ui.set_wifi_networks(ModelRc::new(VecModel::from(Vec::<WifiNetworkRow>::new())));
@@ -1705,6 +1715,7 @@ pub extern "C" fn slint_ui_run() {
     let mut last_command_result_revision = unsafe { slint_bridge_get_command_result_revision() };
     let mut command_feedback_until = Instant::now();
     let mut last_qr_payload = String::new();
+    let mut last_touch_activity = Instant::now();
     let frame_budget = Duration::from_millis(1000 / UI_TARGET_FPS);
     let mut next_frame_at = Instant::now() + frame_budget;
 
@@ -1767,6 +1778,28 @@ pub extern "C" fn slint_ui_run() {
             ui.set_touch_y(y as i32);
             ui.set_touch_z(z as i32);
             ui.set_touch_pressed(pressed);
+
+            if pressed {
+                last_touch_activity = Instant::now();
+                if ui.get_standby_visible() && !last_touch {
+                    // First tap only wakes the screen, without forwarding the touch to controls.
+                    ui.set_standby_visible(false);
+                    last_touch = true;
+                    last_x = x;
+                    last_y = y;
+                    have_last_sent = false;
+                    continue;
+                }
+            } else if !ui.get_standby_visible()
+                && !ui.get_boot_splash_visible()
+                && !ui.get_kb_visible()
+                && !ui.get_show_stop_confirm()
+                && !ui.get_show_skip_confirm()
+                && !ui.get_show_running_edit_confirm()
+                && last_touch_activity.elapsed() >= Duration::from_millis(STANDBY_TIMEOUT_MS)
+            {
+                ui.set_standby_visible(true);
+            }
         }
 
         // Calibration: record the next point on every fresh tap.
