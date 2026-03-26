@@ -2,41 +2,41 @@ dependencies:
   atanisoft/esp_lcd_touch_xpt2046:
     dependencies: []
     source:
-      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\atanisoft__esp_lcd_touch_xpt2046
+      path: managed_components\atanisoft__esp_lcd_touch_xpt2046
       type: local
     version: 1.0.6
   espressif/cjson:
     dependencies: []
     source:
-      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cjson
+      path: managed_components\espressif__cjson
       type: local
     version: 1.7.19~1
   espressif/esp_lcd_touch:
     dependencies: []
     source:
-      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch
+      path: managed_components\espressif__esp_lcd_touch
       type: local
     version: 1.2.1
   espressif/mdns:
     dependencies: []
     source:
-      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__mdns
+      path: managed_components\espressif__mdns
       type: local
-    version: 1.10.1
+    version: 1.11.0
   espressif/mqtt:
     dependencies: []
     source:
-      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__mqtt
+      path: managed_components\espressif__mqtt
       type: local
     version: 1.0.0
   idf:
     source:
       type: idf
-    version: 5.5.3
+    version: 6.0.0
   joltwallet/littlefs:
     dependencies: []
     source:
-      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\joltwallet__littlefs
+      path: managed_components\joltwallet__littlefs
       type: local
     version: 1.20.4
 direct_dependencies:
@@ -47,6 +47,6 @@ direct_dependencies:
 - espressif/mqtt
 - idf
 - joltwallet/littlefs
-manifest_hash: e4e7424a5c8ab44a48d482f044ba4b4e6d5048e1d55e063929995b4b1954146b
+manifest_hash: e142ab49494604dc5b46b02fb9df2aac2c7eab8bd3ab500c5010d740d349ef24
 target: esp32s3
-version: 2.0.0
+version: 3.0.0

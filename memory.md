@@ -75,6 +75,8 @@
 - Thermal safety refactor: centralized fault path in `thermal_control` now forces one consistent fail-safe behavior (`heater_off`, latched `KILN_FAULT`, unified reason propagation/history finalize) instead of scattered fault handling branches.
 - Sensor robustness update: thermocouple validation now includes invalid/spike streak latching, `open/short/stuck` heuristics, read-timeout watchdog fault, and auto-clear only after stable valid recovery.
 - Runtime state model aligned for UI/API clarity: kiln status string now emits `IDLE/RUNNING/HOLD/COOLING/COMPLETE/FAULT/PAUSED/TUNING`.
+- ESP-IDF migration baseline updated to v6.0: `dependencies.lock` now resolves `idf (6.0.0)` and firmware builds/flashes with toolchain v6.
+- Partition layout changed for v6-sized firmware: switched from dual OTA slots (`app0/app1`) to single large `factory` app partition (`0xCA0000`) + LittleFS storage (`0x350000`) to fit current Slint/Rust image.
 
 ## TODO
 - P0: Verify Slint embedded build for `xtensa-esp32s3-espidf` and confirm Slint software renderer + touch input on hardware.
@@ -98,6 +100,7 @@
 - P1: Persist fan curve + mode at boot explicitly (load config before fan init or defer fan init until LittleFS config is applied).
 - P1: Remote access hardening: broker TLS cert pinning/CA upload, per-device command auth (signed nonce), and role-based command allowlist.
 - P1: Remote hardening next: add CA upload/pinning (`mqtts` cert field in config), signed-command helper docs/examples, and per-command role scopes.
+- P1: Reintroduce OTA-friendly partitioning after binary size reduction (or compressed/delta OTA strategy) so dual-slot updates can be restored safely.
 - P2: API schema: extend compatibility fields with `fault_code` and `uptime_ms` across endpoints (DONE: `schema_version` + `fw_version` already added to canonical state).
 - P2: Persistent event log: ring-buffer faults/start/stop/overtemp into `/littlefs/logs`.
 - P2: OTA updates: add signed manifest validation (cryptographic signature) and rollback-status reporting endpoint.

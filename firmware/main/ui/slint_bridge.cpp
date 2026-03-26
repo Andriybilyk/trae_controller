@@ -22,8 +22,38 @@
 static std::atomic<uint64_t> s_ui_heartbeat_ms{0};
 static constexpr const char *UI_PREF_NS = "ui_pref";
 static constexpr const char *UI_PREF_LANG_KEY = "lang";
+static constexpr const char *UI_PREF_TEMP_UNIT_KEY = "temp_unit";
+static constexpr const char *UI_PREF_TIME_FMT_KEY = "time_fmt";
+static constexpr const char *UI_PREF_DATE_FMT_KEY = "date_fmt";
+static constexpr uint8_t TEMP_UNIT_C = 0;
+static constexpr uint8_t TEMP_UNIT_F = 1;
+static constexpr uint8_t TIME_FMT_24H = 0;
+static constexpr uint8_t TIME_FMT_12H = 1;
+static constexpr uint8_t DATE_FMT_DMY = 0;
+static constexpr uint8_t DATE_FMT_MDY = 1;
+static constexpr uint8_t DATE_FMT_YMD = 2;
 static std::atomic<bool> s_fault_clear_inflight{false};
 static std::atomic<uint64_t> s_last_fault_clear_ms{0};
+
+static uint8_t ui_pref_get_u8(const char *key, uint8_t fallback) {
+    nvs_handle_t h = 0;
+    if (nvs_open(UI_PREF_NS, NVS_READONLY, &h) != ESP_OK) {
+        return fallback;
+    }
+    uint8_t value = fallback;
+    const esp_err_t err = nvs_get_u8(h, key, &value);
+    nvs_close(h);
+    if (err != ESP_OK) return fallback;
+    return value;
+}
+
+static void ui_pref_set_u8(const char *key, uint8_t value) {
+    nvs_handle_t h = 0;
+    if (nvs_open(UI_PREF_NS, NVS_READWRITE, &h) != ESP_OK) return;
+    (void)nvs_set_u8(h, key, value);
+    (void)nvs_commit(h);
+    nvs_close(h);
+}
 
 static void fault_clear_worker_task(void *) {
     const bool cleared = thermalCtrl.clearFault();
@@ -275,7 +305,42 @@ extern "C" bool slint_bridge_get_time_str(char *out, int32_t out_len) {
         return false;
     }
 
-    std::snprintf(out, out_len, "%02d:%02d", local_tm.tm_hour, local_tm.tm_min);
+    const uint8_t fmt = ui_pref_get_u8(UI_PREF_TIME_FMT_KEY, TIME_FMT_24H);
+    if (fmt == TIME_FMT_12H) {
+        int hour = local_tm.tm_hour % 12;
+        if (hour == 0) hour = 12;
+        const bool is_pm = local_tm.tm_hour >= 12;
+        std::snprintf(out, out_len, "%02d:%02d %s", hour, local_tm.tm_min, is_pm ? "PM" : "AM");
+    } else {
+        std::snprintf(out, out_len, "%02d:%02d", local_tm.tm_hour, local_tm.tm_min);
+    }
+    return true;
+}
+
+extern "C" bool slint_bridge_get_date_str(char *out, int32_t out_len) {
+    if (!out || out_len <= 0) return false;
+    out[0] = '\0';
+
+    time_t now = time(nullptr);
+    struct tm local_tm;
+    if (now < 100000 || !localtime_r(&now, &local_tm)) {
+        std::snprintf(out, out_len, "--.--.----");
+        return false;
+    }
+    const int year = local_tm.tm_year + 1900;
+    if (year < 2020) {
+        std::snprintf(out, out_len, "--.--.----");
+        return false;
+    }
+
+    const uint8_t fmt = ui_pref_get_u8(UI_PREF_DATE_FMT_KEY, DATE_FMT_DMY);
+    if (fmt == DATE_FMT_MDY) {
+        std::snprintf(out, out_len, "%02d/%02d/%04d", local_tm.tm_mon + 1, local_tm.tm_mday, year);
+    } else if (fmt == DATE_FMT_YMD) {
+        std::snprintf(out, out_len, "%04d-%02d-%02d", year, local_tm.tm_mon + 1, local_tm.tm_mday);
+    } else {
+        std::snprintf(out, out_len, "%02d.%02d.%04d", local_tm.tm_mday, local_tm.tm_mon + 1, year);
+    }
     return true;
 }
 
@@ -297,4 +362,37 @@ extern "C" void slint_bridge_set_language_is_ua(bool is_ua) {
     (void)nvs_set_u8(h, UI_PREF_LANG_KEY, is_ua ? 1 : 0);
     (void)nvs_commit(h);
     nvs_close(h);
+}
+
+extern "C" uint8_t slint_bridge_get_temp_unit(void) {
+    const uint8_t v = ui_pref_get_u8(UI_PREF_TEMP_UNIT_KEY, TEMP_UNIT_C);
+    return (v == TEMP_UNIT_F) ? TEMP_UNIT_F : TEMP_UNIT_C;
+}
+
+extern "C" void slint_bridge_set_temp_unit(uint8_t unit) {
+    const uint8_t v = (unit == TEMP_UNIT_F) ? TEMP_UNIT_F : TEMP_UNIT_C;
+    ui_pref_set_u8(UI_PREF_TEMP_UNIT_KEY, v);
+}
+
+extern "C" uint8_t slint_bridge_get_time_format(void) {
+    const uint8_t v = ui_pref_get_u8(UI_PREF_TIME_FMT_KEY, TIME_FMT_24H);
+    return (v == TIME_FMT_12H) ? TIME_FMT_12H : TIME_FMT_24H;
+}
+
+extern "C" void slint_bridge_set_time_format(uint8_t fmt) {
+    const uint8_t v = (fmt == TIME_FMT_12H) ? TIME_FMT_12H : TIME_FMT_24H;
+    ui_pref_set_u8(UI_PREF_TIME_FMT_KEY, v);
+}
+
+extern "C" uint8_t slint_bridge_get_date_format(void) {
+    const uint8_t v = ui_pref_get_u8(UI_PREF_DATE_FMT_KEY, DATE_FMT_DMY);
+    if (v == DATE_FMT_MDY || v == DATE_FMT_YMD) return v;
+    return DATE_FMT_DMY;
+}
+
+extern "C" void slint_bridge_set_date_format(uint8_t fmt) {
+    uint8_t v = DATE_FMT_DMY;
+    if (fmt == DATE_FMT_MDY) v = DATE_FMT_MDY;
+    if (fmt == DATE_FMT_YMD) v = DATE_FMT_YMD;
+    ui_pref_set_u8(UI_PREF_DATE_FMT_KEY, v);
 }

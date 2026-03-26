@@ -120,6 +120,19 @@ component WifiIcon {
 
 }
 
+component SettingsIcon {
+    in property <color> color: #FFFFFF;
+    width: 24px; height: 24px;
+    Text {
+        text: "\u{e8b8}";
+        color: root.color;
+        font-family: "Material Icons";
+        font-size: 22px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
 
 
 component ThermometerIcon {
@@ -317,6 +330,7 @@ export component AppWindow inherits Window {
 
 
     in-out property <string> current_time: "00:00";
+    in-out property <string> current_date: "--.--.----";
 
 
 
@@ -325,6 +339,12 @@ export component AppWindow inherits Window {
 
 
     in-out property <string> temp_label: "24.5";
+    in-out property <string> temp_unit: "C";
+    in-out property <string> temp_unit_label: "°C";
+    in-out property <string> rate_unit_label: "°C/h";
+    in-out property <string> rate_unit_label_min: "°C/min";
+    in-out property <string> time_format: "24";
+    in-out property <string> date_format: "DMY";
 
 
 
@@ -419,6 +439,9 @@ export component AppWindow inherits Window {
     in-out property <string> kb_field: "";
     in-out property <string> kb_mode: "num";
     in-out property <bool> kb_caps: false;
+    in-out property <string> settings_page: "all";
+    in-out property <bool> delete_confirm_visible: false;
+    in-out property <int> delete_confirm_index: -1;
 
     // Fan (manual override + power %)
     in-out property <bool> fan_manual: false;
@@ -457,6 +480,10 @@ export component AppWindow inherits Window {
     callback open_selected_program();
     callback open_running_editor();
 
+    callback set_temp_unit(string);
+    callback set_time_format(string);
+    callback set_date_format(string);
+
 
 
     callback select_schedule(int);
@@ -464,6 +491,7 @@ export component AppWindow inherits Window {
 
 
     callback edit_schedule(int);
+    callback delete_schedule(int);
 
 
 
@@ -612,7 +640,7 @@ export component AppWindow inherits Window {
         HorizontalBox {
             x: parent.width - self.width - 15px;
             y: 2px;
-            width: 140px;
+            width: 230px;
             height: 24px;
             spacing: 6px;
 
@@ -632,13 +660,23 @@ export component AppWindow inherits Window {
             }
 
             Rectangle {
-                width: 58px; height: 24px;
+                width: 110px; height: 24px;
                 background: #00000000;
                 Text {
+                    x: 0px; y: 0px; width: parent.width; height: 12px;
                     text: root.current_time;
                     color: #A1A1AA;
                     font-family: "PT Sans";
                     font-size: 12px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+                Text {
+                    x: 0px; y: 12px; width: parent.width; height: 12px;
+                    text: root.current_date;
+                    color: #71717A;
+                    font-family: "PT Sans";
+                    font-size: 10px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
@@ -657,7 +695,24 @@ export component AppWindow inherits Window {
                     x: -6px; y: -6px;
                     width: parent.width + 12px;
                     height: parent.height + 12px;
-                    clicked => { root.view = View.Settings; }
+                    clicked => { root.settings_page = "wifi"; root.view = View.Settings; }
+                }
+            }
+
+            Rectangle {
+                width: 32px; height: 24px;
+                background: #00000000;
+                SettingsIcon {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    width: 22px; height: 22px;
+                    color: #A1A1AA;
+                }
+                TouchArea {
+                    x: -6px; y: -6px;
+                    width: parent.width + 12px;
+                    height: parent.height + 12px;
+                    clicked => { root.settings_page = "all"; root.view = View.Settings; }
                 }
             }
         }
@@ -908,7 +963,7 @@ export component AppWindow inherits Window {
 
 
 
-                    text: "°C";
+                    text: root.temp_unit_label;
 
 
                     color: root.c_text;
@@ -991,7 +1046,7 @@ export component AppWindow inherits Window {
 
 
 
-                        text: root.target + "°C";
+                        text: root.target + root.temp_unit_label;
 
 
                         color: root.c_text;
@@ -1412,7 +1467,9 @@ export component AppWindow inherits Window {
 
 
 
-                            text: root.is_ua ? ("Ціль " + root.active_segment_target + "°C") : ("Target " + root.active_segment_target + "°C");
+                            text: root.is_ua
+                                ? ("Ціль " + root.active_segment_target + root.temp_unit_label)
+                                : ("Target " + root.active_segment_target + root.temp_unit_label);
 
 
 
@@ -2037,8 +2094,8 @@ export component AppWindow inherits Window {
 
 
 
-                                x: 210px; y: 54px;
-                                width: parent.width - 210px - 68px;
+                                x: 170px; y: 54px;
+                                width: parent.width - 170px - 68px - 52px - 8px;
 
 
                                 text: "• " + (root.is_ua ? "Користувацька" : "Custom");
@@ -2058,6 +2115,29 @@ export component AppWindow inherits Window {
                             }
 
 
+
+                            Rectangle {
+                                z: 2;
+                                x: parent.width - self.width - 68px;
+                                y: (parent.height - self.height) / 2;
+                                width: 52px; height: 52px;
+                                background: #3A1C1C;
+                                border-radius: 26px;
+
+                                Text {
+                                    x: 0px; y: 0px;
+                                    width: parent.width; height: parent.height;
+                                    text: "\u{e872}";
+                                    color: #FFFFFF;
+                                    font-family: "Material Icons";
+                                    font-size: 24px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+
+                                TouchArea {
+                    width: parent.width; height: parent.height; clicked => { root.delete_confirm_index = i; root.delete_confirm_visible = true; } }
+                            }
 
                             Rectangle {
 
@@ -2111,7 +2191,7 @@ export component AppWindow inherits Window {
 
 
                                 x: 0px; y: 0px;
-                                width: parent.width - 68px; height: parent.height;
+                                width: parent.width - 126px; height: parent.height;
                                 z: 1;
                                 clicked => { root.edit_schedule(i); }
                             }
@@ -2197,7 +2277,7 @@ export component AppWindow inherits Window {
                     border-color: #27272A;
                     border-width: 1px;
                     border-radius: 12px;
-                    Text { x: 14px; y: 8px; text: root.is_ua ? "Швидкість нагріву (°C/хв)" : "Ramp rate (°C/min)"; color: #A1A1AA; font-size: 13px; }
+                    Text { x: 14px; y: 8px; text: root.is_ua ? ("Швидкість нагріву (" + root.rate_unit_label_min + ")") : ("Ramp rate (" + root.rate_unit_label_min + ")"); color: #A1A1AA; font-size: 13px; }
                     Text { x: 14px; y: 28px; text: root.running_edit_rate; color: #FFFFFF; font-size: 18px; font-weight: 700; }
                     TouchArea { width: parent.width; height: parent.height; clicked => { root.kb_open("run_rate", -1, root.running_edit_rate); } }
                 }
@@ -2208,7 +2288,7 @@ export component AppWindow inherits Window {
                     border-color: #27272A;
                     border-width: 1px;
                     border-radius: 12px;
-                    Text { x: 14px; y: 8px; text: root.is_ua ? "Додати температуру (°C)" : "Add temperature (°C)"; color: #A1A1AA; font-size: 13px; }
+                    Text { x: 14px; y: 8px; text: root.is_ua ? ("Додати температуру (" + root.temp_unit_label + ")") : ("Add temperature (" + root.temp_unit_label + ")"); color: #A1A1AA; font-size: 13px; }
                     Text { x: 14px; y: 28px; text: root.running_edit_add_temp; color: #FFFFFF; font-size: 18px; font-weight: 700; }
                     TouchArea { width: parent.width; height: parent.height; clicked => { root.kb_open("run_temp", -1, root.running_edit_add_temp); } }
                 }
@@ -2243,9 +2323,12 @@ export component AppWindow inherits Window {
                 HorizontalBox {
                     x: 14px; y: 10px;
                     spacing: 6px;
-                    WifiIcon { color: root.wifi_ok ? #10B981 : #52525B; }
+                    if (root.settings_page == "wifi") : WifiIcon { color: root.wifi_ok ? #10B981 : #52525B; }
+                    if (root.settings_page != "wifi") : SettingsIcon { color: #A1A1AA; }
                     Text {
-                        text: root.is_ua ? "Налаштування" : "Settings";
+                        text: root.settings_page == "wifi"
+                            ? "Wi‑Fi"
+                            : (root.is_ua ? "Налаштування" : "Settings");
                         color: #FFFFFF;
                         font-family: "PT Sans";
                         font-size: 18px;
@@ -2271,7 +2354,7 @@ export component AppWindow inherits Window {
                         width: 438px;
                         spacing: 8px;
 
-                        Rectangle {
+                        if (root.settings_page == "wifi") : Rectangle {
                             width: 426px; height: 146px;
                             background: #0F0F0F;
                             border-color: #27272A;
@@ -2383,7 +2466,78 @@ export component AppWindow inherits Window {
                             }
                         }
 
+                        if (root.settings_page != "wifi") : Rectangle {
+                        width: 426px; height: 116px;
+                        background: #0F0F0F;
+                        border-color: #27272A;
+                        border-width: 1px;
+                        border-radius: 12px;
+
+                        Text {
+                            x: 12px; y: 8px;
+                            text: root.is_ua ? "Режим відображення" : "Display mode";
+                            color: #FFFFFF;
+                            font-family: "PT Sans";
+                            font-size: 16px;
+                        }
+
+                        Text { x: 12px; y: 36px; text: root.is_ua ? "Температура" : "Temperature"; color: #A1A1AA; font-size: 12px; }
                         Rectangle {
+                            x: 250px; y: 30px; width: 70px; height: 24px;
+                            background: root.temp_unit == "C" ? #10B981 : #27272A;
+                            border-radius: 8px;
+                            Text { text: "°C"; color: root.temp_unit == "C" ? #000000 : #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.temp_unit = "C"; root.set_temp_unit("C"); } }
+                        }
+                        Rectangle {
+                            x: 332px; y: 30px; width: 70px; height: 24px;
+                            background: root.temp_unit == "F" ? #10B981 : #27272A;
+                            border-radius: 8px;
+                            Text { text: "°F"; color: root.temp_unit == "F" ? #000000 : #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.temp_unit = "F"; root.set_temp_unit("F"); } }
+                        }
+
+                        Text { x: 12px; y: 62px; text: root.is_ua ? "Час" : "Time"; color: #A1A1AA; font-size: 12px; }
+                        Rectangle {
+                            x: 250px; y: 56px; width: 70px; height: 24px;
+                            background: root.time_format == "24" ? #10B981 : #27272A;
+                            border-radius: 8px;
+                            Text { text: "24h"; color: root.time_format == "24" ? #000000 : #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.time_format = "24"; root.set_time_format("24"); } }
+                        }
+                        Rectangle {
+                            x: 332px; y: 56px; width: 70px; height: 24px;
+                            background: root.time_format == "12" ? #10B981 : #27272A;
+                            border-radius: 8px;
+                            Text { text: "12h"; color: root.time_format == "12" ? #000000 : #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.time_format = "12"; root.set_time_format("12"); } }
+                        }
+
+                        Text { x: 12px; y: 88px; text: root.is_ua ? "Дата" : "Date"; color: #A1A1AA; font-size: 12px; }
+                        Rectangle {
+                            x: 170px; y: 82px; width: 72px; height: 24px;
+                            background: root.date_format == "DMY" ? #10B981 : #27272A;
+                            border-radius: 8px;
+                            Text { text: "ДД.ММ"; color: root.date_format == "DMY" ? #000000 : #FFFFFF; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "DMY"; root.set_date_format("DMY"); } }
+                        }
+                        Rectangle {
+                            x: 250px; y: 82px; width: 72px; height: 24px;
+                            background: root.date_format == "MDY" ? #10B981 : #27272A;
+                            border-radius: 8px;
+                            Text { text: "MM/DD"; color: root.date_format == "MDY" ? #000000 : #FFFFFF; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "MDY"; root.set_date_format("MDY"); } }
+                        }
+                        Rectangle {
+                            x: 330px; y: 82px; width: 72px; height: 24px;
+                            background: root.date_format == "YMD" ? #10B981 : #27272A;
+                            border-radius: 8px;
+                            Text { text: "YYYY"; color: root.date_format == "YMD" ? #000000 : #FFFFFF; font-size: 10px; horizontal-alignment: center; vertical-alignment: center; }
+                            TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "YMD"; root.set_date_format("YMD"); } }
+                        }
+                        }
+
+                        if (root.settings_page != "wifi") : Rectangle {
                         width: 426px; height: 86px;
                         background: #0F0F0F;
                         border-color: #27272A;
@@ -2483,7 +2637,7 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                        Rectangle {
+                        if (root.settings_page != "wifi") : Rectangle {
                         width: 426px; height: 108px;
                         background: #0F0F0F;
                         border-color: #27272A;
@@ -2500,7 +2654,9 @@ export component AppWindow inherits Window {
 
                         Text {
                             x: 12px; y: 30px;
-                            text: root.is_ua ? "Цільова температура" : "Target temperature";
+                            text: root.is_ua
+                                ? ("Цільова температура (" + root.temp_unit_label + ")")
+                                : ("Target temperature (" + root.temp_unit_label + ")");
                             color: #A1A1AA;
                             font-family: "PT Sans";
                             font-size: 12px;
@@ -2510,7 +2666,7 @@ export component AppWindow inherits Window {
                             x: 12px; y: 50px; width: 130px; height: 32px;
                             background: #27272A;
                             border-radius: 10px;
-                            Text { text: root.autotune_target_c + "°C"; color: #FFFFFF; font-family: "PT Sans"; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { text: root.autotune_target_c + root.temp_unit_label; color: #FFFFFF; font-family: "PT Sans"; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
                                 clicked => {
@@ -2548,7 +2704,7 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                        Rectangle {
+                        if (root.settings_page != "wifi") : Rectangle {
                         width: 426px; height: 64px;
                         background: #0F0F0F;
                         border-color: #27272A;
@@ -2577,7 +2733,7 @@ export component AppWindow inherits Window {
                         }
                         }
 
-                        Rectangle {
+                        if (root.settings_page != "wifi") : Rectangle {
                         width: 426px; height: 46px;
                         background: root.fault_active ? #7F1D1D : #18181B;
                         border-radius: 12px;
@@ -2599,7 +2755,7 @@ export component AppWindow inherits Window {
                         }
                         }
 
-                        Rectangle {
+                        if (root.settings_page != "wifi") : Rectangle {
                         width: 426px; height: 46px;
                         background: #27272A;
                         border-radius: 12px;
@@ -3028,7 +3184,7 @@ export component AppWindow inherits Window {
                                     spacing: 4px;
 
 
-                                    Text { text: root.is_ua ? "Швидк. (°C/год)" : "Rate (°C/h)"; color: #71717A; font-size: 14px; }
+                                    Text { text: root.is_ua ? ("Швидк. (" + root.rate_unit_label + ")") : ("Rate (" + root.rate_unit_label + ")"); color: #71717A; font-size: 14px; }
 
 
                                     Rectangle {
@@ -3125,7 +3281,7 @@ export component AppWindow inherits Window {
                                     spacing: 4px;
 
 
-                                    Text { text: root.is_ua ? "Темп. (°C)" : "Target (°C)"; color: #71717A; font-size: 14px; }
+                                    Text { text: root.is_ua ? ("Темп. (" + root.temp_unit_label + ")") : ("Target (" + root.temp_unit_label + ")"); color: #71717A; font-size: 14px; }
 
 
                                     Rectangle {
@@ -3720,7 +3876,7 @@ export component AppWindow inherits Window {
         KbKeyButton { x: 176px; y: 238px; width: 134px; height: 60px; background: #27272A; label: root.is_ua ? "Пробіл" : "Space"; font_size: 18px;
             pressed(v) => { root.kb_key("SPACE"); }
         }
-        KbKeyButton { x: 318px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: "⌫"; font_size: 22px;
+        KbKeyButton { x: 318px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: "←"; font_size: 22px;
             pressed(v) => { root.kb_key("BS"); }
         }
         KbKeyButton { x: 398px; y: 238px; width: 72px; height: 60px; background: #3F3F46; label: root.is_ua ? "Очист." : "Clear"; font_size: 14px;
@@ -3729,7 +3885,7 @@ export component AppWindow inherits Window {
     }
 
     // Bottom numeric keyboard overlay (Editor)
-    if (root.kb_visible && ((root.kb_field == "name" && root.kb_mode == "num") || (root.kb_field == "wifi_pass" && root.kb_mode == "num") || (root.kb_field != "name" && root.kb_field != "wifi_pass"))) : Rectangle {
+    if (root.kb_visible && ((root.kb_field == "name" && (root.kb_mode == "num" || root.kb_mode == "sym")) || (root.kb_field == "wifi_pass" && (root.kb_mode == "num" || root.kb_mode == "sym")) || (root.kb_field != "name" && root.kb_field != "wifi_pass"))) : Rectangle {
         x: 0px;
         y: 0px;
         width: 480px;
@@ -3753,7 +3909,7 @@ export component AppWindow inherits Window {
                                 : root.kb_field == "run_rate"
                                     ? (root.is_ua ? "Нова швидкість" : "New rate")
                                     : root.kb_field == "run_temp"
-                                        ? (root.is_ua ? "Додати температуру" : "Add temperature")
+                                        ? (root.is_ua ? ("Додати температуру (" + root.temp_unit_label + ")") : ("Add temperature (" + root.temp_unit_label + ")"))
                                         : root.kb_field == "run_time"
                                             ? (root.is_ua ? "Додати час" : "Add time")
                                 : root.kb_field == "name"
@@ -3778,6 +3934,9 @@ export component AppWindow inherits Window {
         if (root.kb_field == "wifi_pass" || root.kb_field == "name") : KbKeyButton { x: 388px; y: 8px; width: 80px; height: 32px; background: #27272A; label: "ABC"; font_size: 12px;
             pressed(v) => { root.kb_mode = "alpha"; }
         }
+        if (root.kb_field == "wifi_pass" || root.kb_field == "name") : KbKeyButton { x: 300px; y: 8px; width: 80px; height: 32px; background: #27272A; label: root.kb_mode == "sym" ? "123" : "SYM"; font_size: 12px;
+            pressed(v) => { root.kb_mode = root.kb_mode == "sym" ? "num" : "sym"; }
+        }
 
         property <length> kx: 25px;
     property <length> ky: 76px;
@@ -3785,24 +3944,70 @@ export component AppWindow inherits Window {
         property <length> kh: 42px;
         property <length> kg: 10px;
 
-        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "1"; font_size: 22px; pressed(v) => { root.kb_key("1"); } }
-        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "2"; font_size: 22px; pressed(v) => { root.kb_key("2"); } }
-        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "3"; font_size: 22px; pressed(v) => { root.kb_key("3"); } }
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "!" : "1"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "!" : "1"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "@" : "2"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "@" : "2"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 0 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "#" : "3"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "#" : "3"); } }
 
-        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "4"; font_size: 22px; pressed(v) => { root.kb_key("4"); } }
-        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "5"; font_size: 22px; pressed(v) => { root.kb_key("5"); } }
-        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "6"; font_size: 22px; pressed(v) => { root.kb_key("6"); } }
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "$" : "4"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "$" : "4"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "%" : "5"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "%" : "5"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 1 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "&" : "6"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "&" : "6"); } }
 
-        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "7"; font_size: 22px; pressed(v) => { root.kb_key("7"); } }
-        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "8"; font_size: 22px; pressed(v) => { root.kb_key("8"); } }
-        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "9"; font_size: 22px; pressed(v) => { root.kb_key("9"); } }
+        KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "*" : "7"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "*" : "7"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "-" : "8"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "-" : "8"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 2 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "_" : "9"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "_" : "9"); } }
 
         KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #3F3F46; label: root.is_ua ? "Очист." : "Clear"; font_size: 14px; pressed(v) => { root.kb_key("CLR"); } }
-        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: "0"; font_size: 22px; pressed(v) => { root.kb_key("0"); } }
-        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #3F3F46; label: "⌫"; font_size: 22px; pressed(v) => { root.kb_key("BS"); } }
+        KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; label: root.kb_mode == "sym" ? "." : "0"; font_size: 22px; pressed(v) => { root.kb_key(root.kb_mode == "sym" ? "." : "0"); } }
+        KbKeyButton { x: parent.kx + 2 * (parent.kw + parent.kg); y: parent.ky + 3 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #3F3F46; label: "←"; font_size: 22px; pressed(v) => { root.kb_key("BS"); } }
 
         KbKeyButton { x: parent.kx + 0 * (parent.kw + parent.kg); y: parent.ky + 4 * (parent.kh + 6px); width: parent.kw; height: parent.kh; background: #7F1D1D; label: root.is_ua ? "Скас." : "Cancel"; font_size: 14px; pressed(v) => { root.kb_key("CANCEL"); } }
         KbKeyButton { x: parent.kx + 1 * (parent.kw + parent.kg); y: parent.ky + 4 * (parent.kh + 6px); width: parent.kw + parent.kg + parent.kw; height: parent.kh; background: #10B981; text_color: #000000; label: "OK"; font_size: 20px; pressed(v) => { root.kb_key("OK"); } }
+    }
+
+    if (root.delete_confirm_visible) : Rectangle {
+        x: 0px; y: 0px; width: 480px; height: 320px;
+        background: #000000B3;
+        z: 5100;
+        Rectangle {
+            x: 60px; y: 70px; width: 360px; height: 180px;
+            background: #0B0B0B;
+            border-color: #3F3F46;
+            border-width: 1px;
+            border-radius: 16px;
+            Text {
+                x: 0px; y: 22px; width: parent.width;
+                text: root.is_ua ? "Видалити програму?" : "Delete program?";
+                color: #FFFFFF;
+                font-family: "PT Sans";
+                font-size: 20px;
+                horizontal-alignment: center;
+            }
+            Text {
+                x: 20px; y: 60px; width: parent.width - 40px;
+                text: root.is_ua ? "Цю дію неможливо скасувати." : "This action cannot be undone.";
+                color: #A1A1AA;
+                font-size: 12px;
+                horizontal-alignment: center;
+            }
+            Rectangle {
+                x: 24px; y: 120px; width: 150px; height: 44px;
+                background: #27272A; border-radius: 10px;
+                Text { text: root.is_ua ? "Скасувати" : "Cancel"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                TouchArea { width: parent.width; height: parent.height; clicked => { root.delete_confirm_visible = false; } }
+            }
+            Rectangle {
+                x: 186px; y: 120px; width: 150px; height: 44px;
+                background: #7F1D1D; border-radius: 10px;
+                Text { text: root.is_ua ? "Видалити" : "Delete"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
+                TouchArea {
+                    width: parent.width; height: parent.height;
+                    clicked => {
+                        if (root.delete_confirm_index >= 0) { root.delete_schedule(root.delete_confirm_index); }
+                        root.delete_confirm_visible = false;
+                    }
+                }
+            }
+        }
     }
 
     if (root.show_skip_confirm) : Rectangle {
@@ -3883,39 +4088,39 @@ export component AppWindow inherits Window {
             background: #05070B;
             z: 5150;
 
-            Text {
-                x: 0px; y: 42px; width: 480px; height: 34px;
-                text: "Kiln PRO";
-                color: #FFFFFF;
-                font-family: "PT Sans";
-                font-size: 28px;
-                font-weight: 700;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-
             Rectangle {
-                x: 198px; y: 82px;
-                width: 84px; height: 84px;
+                x: 142px; y: 24px;
+                width: 44px; height: 44px;
                 background: #00D084;
-                border-radius: 22px;
+                border-radius: 12px;
                 Text {
                     x: 0px; y: 0px; width: parent.width; height: parent.height;
                     text: "\u{ef55}";
                     color: #000000;
                     font-family: "Material Icons";
-                    font-size: 62px;
+                    font-size: 32px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
             }
 
             Text {
-                x: 0px; y: 182px; width: 480px; height: 82px;
-                text: root.temp_label + "°C";
+                x: 194px; y: 24px; width: 150px; height: 44px;
+                text: "KilnPro";
                 color: #FFFFFF;
                 font-family: "PT Sans";
-                font-size: 76px;
+                font-size: 34px;
+                font-weight: 700;
+                horizontal-alignment: left;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 0px; y: 108px; width: 480px; height: 132px;
+                text: root.temp_label + root.temp_unit_label;
+                color: #FFFFFF;
+                font-family: "PT Sans";
+                font-size: 116px;
                 font-weight: 700;
                 horizontal-alignment: center;
                 vertical-alignment: center;
@@ -3934,34 +4139,33 @@ export component AppWindow inherits Window {
             z: 5200;
 
             Rectangle {
-                x: 154px; y: 76px;
-                width: 172px; height: 172px;
+                x: 171px; y: 86px;
+                width: 138px; height: 138px;
                 background: #00D084;
-                border-radius: 34px;
+                border-radius: 28px;
 
                 Text {
                     x: 0px; y: 0px; width: parent.width; height: parent.height;
                     text: "\u{ef55}";
                     color: #000000;
                     font-family: "Material Icons";
-                    font-size: 124px;
+                    font-size: 100px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
             }
 
             Text {
-                x: 0px; y: 258px; width: 480px; height: 48px;
+                x: 0px; y: 240px; width: 480px; height: 42px;
                 text: "KilnPro";
                 color: #FFFFFF;
                 font-family: "PT Sans";
-                font-size: 48px;
+                font-size: 40px;
                 font-weight: 700;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
     }
-
     if (root.show_stop_confirm) : Rectangle {
 
 

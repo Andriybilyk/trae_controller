@@ -108,8 +108,15 @@ extern "C" {
     fn slint_bridge_notify_schedules_changed();
     fn slint_bridge_ui_heartbeat();
     fn slint_bridge_get_time_str(out: *mut c_char, out_len: i32) -> bool;
+    fn slint_bridge_get_date_str(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_get_language_is_ua() -> bool;
     fn slint_bridge_set_language_is_ua(is_ua: bool);
+    fn slint_bridge_get_temp_unit() -> u8;
+    fn slint_bridge_set_temp_unit(unit: u8);
+    fn slint_bridge_get_time_format() -> u8;
+    fn slint_bridge_set_time_format(fmt: u8);
+    fn slint_bridge_get_date_format() -> u8;
+    fn slint_bridge_set_date_format(fmt: u8);
 
     fn display_driver_touch_probe(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
     fn display_driver_touch_probe_raw(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
@@ -171,6 +178,113 @@ struct AppState {
     editor_steps: Vec<EditorStepRow>,
     display_temp_c: f32,
     display_temp_valid: bool,
+    temp_unit: TempUnit,
+    time_format: TimeFormat,
+    date_format: DateFormat,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum TempUnit {
+    C,
+    F,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum TimeFormat {
+    H24,
+    H12,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum DateFormat {
+    Dmy,
+    Mdy,
+    Ymd,
+}
+
+fn c_to_f(c: f32) -> f32 {
+    c * 9.0 / 5.0 + 32.0
+}
+
+fn f_to_c(f: f32) -> f32 {
+    (f - 32.0) * 5.0 / 9.0
+}
+
+fn temp_to_display(value_c: f32, unit: TempUnit) -> f32 {
+    match unit {
+        TempUnit::C => value_c,
+        TempUnit::F => c_to_f(value_c),
+    }
+}
+
+fn temp_to_display_i32(value_c: i32, unit: TempUnit) -> i32 {
+    temp_to_display(value_c as f32, unit).round() as i32
+}
+
+fn temp_to_c_from_display(value: i32, unit: TempUnit) -> i32 {
+    match unit {
+        TempUnit::C => value,
+        TempUnit::F => f_to_c(value as f32).round() as i32,
+    }
+}
+
+fn rate_to_display(value_c: i32, unit: TempUnit) -> i32 {
+    match unit {
+        TempUnit::C => value_c,
+        TempUnit::F => (value_c as f32 * 9.0 / 5.0).round() as i32,
+    }
+}
+
+fn rate_to_c_from_display(value: i32, unit: TempUnit) -> i32 {
+    match unit {
+        TempUnit::C => value,
+        TempUnit::F => (value as f32 * 5.0 / 9.0).round() as i32,
+    }
+}
+
+fn update_unit_labels(ui: &AppWindow, unit: TempUnit) {
+    ui.set_temp_unit(match unit { TempUnit::C => "C", TempUnit::F => "F" }.into());
+    ui.set_temp_unit_label(match unit { TempUnit::C => "°C", TempUnit::F => "°F" }.into());
+    ui.set_rate_unit_label(match unit { TempUnit::C => "°C/h", TempUnit::F => "°F/h" }.into());
+    ui.set_rate_unit_label_min(match unit { TempUnit::C => "°C/min", TempUnit::F => "°F/min" }.into());
+}
+
+fn apply_temp_unit_change(ui: &AppWindow, state: &mut AppState, new_unit: TempUnit) {
+    if state.temp_unit == new_unit {
+        return;
+    }
+    let old_unit = state.temp_unit;
+
+    for step in &mut state.editor_steps {
+        let rate_c = rate_to_c_from_display(step.rate, old_unit);
+        step.rate = rate_to_display(rate_c, new_unit);
+        let target_c = temp_to_c_from_display(step.target, old_unit);
+        step.target = temp_to_display_i32(target_c, new_unit);
+    }
+    refresh_editor_model(ui, state);
+
+    let temp_c = match old_unit {
+        TempUnit::C => ui.get_temp(),
+        TempUnit::F => f_to_c(ui.get_temp()),
+    };
+    let target_c = temp_to_c_from_display(ui.get_target(), old_unit);
+    let seg_target_c = temp_to_c_from_display(ui.get_active_segment_target(), old_unit);
+    let max_target_c = temp_to_c_from_display(ui.get_schedule_target_max_c(), old_unit);
+    let autotune_c = temp_to_c_from_display(ui.get_autotune_target_c(), old_unit);
+    let run_temp_c = temp_to_c_from_display(ui.get_running_edit_add_temp(), old_unit);
+    let run_rate_c = rate_to_c_from_display(ui.get_running_edit_rate(), old_unit);
+
+    ui.set_temp(temp_to_display(temp_c, new_unit));
+    ui.set_temp_label(format!("{:.1}", temp_to_display(temp_c, new_unit)).into());
+    ui.set_target(temp_to_display_i32(target_c, new_unit));
+    ui.set_active_segment_target(temp_to_display_i32(seg_target_c, new_unit));
+    ui.set_schedule_target_max_c(temp_to_display_i32(max_target_c, new_unit));
+    ui.set_autotune_target_c(temp_to_display_i32(autotune_c, new_unit));
+    ui.set_running_edit_add_temp(temp_to_display_i32(run_temp_c, new_unit));
+    ui.set_running_edit_rate(rate_to_display(run_rate_c, new_unit));
+
+    state.temp_unit = new_unit;
+    update_unit_labels(ui, new_unit);
 }
 
 struct EspPlatform {
@@ -330,20 +444,24 @@ fn schedule_steps_count(schedule: &ScheduleFile) -> i32 {
     schedule.steps_count.unwrap_or(schedule.steps.len() as i32)
 }
 
-fn to_editor_steps(schedule: &ScheduleFile) -> Vec<EditorStepRow> {
+fn to_editor_steps(schedule: &ScheduleFile, unit: TempUnit) -> Vec<EditorStepRow> {
     schedule
         .steps
         .iter()
         .map(|s| EditorStepRow {
             step_type: s.step_type.clone().into(),
-            rate: s.rate.unwrap_or(0),
-            target: s.target.unwrap_or(0),
+            rate: rate_to_display(s.rate.unwrap_or(0), unit),
+            target: temp_to_display_i32(s.target.unwrap_or(0), unit),
             hold: s.hold_time.unwrap_or(0),
         })
         .collect()
 }
 
-fn to_schedule_steps(existing: &[ScheduleStepFile], editor_steps: &[EditorStepRow]) -> Vec<ScheduleStepFile> {
+fn to_schedule_steps(
+    existing: &[ScheduleStepFile],
+    editor_steps: &[EditorStepRow],
+    unit: TempUnit,
+) -> Vec<ScheduleStepFile> {
     let mut out = Vec::new();
     for (i, s) in editor_steps.iter().enumerate() {
         let mut step = existing.get(i).cloned().unwrap_or_else(|| ScheduleStepFile {
@@ -366,8 +484,8 @@ fn to_schedule_steps(existing: &[ScheduleStepFile], editor_steps: &[EditorStepRo
             step.target = None;
             step.hold_time = Some(s.hold);
         } else {
-            step.rate = Some(s.rate);
-            step.target = Some(s.target);
+            step.rate = Some(rate_to_c_from_display(s.rate, unit));
+            step.target = Some(temp_to_c_from_display(s.target, unit));
             step.hold_time = Some(s.hold);
         }
         out.push(step);
@@ -440,6 +558,27 @@ fn make_safe_id(name: &str) -> String {
         out = "schedule".to_string();
     }
     out
+}
+
+fn make_unique_schedule_name(schedules: &[ScheduleFile], base_name: &str) -> String {
+    let base = base_name.trim();
+    let mut max_index: u32 = 0;
+
+    for s in schedules {
+        let name = s.name.trim();
+        if name == base {
+            continue;
+        }
+        if let Some(suffix) = name.strip_prefix(base).and_then(|rest| rest.strip_prefix(' ')) {
+            if let Ok(n) = suffix.trim().parse::<u32>() {
+                if n > max_index {
+                    max_index = n;
+                }
+            }
+        }
+    }
+
+    format!("{} {}", base, max_index + 1)
 }
 
 fn parse_int_with_clamp(text: &str, min: i32, max: i32, fallback: i32) -> i32 {
@@ -541,7 +680,8 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
     };
     let is_idle = !state.is_firing;
 
-    let mut shown_temp = state.current_temp;
+    let unit = app_state.temp_unit;
+    let mut shown_temp_c = state.current_temp;
     if state.current_temp.is_finite() {
         if !app_state.display_temp_valid || !app_state.display_temp_c.is_finite() {
             app_state.display_temp_c = state.current_temp;
@@ -553,14 +693,16 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
             let blended = prev * (1.0 - ALPHA) + state.current_temp * ALPHA;
             app_state.display_temp_c = if (blended - prev).abs() < DEAD_BAND_C { prev } else { blended };
         }
-        shown_temp = app_state.display_temp_c;
+        shown_temp_c = app_state.display_temp_c;
     } else {
         app_state.display_temp_valid = false;
     }
 
+    let shown_temp = temp_to_display(shown_temp_c, unit);
     ui.set_temp(shown_temp);
     ui.set_temp_label(format!("{:.1}", shown_temp).into());
-    ui.set_target(state.target_temp as i32);
+    let target_display = temp_to_display(state.target_temp, unit);
+    ui.set_target(target_display.round() as i32);
     let fallback_target = state.target_temp.round() as i32;
     let segment_target = if let Some(idx) = app_state.selected_index {
         if let Some(schedule) = app_state.schedules.get(idx) {
@@ -571,7 +713,7 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
     } else {
         fallback_target
     };
-    ui.set_active_segment_target(segment_target);
+    ui.set_active_segment_target(temp_to_display_i32(segment_target, unit));
     ui.set_status_label(status_label.into());
     ui.set_is_idle(is_idle);
     ui.set_step_index(state.current_step as i32);
@@ -602,16 +744,16 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
         "http://192.168.4.1".to_string()
     };
     ui.set_wifi_server_url(server_url.into());
-    let initial_max_temp = unsafe { slint_bridge_get_user_max_temp_c() };
-    let initial_max_temp = if initial_max_temp.is_finite() {
-        initial_max_temp.clamp(100.0, 1300.0) as i32
+    let initial_max_temp_c = unsafe { slint_bridge_get_user_max_temp_c() };
+    let initial_max_temp_c = if initial_max_temp_c.is_finite() {
+        initial_max_temp_c.clamp(100.0, 1300.0)
     } else {
-        1300
+        1300.0
     };
-    ui.set_schedule_target_max_c(initial_max_temp);
-    let initial_autotune_target = unsafe { slint_bridge_get_autotune_target_c() };
-    if initial_autotune_target.is_finite() {
-        ui.set_autotune_target_c(initial_autotune_target.clamp(100.0, 1200.0) as i32);
+    ui.set_schedule_target_max_c(temp_to_display(initial_max_temp_c, unit).round() as i32);
+    let initial_autotune_target_c = unsafe { slint_bridge_get_autotune_target_c() };
+    if initial_autotune_target_c.is_finite() {
+        ui.set_autotune_target_c(temp_to_display(initial_autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32);
     }
 }
 
@@ -930,6 +1072,25 @@ pub extern "C" fn slint_ui_run() {
     }
     let lang_is_ua = unsafe { slint_bridge_get_language_is_ua() };
     ui.set_is_ua(lang_is_ua);
+    let temp_unit = match unsafe { slint_bridge_get_temp_unit() } {
+        1 => TempUnit::F,
+        _ => TempUnit::C,
+    };
+    let time_format = match unsafe { slint_bridge_get_time_format() } {
+        1 => TimeFormat::H12,
+        _ => TimeFormat::H24,
+    };
+    let date_format = match unsafe { slint_bridge_get_date_format() } {
+        1 => DateFormat::Mdy,
+        2 => DateFormat::Ymd,
+        _ => DateFormat::Dmy,
+    };
+    ui.set_temp_unit(match temp_unit { TempUnit::C => "C", TempUnit::F => "F" }.into());
+    ui.set_time_format(match time_format { TimeFormat::H24 => "24", TimeFormat::H12 => "12" }.into());
+    ui.set_date_format(match date_format { DateFormat::Dmy => "DMY", DateFormat::Mdy => "MDY", DateFormat::Ymd => "YMD" }.into());
+    ui.set_temp_unit_label(match temp_unit { TempUnit::C => "°C", TempUnit::F => "°F" }.into());
+    ui.set_rate_unit_label(match temp_unit { TempUnit::C => "°C/h", TempUnit::F => "°F/h" }.into());
+    ui.set_rate_unit_label_min(match temp_unit { TempUnit::C => "°C/min", TempUnit::F => "°F/min" }.into());
     ui.set_wifi_networks(ModelRc::new(VecModel::from(Vec::<WifiNetworkRow>::new())));
     ui.set_wifi_qr_image(build_qr_image(&format!("WIFI:T:nopass;S:{};;", CONTROLLER_AP_SSID)));
     ui.set_wifi_qr_hint(
@@ -948,6 +1109,9 @@ pub extern "C" fn slint_ui_run() {
         editor_steps: Vec::new(),
         display_temp_c: 0.0,
         display_temp_valid: false,
+        temp_unit,
+        time_format,
+        date_format,
     };
 
     if !state.schedules.is_empty() {
@@ -999,7 +1163,7 @@ pub extern "C" fn slint_ui_run() {
                 if idx < state.schedules.len() {
                     state.editing_index = Some(idx);
                     let schedule = state.schedules[idx].clone();
-                    state.editor_steps = to_editor_steps(&schedule);
+                    state.editor_steps = to_editor_steps(&schedule, state.temp_unit);
                     ui.set_selected_schedule_name(schedule.name.clone().into());
                     refresh_editor_model(&ui, &state);
                     ui.set_view(View::Editor);
@@ -1022,7 +1186,7 @@ pub extern "C" fn slint_ui_run() {
                 if idx < state.schedules.len() {
                     state.editing_index = Some(idx);
                     let schedule = state.schedules[idx].clone();
-                    state.editor_steps = to_editor_steps(&schedule);
+                    state.editor_steps = to_editor_steps(&schedule, state.temp_unit);
                     ui.set_selected_schedule_name(schedule.name.clone().into());
                     refresh_editor_model(&ui, &state);
                     ui.set_view(View::Editor);
@@ -1040,6 +1204,49 @@ pub extern "C" fn slint_ui_run() {
             let is_ua = !ui.get_is_ua();
             ui.set_is_ua(is_ua);
             unsafe { slint_bridge_set_language_is_ua(is_ua) };
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_set_temp_unit(move |unit| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let new_unit = if unit.to_string() == "F" { TempUnit::F } else { TempUnit::C };
+            let mut state = app_state.borrow_mut();
+            apply_temp_unit_change(&ui, &mut state, new_unit);
+            unsafe { slint_bridge_set_temp_unit(if new_unit == TempUnit::F { 1 } else { 0 }) };
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_set_time_format(move |fmt| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let new_fmt = if fmt.to_string() == "12" { TimeFormat::H12 } else { TimeFormat::H24 };
+            ui.set_time_format(match new_fmt { TimeFormat::H24 => "24", TimeFormat::H12 => "12" }.into());
+            app_state.borrow_mut().time_format = new_fmt;
+            unsafe { slint_bridge_set_time_format(if new_fmt == TimeFormat::H12 { 1 } else { 0 }) };
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_set_date_format(move |fmt| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let new_fmt = match fmt.to_string().as_str() {
+                "MDY" => DateFormat::Mdy,
+                "YMD" => DateFormat::Ymd,
+                _ => DateFormat::Dmy,
+            };
+            ui.set_date_format(match new_fmt { DateFormat::Dmy => "DMY", DateFormat::Mdy => "MDY", DateFormat::Ymd => "YMD" }.into());
+            app_state.borrow_mut().date_format = new_fmt;
+            unsafe {
+                let v = match new_fmt { DateFormat::Dmy => 0, DateFormat::Mdy => 1, DateFormat::Ymd => 2 };
+                slint_bridge_set_date_format(v);
+            }
         });
     }
 
@@ -1090,15 +1297,21 @@ pub extern "C" fn slint_ui_run() {
 
     {
         let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
         ui.on_autotune_start(move |target| {
             let Some(ui) = ui_weak.upgrade() else { return; };
-            let clamped = target.clamp(100, 1200);
+            let unit = app_state.borrow().temp_unit;
+            let min_disp = temp_to_display_i32(100, unit);
+            let max_disp = temp_to_display_i32(1200, unit);
+            let clamped = target.clamp(min_disp, max_disp);
             ui.set_autotune_target_c(clamped);
             unsafe {
-                let _ = slint_bridge_set_autotune_target_c(clamped as f32);
+                let clamped_c = temp_to_c_from_display(clamped, unit);
+                let _ = slint_bridge_set_autotune_target_c(clamped_c as f32);
             }
             unsafe {
-                let _ = slint_bridge_start_autotune(clamped as f32);
+                let clamped_c = temp_to_c_from_display(clamped, unit);
+                let _ = slint_bridge_start_autotune(clamped_c as f32);
             }
         });
     }
@@ -1278,16 +1491,20 @@ pub extern "C" fn slint_ui_run() {
 
     {
         let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
         ui.on_running_edit_confirm(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
-            let d_temp = ui.get_running_edit_add_temp() as f32;
+            let unit = app_state.borrow().temp_unit;
+            let d_temp_disp = ui.get_running_edit_add_temp();
             let d_time = ui.get_running_edit_add_time() as f32;
-            let rate = ui.get_running_edit_rate() as f32;
-            if rate > 0.0 {
-                let _ = unsafe { slint_bridge_set_rate(rate) };
+            let rate_disp = ui.get_running_edit_rate();
+            if rate_disp > 0 {
+                let rate_c = rate_to_c_from_display(rate_disp, unit) as f32;
+                let _ = unsafe { slint_bridge_set_rate(rate_c) };
             }
-            if d_temp != 0.0 {
-                unsafe { slint_bridge_add_temp(d_temp); }
+            if d_temp_disp != 0 {
+                let d_temp_c = temp_to_c_from_display(d_temp_disp, unit) as f32;
+                unsafe { slint_bridge_add_temp(d_temp_c); }
             }
             if d_time != 0.0 {
                 unsafe { slint_bridge_add_time(d_time); }
@@ -1334,7 +1551,7 @@ pub extern "C" fn slint_ui_run() {
             if idx < state.schedules.len() {
                 state.editing_index = Some(idx);
                 let schedule = state.schedules[idx].clone();
-                state.editor_steps = to_editor_steps(&schedule);
+                state.editor_steps = to_editor_steps(&schedule, state.temp_unit);
                 ui.set_selected_schedule_name(schedule.name.clone().into());
                 refresh_editor_model(&ui, &state);
                 ui.set_view(View::Editor);
@@ -1345,14 +1562,71 @@ pub extern "C" fn slint_ui_run() {
     {
         let ui_weak = ui_weak.clone();
         let app_state = app_state.clone();
+        ui.on_delete_schedule(move |index| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let mut state = app_state.borrow_mut();
+            let idx = index as usize;
+            if idx >= state.schedules.len() {
+                return;
+            }
+
+            let removed_selected = state.selected_index == Some(idx);
+            state.schedules.remove(idx);
+
+            state.selected_index = match state.selected_index {
+                Some(sel) if sel == idx => {
+                    if state.schedules.is_empty() {
+                        None
+                    } else {
+                        Some(idx.min(state.schedules.len() - 1))
+                    }
+                }
+                Some(sel) if sel > idx => Some(sel - 1),
+                other => other,
+            };
+
+            state.editing_index = match state.editing_index {
+                Some(edit) if edit == idx => None,
+                Some(edit) if edit > idx => Some(edit - 1),
+                other => other,
+            };
+
+            if let Some(sel) = state.selected_index {
+                if let Some(schedule) = state.schedules.get(sel) {
+                    ui.set_selected_schedule_name(schedule.name.clone().into());
+                    ui.set_selected_steps_count(schedule_steps_count(schedule));
+                    if removed_selected {
+                        if let Ok(json) = serde_json::to_string(schedule) {
+                            if let Ok(c_json) = CString::new(json) {
+                                unsafe {
+                                    let _ = slint_bridge_load_schedule_json(c_json.as_ptr());
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                ui.set_selected_schedule_name("".into());
+                ui.set_selected_steps_count(0);
+            }
+
+            let _ = save_schedules(&state.schedules);
+            unsafe { slint_bridge_notify_schedules_changed() };
+            refresh_schedule_model(&ui, &state);
+        });
+    }
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
         ui.on_new_schedule(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let mut state = app_state.borrow_mut();
-            let name = if ui.get_is_ua() { "Нова програма" } else { "New Program" };
-            let id = make_safe_id(name);
+            let base_name = if ui.get_is_ua() { "Нова програма" } else { "New Program" };
+            let name = make_unique_schedule_name(&state.schedules, base_name);
+            let id = make_safe_id(&name);
             state.schedules.push(ScheduleFile {
                 id,
-                name: name.to_string(),
+                name: name.clone(),
                 schedule_type: "Custom".to_string(),
                 created: String::new(),
                 steps_count: Some(0),
@@ -1392,7 +1666,7 @@ pub extern "C" fn slint_ui_run() {
                 let selected_for_run = state.selected_index;
                 let old_steps = state.schedules.get(idx).map(|s| s.steps.clone()).unwrap_or_default();
                 let name = ui.get_selected_schedule_name().to_string();
-                let steps = to_schedule_steps(&state.schedules[idx].steps, &state.editor_steps);
+                let steps = to_schedule_steps(&state.schedules[idx].steps, &state.editor_steps, state.temp_unit);
                 if let Some(schedule) = state.schedules.get_mut(idx) {
                     schedule.name = name;
                     schedule.steps = steps;
@@ -1428,9 +1702,10 @@ pub extern "C" fn slint_ui_run() {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let mut state = app_state.borrow_mut();
             let target = state.editor_steps.last().map(|s| s.target).unwrap_or(100);
+            let rate_default = rate_to_display(100, state.temp_unit);
             state.editor_steps.push(EditorStepRow {
                 step_type: "ramp".into(),
-                rate: 100,
+                rate: rate_default,
                 target,
                 hold: 0,
             });
@@ -1444,8 +1719,10 @@ pub extern "C" fn slint_ui_run() {
         ui.on_editor_rate_changed(move |index, value| {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let mut state = app_state.borrow_mut();
+            let unit = state.temp_unit;
             if let Some(step) = state.editor_steps.get_mut(index as usize) {
-                let v = parse_int_with_clamp(value.as_str(), 0, 9999, step.rate);
+                let max_disp = rate_to_display(9999, unit);
+                let v = parse_int_with_clamp(value.as_str(), 0, max_disp, step.rate);
                 step.rate = v;
             }
             refresh_editor_model(&ui, &state);
@@ -1459,7 +1736,8 @@ pub extern "C" fn slint_ui_run() {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let mut state = app_state.borrow_mut();
             if let Some(step) = state.editor_steps.get_mut(index as usize) {
-                let v = parse_int_with_clamp(value.as_str(), 0, 2000, step.target);
+                let max_disp = ui.get_schedule_target_max_c().clamp(100, 3000);
+                let v = parse_int_with_clamp(value.as_str(), 0, max_disp, step.target);
                 step.target = v;
             }
             refresh_editor_model(&ui, &state);
@@ -1581,15 +1859,23 @@ pub extern "C" fn slint_ui_run() {
                 return;
             }
 
-            let schedule_target_max = ui.get_schedule_target_max_c().clamp(100, 1300);
+            let unit = app_state.borrow().temp_unit;
+            let schedule_target_max = ui.get_schedule_target_max_c().clamp(100, 3000);
+            let autotune_min = temp_to_display_i32(100, unit);
+            let autotune_max = temp_to_display_i32(1200, unit);
+            let run_temp_min = temp_to_display_i32(-300, unit);
+            let run_temp_max = temp_to_display_i32(300, unit);
+            let run_rate_min = rate_to_display(1, unit);
+            let run_rate_max = rate_to_display(9999, unit);
+            let rate_len = if unit == TempUnit::F { 5usize } else { 4usize };
             let (min, max, max_len) = match field.as_str() {
-                "rate" => (0, 9999, 4usize),
+                "rate" => (0, rate_to_display(9999, unit), rate_len),
                 "target" => (0, schedule_target_max, 4usize),
                 "hold" => (0, 999, 3usize),
                 "fan" => (0, 100, 3usize),
-                "autotune" => (100, 1200, 4usize),
-                "run_rate" => (1, 9999, 4usize),
-                "run_temp" => (-300, 300, 4usize),
+                "autotune" => (autotune_min, autotune_max, 4usize),
+                "run_rate" => (run_rate_min, run_rate_max, rate_len),
+                "run_temp" => (run_temp_min, run_temp_max, 4usize),
                 "run_time" => (-300, 300, 4usize),
                 _ => (0, 9999, 5usize),
             };
@@ -1635,7 +1921,8 @@ pub extern "C" fn slint_ui_run() {
                         let parsed = parse_int_with_clamp(&value, min, max, ui.get_autotune_target_c());
                         ui.set_autotune_target_c(parsed);
                         unsafe {
-                            let _ = slint_bridge_set_autotune_target_c(parsed as f32);
+                            let parsed_c = temp_to_c_from_display(parsed, unit);
+                            let _ = slint_bridge_set_autotune_target_c(parsed_c as f32);
                         }
                     } else if field == "run_rate" {
                         let parsed = parse_int_with_clamp(&value, min, max, ui.get_running_edit_rate());
@@ -1734,6 +2021,11 @@ pub extern "C" fn slint_ui_run() {
             let label = c_buf_to_string(&buf);
             if let Some(ui) = ui_weak.upgrade() {
                 ui.set_current_time(label.into());
+                let _ = unsafe { slint_bridge_get_date_str(buf.as_mut_ptr() as *mut c_char, buf.len() as i32) };
+                let date_label = c_buf_to_string(&buf);
+                if !date_label.is_empty() {
+                    ui.set_current_date(date_label.into());
+                }
             }
         }
 
@@ -1784,6 +2076,11 @@ pub extern "C" fn slint_ui_run() {
                 if ui.get_standby_visible() && !last_touch {
                     // First tap only wakes the screen, without forwarding the touch to controls.
                     ui.set_standby_visible(false);
+                    // Do not block the next tap on Start by the anti-bounce cooldown.
+                    {
+                        let mut last_start = start_cooldown_at.borrow_mut();
+                        *last_start = Instant::now() - Duration::from_secs(5);
+                    }
                     last_touch = true;
                     last_x = x;
                     last_y = y;
@@ -1926,11 +2223,13 @@ pub extern "C" fn slint_ui_run() {
             }
             let max_temp = unsafe { slint_bridge_get_user_max_temp_c() };
             if max_temp.is_finite() {
-                ui.set_schedule_target_max_c(max_temp.clamp(100.0, 1300.0) as i32);
+                let unit = app_state.borrow().temp_unit;
+                ui.set_schedule_target_max_c(temp_to_display(max_temp.clamp(100.0, 1300.0), unit).round() as i32);
             }
-            let autotune_target = unsafe { slint_bridge_get_autotune_target_c() };
-            if autotune_target.is_finite() {
-                ui.set_autotune_target_c(autotune_target.clamp(100.0, 1200.0) as i32);
+            let autotune_target_c = unsafe { slint_bridge_get_autotune_target_c() };
+            if autotune_target_c.is_finite() {
+                let unit = app_state.borrow().temp_unit;
+                ui.set_autotune_target_c(temp_to_display(autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32);
             }
             let wifi_ok = ui.get_wifi_ok();
             let url = ui.get_wifi_server_url().to_string();

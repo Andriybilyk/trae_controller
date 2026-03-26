@@ -62,8 +62,15 @@ void slint_bridge_notify_schedules_changed(void);
 void slint_bridge_ui_heartbeat(void);
 uint64_t slint_bridge_get_ui_heartbeat_ms(void);
 bool slint_bridge_get_time_str(char *out, int32_t out_len);
+bool slint_bridge_get_date_str(char *out, int32_t out_len);
 bool slint_bridge_get_language_is_ua(void);
 void slint_bridge_set_language_is_ua(bool is_ua);
+uint8_t slint_bridge_get_temp_unit(void);
+void slint_bridge_set_temp_unit(uint8_t unit);
+uint8_t slint_bridge_get_time_format(void);
+void slint_bridge_set_time_format(uint8_t fmt);
+uint8_t slint_bridge_get_date_format(void);
+void slint_bridge_set_date_format(uint8_t fmt);
 
 #ifdef __cplusplus
 }
