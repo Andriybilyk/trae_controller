@@ -174,6 +174,58 @@ component ThermometerIcon {
 
 
 
+// Shared primitives for unified UI style.
+component UiCard {
+    in property <brush> background: #111118;
+    in property <brush> border_color: #27272A;
+    in property <length> border_w: 1px;
+    in property <length> radius: 12px;
+
+    Rectangle {
+        background: root.background;
+        border-color: root.border_color;
+        border-width: root.border_w;
+        border-radius: root.radius;
+        clip: true;
+    }
+}
+
+component UiButton {
+    in property <string> label;
+    in property <brush> background: #27272A;
+    in property <brush> foreground: #FFFFFF;
+    in property <length> radius: 10px;
+    in property <length> text_size: 15px;
+    in property <length> pad_h: 10px;
+    in property <bool> bold: false;
+    callback tapped();
+
+    Rectangle {
+        background: root.background;
+        border-radius: root.radius;
+        clip: true;
+        Text {
+            x: root.pad_h;
+            y: 0px;
+            width: parent.width - root.pad_h * 2;
+            height: parent.height;
+            text: root.label;
+            color: root.foreground;
+            font-family: "PT Sans";
+            font-size: root.text_size;
+            font-weight: root.bold ? 700 : 400;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            clicked => { root.tapped(); }
+        }
+    }
+}
+
 component KbKeyButton {
     in property <string> label;
     in property <string> value: root.label;
@@ -319,13 +371,19 @@ export component AppWindow inherits Window {
     property <color> c_warn: #F59E0B;
 
     property <color> c_danger: #DC2626;
+    property <length> edge_gap: 10px;
+    property <length> top_bar_h: 40px;
+    property <length> page_content_h: 280px;
 
     // Shared settings layout metrics (keeps panels symmetric and avoids clipping).
-    property <length> settings_side_gap: 10px;
+    property <length> settings_side_gap: root.edge_gap;
     property <length> settings_content_width: 460px;
     property <length> settings_title_y: 8px;
     property <length> settings_content_y: 44px;
     property <length> settings_content_height: 214px;
+    property <length> settings_btn_height: 34px;
+    property <length> settings_btn_radius: 10px;
+    property <length> settings_btn_text_size: 15px;
 
     // Status styling (based on status_label coming from firmware: IDLE/RAMP/ERROR/...).
 
@@ -644,8 +702,8 @@ export component AppWindow inherits Window {
         border-width: 1px;
 
         Text {
-            x: 12px; y: 0px;
-            width: 190px; height: parent.height;
+            x: 12px; y: 4px;
+            width: 190px; height: 32px;
             text: "NOVA KILN";
             color: #FFFFFF;
             font-family: "PT Sans";
@@ -658,9 +716,9 @@ export component AppWindow inherits Window {
 
         HorizontalBox {
             x: parent.width - self.width - 10px;
-            y: 0px;
+            y: 4px;
             width: 268px;
-            height: parent.height;
+            height: 32px;
             alignment: end;
             spacing: 6px;
 
@@ -2331,8 +2389,9 @@ export component AppWindow inherits Window {
 
         // Settings View
         if (root.view == View.Settings) : Rectangle {
-                x: 0px; y: 0px; width: 480px; height: 280px;
+                x: 0px; y: 0px; width: 480px; height: root.page_content_h;
                 background: #000000;
+                clip: true;
 
                 HorizontalBox {
                     x: root.settings_side_gap; y: root.settings_title_y;
@@ -2360,20 +2419,22 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                if (root.settings_page != "all" && root.settings_page != "wifi") : Rectangle {
+                if (root.settings_page != "all" && root.settings_page != "wifi") : UiButton {
                     x: 480px - root.settings_side_gap - 90px; y: root.settings_title_y; width: 40px; height: 28px;
                     background: #1F2937;
-                    border-radius: 10px;
-                    Text { text: "<"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
-                    TouchArea { width: parent.width; height: parent.height; clicked => { root.settings_page = "all"; } }
+                    radius: 10px;
+                    label: "<";
+                    text_size: 16px;
+                    tapped => { root.settings_page = "all"; }
                 }
 
-                Rectangle {
+                UiButton {
                     x: 480px - root.settings_side_gap - 40px; y: root.settings_title_y; width: 40px; height: 28px;
                     background: #27272A;
-                    border-radius: 10px;
-                    Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
-                    TouchArea { width: parent.width; height: parent.height; clicked => { root.view = View.Dashboard; } }
+                    radius: 10px;
+                    label: "X";
+                    text_size: 16px;
+                    tapped => { root.view = View.Dashboard; }
                 }
 
                 if (root.settings_page != "display_hw") : ScrollView {
@@ -2514,17 +2575,17 @@ export component AppWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 Rectangle {
-                                    x: parent.width - 154px; y: 15px; width: 68px; height: 30px;
+                                    x: parent.width - 154px; y: 13px; width: 68px; height: root.settings_btn_height;
                                     background: root.temp_unit == "C" ? #10B981 : #27272A;
-                                    border-radius: 10px;
-                                    Text { text: "C\u{00B0}"; color: root.temp_unit == "C" ? #000000 : #FFFFFF; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: "C\u{00B0}"; color: root.temp_unit == "C" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.temp_unit = "C"; root.set_temp_unit("C"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 80px; y: 15px; width: 68px; height: 30px;
+                                    x: parent.width - 80px; y: 13px; width: 68px; height: root.settings_btn_height;
                                     background: root.temp_unit == "F" ? #10B981 : #27272A;
-                                    border-radius: 10px;
-                                    Text { text: "F\u{00B0}"; color: root.temp_unit == "F" ? #000000 : #FFFFFF; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: "F\u{00B0}"; color: root.temp_unit == "F" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.temp_unit = "F"; root.set_temp_unit("F"); } }
                                 }
                             }
@@ -2543,17 +2604,17 @@ export component AppWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 Rectangle {
-                                    x: parent.width - 154px; y: 15px; width: 68px; height: 30px;
+                                    x: parent.width - 154px; y: 13px; width: 68px; height: root.settings_btn_height;
                                     background: root.time_format == "24" ? #10B981 : #27272A;
-                                    border-radius: 10px;
-                                    Text { text: "24h"; color: root.time_format == "24" ? #000000 : #FFFFFF; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: "24h"; color: root.time_format == "24" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.time_format = "24"; root.set_time_format("24"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 80px; y: 15px; width: 68px; height: 30px;
+                                    x: parent.width - 80px; y: 13px; width: 68px; height: root.settings_btn_height;
                                     background: root.time_format == "12" ? #10B981 : #27272A;
-                                    border-radius: 10px;
-                                    Text { text: "12h"; color: root.time_format == "12" ? #000000 : #FFFFFF; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: "12h"; color: root.time_format == "12" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.time_format = "12"; root.set_time_format("12"); } }
                                 }
                             }
@@ -2572,24 +2633,24 @@ export component AppWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 Rectangle {
-                                    x: parent.width - 216px; y: 15px; width: 64px; height: 30px;
+                                    x: parent.width - 216px; y: 13px; width: 64px; height: root.settings_btn_height;
                                     background: root.date_format == "DMY" ? #10B981 : #27272A;
-                                    border-radius: 10px;
-                                    Text { text: "DD.MM"; color: root.date_format == "DMY" ? #000000 : #FFFFFF; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: "DD.MM"; color: root.date_format == "DMY" ? #000000 : #FFFFFF; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "DMY"; root.set_date_format("DMY"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 146px; y: 15px; width: 64px; height: 30px;
+                                    x: parent.width - 146px; y: 13px; width: 64px; height: root.settings_btn_height;
                                     background: root.date_format == "MDY" ? #10B981 : #27272A;
-                                    border-radius: 10px;
-                                    Text { text: "MM/DD"; color: root.date_format == "MDY" ? #000000 : #FFFFFF; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: "MM/DD"; color: root.date_format == "MDY" ? #000000 : #FFFFFF; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "MDY"; root.set_date_format("MDY"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 76px; y: 15px; width: 64px; height: 30px;
+                                    x: parent.width - 76px; y: 13px; width: 64px; height: root.settings_btn_height;
                                     background: root.date_format == "YMD" ? #10B981 : #27272A;
-                                    border-radius: 10px;
-                                    Text { text: "YYYY"; color: root.date_format == "YMD" ? #000000 : #FFFFFF; font-size: 14px; horizontal-alignment: center; vertical-alignment: center; }
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: "YYYY"; color: root.date_format == "YMD" ? #000000 : #FFFFFF; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "YMD"; root.set_date_format("YMD"); } }
                                 }
                             }
@@ -2621,14 +2682,14 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: parent.width - 108px; y: 8px; width: 96px; height: 30px;
+                            x: parent.width - 108px; y: 6px; width: 96px; height: root.settings_btn_height;
                             background: root.fan_manual ? #10B981 : #27272A;
-                            border-radius: 10px;
+                            border-radius: root.settings_btn_radius;
                             Text {
                                 text: root.fan_manual ? (root.is_ua ? "ВКЛ" : "ON") : (root.is_ua ? "ВИКЛ" : "OFF");
                                 color: root.fan_manual ? #000000 : #FFFFFF;
                                 font-family: "PT Sans";
-                                font-size: 16px;
+                                font-size: root.settings_btn_text_size;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -2646,9 +2707,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // -
-                            x: parent.width - 214px; y: 46px; width: 60px; height: 32px;
+                            x: parent.width - 214px; y: 44px; width: 60px; height: root.settings_btn_height;
                             background: root.fan_manual ? #27272A : #18181B;
-                            border-radius: 10px;
+                            border-radius: root.settings_btn_radius;
                             Text { text: "−"; color: #FFFFFF; font-family: "PT Sans"; font-size: 26px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
@@ -2662,9 +2723,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // % (tap for keypad)
-                            x: parent.width - 148px; y: 46px; width: 64px; height: 32px;
+                            x: parent.width - 148px; y: 44px; width: 64px; height: root.settings_btn_height;
                             background: root.fan_manual ? #27272A : #18181B;
-                            border-radius: 10px;
+                            border-radius: root.settings_btn_radius;
                             Text { text: root.fan_power + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
@@ -2679,9 +2740,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // +
-                            x: parent.width - 78px; y: 46px; width: 66px; height: 32px;
+                            x: parent.width - 78px; y: 44px; width: 66px; height: root.settings_btn_height;
                             background: root.fan_manual ? #27272A : #18181B;
-                            border-radius: 10px;
+                            border-radius: root.settings_btn_radius;
                             Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 24px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
@@ -2721,10 +2782,10 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: 12px; y: 50px; width: 130px; height: 32px;
+                            x: 12px; y: 48px; width: 130px; height: root.settings_btn_height;
                             background: #27272A;
-                            border-radius: 10px;
-                            Text { text: root.autotune_target_c + root.temp_unit_label; color: #FFFFFF; font-family: "PT Sans"; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                            border-radius: root.settings_btn_radius;
+                            Text { text: root.autotune_target_c + root.temp_unit_label; color: #FFFFFF; font-family: "PT Sans"; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
                                 clicked => {
@@ -2736,9 +2797,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: 154px; y: 50px; width: 286px; height: 40px;
+                            x: 154px; y: 46px; width: 286px; height: 44px;
                             background: root.status_label == "TUNING" ? #7F1D1D : (root.fault_active ? #18181B : #14532D);
-                            border-radius: 10px;
+                            border-radius: root.settings_btn_radius;
                             Text {
                                 text: root.status_label == "TUNING"
                                     ? (root.is_ua ? "Зупинити автоналаштування" : "Stop autotune")
@@ -2791,43 +2852,27 @@ export component AppWindow inherits Window {
                         }
                         }
 
-                        if (root.settings_page == "fault") : Rectangle {
-                        width: root.settings_content_width; height: 46px;
+                        if (root.settings_page == "fault") : UiButton {
+                        width: root.settings_content_width; height: 50px;
                         background: root.fault_active ? #7F1D1D : #18181B;
-                        border-color: #27272A;
-                        border-width: 1px;
-                        border-radius: 12px;
-                        Text {
-                            text: root.is_ua ? "Скинути помилку" : "Clear Fault";
-                            color: root.fault_active ? #FFFFFF : #71717A;
-                            font-family: "PT Sans";
-                            font-size: 16px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                        TouchArea {
-                            width: parent.width; height: parent.height;
-                            clicked => {
-                                if (root.fault_active) {
-                                    root.clear_fault();
-                                }
+                        foreground: root.fault_active ? #FFFFFF : #71717A;
+                        radius: 12px;
+                        label: root.is_ua ? "Скинути помилку" : "Clear Fault";
+                        text_size: root.settings_btn_text_size;
+                        tapped => {
+                            if (root.fault_active) {
+                                root.clear_fault();
                             }
                         }
                         }
 
-                        if (root.settings_page == "touch") : Rectangle {
-                        width: root.settings_content_width; height: 46px;
+                        if (root.settings_page == "touch") : UiButton {
+                        width: root.settings_content_width; height: 50px;
                         background: #27272A;
-                        border-radius: 12px;
-                        Text {
-                            text: root.is_ua ? "Калібрування тач" : "Touch Calibration";
-                            color: #FFFFFF;
-                            font-family: "PT Sans";
-                            font-size: 16px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                        TouchArea { width: parent.width; height: parent.height; clicked => { root.view = View.Calibration; root.start_touch_calibration(); } }
+                        radius: 12px;
+                        label: root.is_ua ? "Калібрування тач" : "Touch Calibration";
+                        text_size: root.settings_btn_text_size;
+                        tapped => { root.view = View.Calibration; root.start_touch_calibration(); }
                         }
 
                         if (root.settings_page == "wifi") : Rectangle {
@@ -2888,60 +2933,33 @@ export component AppWindow inherits Window {
                                 }
                             }
 
-                            Rectangle {
-                                x: parent.width - 138px; y: 58px; width: 126px; height: 36px;
+                            UiButton {
+                                x: parent.width - 138px; y: 56px; width: 126px; height: 40px;
                                 background: #1F2937;
-                                border-radius: 9px;
-                                Text {
-                                    text: "QR";
-                                    color: #FFFFFF;
-                                    font-family: "PT Sans";
-                                    font-size: 14px;
-                                    font-weight: 700;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                                TouchArea {
-                                    width: parent.width; height: parent.height;
-                                    clicked => { root.wifi_qr_toggle(); }
-                                }
+                                radius: 9px;
+                                label: "QR";
+                                bold: true;
+                                text_size: root.settings_btn_text_size;
+                                tapped => { root.wifi_qr_toggle(); }
                             }
 
-                            Rectangle {
-                                x: 12px; y: 106px; width: 210px; height: 30px;
+                            UiButton {
+                                x: 12px; y: 104px; width: 210px; height: root.settings_btn_height;
                                 background: #27272A;
-                                border-radius: 9px;
-                                Text {
-                                    text: root.wifi_ok ? (root.is_ua ? "Змінити мережу" : "Change network")
-                                                      : (root.is_ua ? "Пошук мережі" : "Search networks");
-                                    color: #FFFFFF;
-                                    font-family: "PT Sans";
-                                    font-size: 14px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                                TouchArea {
-                                    width: parent.width; height: parent.height;
-                                    clicked => { root.wifi_open_picker(); }
-                                }
+                                radius: 9px;
+                                label: root.wifi_ok ? (root.is_ua ? "Змінити мережу" : "Change network")
+                                                  : (root.is_ua ? "Пошук мережі" : "Search networks");
+                                text_size: root.settings_btn_text_size;
+                                tapped => { root.wifi_open_picker(); }
                             }
 
-                            Rectangle {
-                                x: 230px; y: 106px; width: 210px; height: 30px;
+                            UiButton {
+                                x: 230px; y: 104px; width: 210px; height: root.settings_btn_height;
                                 background: #7F1D1D;
-                                border-radius: 9px;
-                                Text {
-                                    text: root.is_ua ? "Відключити Wi‑Fi" : "Disconnect Wi‑Fi";
-                                    color: #FFFFFF;
-                                    font-family: "PT Sans";
-                                    font-size: 14px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
-                                TouchArea {
-                                    width: parent.width; height: parent.height;
-                                    clicked => { root.wifi_disconnect(); }
-                                }
+                                radius: 9px;
+                                label: root.is_ua ? "Відключити Wi‑Fi" : "Disconnect Wi‑Fi";
+                                text_size: root.settings_btn_text_size;
+                                tapped => { root.wifi_disconnect(); }
                             }
                         }
                     }
@@ -2954,16 +2972,16 @@ export component AppWindow inherits Window {
                     spacing: 10px;
 
                     Rectangle {
-                        width: root.settings_content_width; height: 80px;
+                        width: root.settings_content_width; height: 84px;
                         background: #111118;
                         border-color: #27272A;
                         border-width: 1px;
                         border-radius: 12px;
                         Text { x: 12px; y: 8px; text: root.is_ua ? "Яскравість" : "Brightness"; color: #A1A1AA; font-size: 13px; }
                         Rectangle {
-                            x: 12px; y: 40px; width: 64px; height: 30px;
+                            x: 12px; y: 38px; width: 64px; height: root.settings_btn_height;
                             background: #27272A;
-                            border-radius: 10px;
+                            border-radius: root.settings_btn_radius;
                             Text { text: "-"; color: #FFFFFF; font-family: "PT Sans"; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
@@ -2975,15 +2993,15 @@ export component AppWindow inherits Window {
                             }
                         }
                         Rectangle {
-                            x: 84px; y: 40px; width: 136px; height: 30px;
+                            x: 84px; y: 38px; width: 136px; height: root.settings_btn_height;
                             background: #1F2937;
-                            border-radius: 10px;
-                            Text { text: root.display_brightness + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                            border-radius: root.settings_btn_radius;
+                            Text { text: root.display_brightness + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                         }
                         Rectangle {
-                            x: 228px; y: 40px; width: 64px; height: 30px;
+                            x: 228px; y: 38px; width: 64px; height: root.settings_btn_height;
                             background: #27272A;
-                            border-radius: 10px;
+                            border-radius: root.settings_btn_radius;
                             Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
@@ -2995,10 +3013,10 @@ export component AppWindow inherits Window {
                             }
                         }
                         Rectangle {
-                            x: 300px; y: 40px; width: 140px; height: 30px;
+                            x: 300px; y: 38px; width: 140px; height: root.settings_btn_height;
                             background: #10B981;
-                            border-radius: 10px;
-                            Text { text: root.is_ua ? "Макс" : "Max"; color: #000000; font-family: "PT Sans"; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
+                            border-radius: root.settings_btn_radius;
+                            Text { text: root.is_ua ? "Макс" : "Max"; color: #000000; font-family: "PT Sans"; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                             TouchArea {
                                 width: parent.width; height: parent.height;
                                 clicked => {
@@ -3009,24 +3027,18 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    Rectangle {
+                    UiButton {
                         width: root.settings_content_width; height: 70px;
                         background: #27272A;
-                        border-radius: 12px;
-                        Text {
-                            text: root.is_ua ? "Калібрування дисплею" : "Display calibration";
-                            color: #FFFFFF;
-                            font-family: "PT Sans";
-                            font-size: 16px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                        TouchArea { width: parent.width; height: parent.height; clicked => { root.view = View.Calibration; root.start_touch_calibration(); } }
+                        radius: 12px;
+                        label: root.is_ua ? "Калібрування дисплею" : "Display calibration";
+                        text_size: 16px;
+                        tapped => { root.view = View.Calibration; root.start_touch_calibration(); }
                     }
                 }
 
                 if (root.wifi_qr_visible) : Rectangle {
-                    x: 0px; y: 0px; width: 480px; height: 280px;
+                    x: 0px; y: 0px; width: 480px; height: root.page_content_h;
                     background: #000000D0;
                     z: 2100;
 
@@ -3049,18 +3061,19 @@ export component AppWindow inherits Window {
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
-                        Rectangle {
+                        UiButton {
                             x: 100px; y: 222px; width: 120px; height: 28px;
                             background: #27272A;
-                            border-radius: 10px;
-                            Text { text: root.is_ua ? "Закрити" : "Close"; color: #FFFFFF; font-size: 16px; horizontal-alignment: center; vertical-alignment: center; }
-                            TouchArea { width: parent.width; height: parent.height; clicked => { root.wifi_qr_toggle(); } }
+                            radius: 10px;
+                            label: root.is_ua ? "Закрити" : "Close";
+                            text_size: 16px;
+                            tapped => { root.wifi_qr_toggle(); }
                         }
                     }
                 }
 
                 if (root.wifi_picker_visible) : Rectangle {
-                    x: 0px; y: 0px; width: 480px; height: 280px;
+                    x: 0px; y: 0px; width: 480px; height: root.page_content_h;
                     background: #000000CC;
                     z: 2000;
 
@@ -3078,12 +3091,13 @@ export component AppWindow inherits Window {
                             font-size: 16px;
                         }
 
-                        Rectangle {
+                        UiButton {
                             x: 398px; y: 8px; width: 38px; height: 28px;
                             background: #27272A;
-                            border-radius: 8px;
-                            Text { text: "X"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
-                            TouchArea { width: parent.width; height: parent.height; clicked => { root.wifi_picker_visible = false; } }
+                            radius: 8px;
+                            label: "X";
+                            text_size: 16px;
+                            tapped => { root.wifi_picker_visible = false; }
                         }
 
                         if (root.wifi_scan_busy) : Text {

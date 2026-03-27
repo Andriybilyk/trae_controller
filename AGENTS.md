@@ -73,10 +73,40 @@ UI:
 
 ---
 
-## 10) Notes (Updated 2026-03-17)
+## 10) Notes (Updated 2026-03-27)
 - Touch stack: XPT2046 в RAW режимі (0..4095) + box calibration + optional affine + optional 3x3 grid warp; усе зберігається в NVS.
 - Touch APIs: `/api/touch/calibration`, `/api/touch/affine`, `/api/touch/grid`, `/api/touch/raw`, `/api/touch/probe`, `/api/touch/spi`, `/touch_calibration.html` (9-point).
 - Effective RAW range: XPT2046 відкидає значення біля “рейок”; практичний діапазон ~`50..4045` (використовується для clamping калібровки).
 - UI renderer: Slint software renderer (MCU) **не** підтримує `Path`; іконки робимо через прямокутники/текст або glyph‑font.
 - UI debug: touch debug bar прибрано; червона “точка дотику” лишається для діагностики вирівнювання.
+
+## 11) UI Map (Slint) — швидка навігація
+- Основний файл UI: `firmware/slint_ui/ui/app.slint` (зараз це головна точка правок інтерфейсу контролера).
+- Boot/standby оверлеї: секція внизу `app.slint` з умовами `boot_splash_visible` та `standby_visible`.
+- Сторінки керуються `View` enum: `Dashboard`, `Schedules`, `Editor`, `RunningEditor`, `Settings`, `Calibration`.
+- Для інтеграції з firmware дивись `firmware/main/ui/slint_bridge.cpp` + `firmware/main/include/ui/slint_bridge.h` (передача props/callbacks).
+
+## 12) UI Design System (обовʼязково для нових змін)
+- Екран контролера фіксований: **480x320**. Не хардкодь розмітку поза цими межами.
+- Використовуй токени в `AppWindow` замість випадкових чисел:
+  - кольори: `c_bg`, `c_card`, `c_border`, `c_text`, `c_muted`, `c_accent`, `c_danger`;
+  - layout: `edge_gap`, `top_bar_h`, `page_content_h`;
+  - settings: `settings_side_gap`, `settings_content_width`, `settings_content_y`, `settings_content_height`;
+  - кнопки settings: `settings_btn_height`, `settings_btn_radius`, `settings_btn_text_size`.
+- Для однакового стилю і безпечного тексту:
+  - використовуй `UiButton` для кнопок (має єдині паддінги + `overflow: elide`);
+  - використовуй `UiCard`/картки з `clip: true` для контейнерів;
+  - в текстах кнопок/лейблів задавай або `overflow: elide`, або достатню ширину.
+- Не копіюй “старі” `Rectangle + Text + TouchArea` для нових кнопок, якщо можна замінити на `UiButton`.
+
+## 13) Guardrails проти виходу за межі екрана
+- Будь-яка нова сторінка/оверлей має мати контейнер з явними `width/height` в межах 480x320 і за потреби `clip: true`.
+- Для контенту сторінок тримайся `page_content_h` та єдиних відступів (`edge_gap`/`settings_side_gap`).
+- Для довгих рядків (UA/EN) перевіряй обидві локалі; там, де ризик, став `overflow: elide`.
+- Після UI-правок мінімум: перевір лінтер + візуально екран Settings, модалки Wi‑Fi, Splash/Standby.
+
+## 14) Практика внесення змін
+- Спочатку шукай існуючий токен/компонент, і лише якщо бракує — додавай новий.
+- Пріоритет: стабільність і читабельність UI > “красивий мікро-рефактор”.
+- Якщо змінюєш стиль кнопок/карток, оновлюй централізовано (через токени/`UiButton`), а не точково в десятках місць.
 
