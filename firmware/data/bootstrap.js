@@ -1,4 +1,4 @@
-﻿const originalFetch = window.fetch.bind(window);
+﻿﻿const originalFetch = window.fetch.bind(window);
 
 const normalizeApiUrl = (inputUrl) => {
   if (typeof inputUrl !== "string") return inputUrl;

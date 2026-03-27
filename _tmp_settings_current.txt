@@ -1,0 +1,74 @@
+// Settings View
+        if (root.view == View.Settings) : Rectangle {
+                x: 0px; y: 0px; width: 480px; height: 280px;
+                background: #000000;
+
+                HorizontalBox {
+                    x: 14px; y: 10px;
+                    spacing: 6px;
+                    if (root.settings_page == "wifi") : WifiIcon { color: root.wifi_ok ? #10B981 : #52525B; }
+                    if (root.settings_page != "wifi") : SettingsIcon { color: #A1A1AA; }
+                    Text {
+                        text: root.settings_page == "wifi"
+                            ? "Wi‑Fi"
+                            : (root.is_ua ? "Налаштування" : "Settings");
+                        color: #FFFFFF;
+                        font-family: "PT Sans";
+                        font-size: 18px;
+                    }
+                }
+
+                Rectangle {
+                    x: 420px; y: 8px; width: 40px; height: 28px;
+                    background: #27272A;
+                    border-radius: 10px;
+                    Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.view = View.Dashboard; } }
+                }
+
+                ScrollView {
+                    x: 10px; y: 48px;
+                    width: 438px; height: 218px;
+                    horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
+                    vertical-scrollbar-policy: ScrollBarPolicy.always-off;
+                    mouse-drag-pan-enabled: true;
+
+                    settings_box := VerticalBox {
+                        width: 438px;
+                        spacing: 8px;
+
+                        if (root.settings_page == "wifi") : Rectangle {
+                            width: 426px; height: 146px;
+                            background: #0F0F0F;
+                            border-color: #27272A;
+                            border-width: 1px;
+                            border-radius: 12px;
+
+                            Text {
+                                x: 12px; y: 10px;
+                                text: "Wi‑Fi";
+                                color: #FFFFFF;
+                                font-family: "PT Sans";
+                                font-size: 16px;
+                                font-weight: 700;
+                            }
+
+                            Rectangle {
+                                x: 294px; y: 8px; width: 120px; height: 24px;
+                                background: root.wifi_ok ? #073B2A : #2A2A2F;
+                                border-radius: 8px;
+                                Text {
+                                    text: root.wifi_ok ? "Connected" : "Disconnected";
+                                    color: root.wifi_ok ? #10B981 : #A1A1AA;
+                                    font-family: "PT Sans";
+                                    font-size: 13px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Text {
+                                x: 12px; y: 38px;
+                                text: root.wifi_selected_ssid == ""
+                                    ? (root.is_ua ? "Оберіть мережу зі списку" : "Pick a network from list")
+                                    : root.wifi

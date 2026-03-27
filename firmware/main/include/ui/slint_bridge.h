@@ -71,6 +71,8 @@ uint8_t slint_bridge_get_time_format(void);
 void slint_bridge_set_time_format(uint8_t fmt);
 uint8_t slint_bridge_get_date_format(void);
 void slint_bridge_set_date_format(uint8_t fmt);
+uint8_t slint_bridge_get_display_brightness(void);
+void slint_bridge_set_display_brightness(uint8_t percent);
 
 #ifdef __cplusplus
 }

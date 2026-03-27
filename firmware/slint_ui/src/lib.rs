@@ -14,6 +14,9 @@ const TOUCH_HOLD_DEADZONE_PX: i32 = 1;
 const TOUCH_FILTER_NUM: i32 = 1;
 const TOUCH_FILTER_DEN: i32 = 2;
 const TOUCH_FAST_MOVE_PX: i32 = 6;
+const TOUCH_DEBUG_MIN_Z: u16 = 140;
+const TOUCH_DEBUG_DEADZONE_PX: i32 = 2;
+const TOUCH_DEBUG_UPDATE_MIN_MS: u64 = 16;
 const STANDBY_TIMEOUT_MS: u64 = 60_000;
 
 slint::include_modules!();
@@ -117,6 +120,8 @@ extern "C" {
     fn slint_bridge_set_time_format(fmt: u8);
     fn slint_bridge_get_date_format() -> u8;
     fn slint_bridge_set_date_format(fmt: u8);
+    fn slint_bridge_get_display_brightness() -> u8;
+    fn slint_bridge_set_display_brightness(percent: u8);
 
     fn display_driver_touch_probe(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
     fn display_driver_touch_probe_raw(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
@@ -805,15 +810,15 @@ fn calib_target_for_step(step: u8) -> (i32, i32) {
     // Use margins so the user can comfortably tap the dot.
     // NOTE: app.slint assumes the same geometry.
     match step {
-        0 => (40, 60),   // top-left
-        1 => (240, 60),  // top-middle
-        2 => (439, 60),  // top-right
-        3 => (40, 160),  // mid-left
+        0 => (20, 20),   // top-left
+        1 => (240, 20),  // top-middle
+        2 => (459, 20),  // top-right
+        3 => (20, 160),  // mid-left
         4 => (240, 160), // mid
-        5 => (439, 160), // mid-right
-        6 => (40, 259),  // bottom-left
-        7 => (240, 259), // bottom-middle
-        8 => (439, 259), // bottom-right
+        5 => (459, 160), // mid-right
+        6 => (20, 299),  // bottom-left
+        7 => (240, 299), // bottom-middle
+        8 => (459, 299), // bottom-right
         _ => (240, 160),
     }
 }
@@ -1088,6 +1093,11 @@ pub extern "C" fn slint_ui_run() {
     ui.set_temp_unit(match temp_unit { TempUnit::C => "C", TempUnit::F => "F" }.into());
     ui.set_time_format(match time_format { TimeFormat::H24 => "24", TimeFormat::H12 => "12" }.into());
     ui.set_date_format(match date_format { DateFormat::Dmy => "DMY", DateFormat::Mdy => "MDY", DateFormat::Ymd => "YMD" }.into());
+    let mut init_brightness = unsafe { slint_bridge_get_display_brightness() } as i32;
+    if init_brightness < 50 { init_brightness = 50; }
+    if init_brightness > 100 { init_brightness = 100; }
+    ui.set_display_brightness(init_brightness);
+    ui.set_ui_dim(((100 - init_brightness).clamp(0, 100) as f32) / 100.0);
     ui.set_temp_unit_label(match temp_unit { TempUnit::C => "°C", TempUnit::F => "°F" }.into());
     ui.set_rate_unit_label(match temp_unit { TempUnit::C => "°C/h", TempUnit::F => "°F/h" }.into());
     ui.set_rate_unit_label_min(match temp_unit { TempUnit::C => "°C/min", TempUnit::F => "°F/min" }.into());
@@ -1247,6 +1257,19 @@ pub extern "C" fn slint_ui_run() {
                 let v = match new_fmt { DateFormat::Dmy => 0, DateFormat::Mdy => 1, DateFormat::Ymd => 2 };
                 slint_bridge_set_date_format(v);
             }
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_display_brightness_changed(move |value| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let mut v = value;
+            if v < 50 { v = 50; }
+            if v > 100 { v = 100; }
+            ui.set_display_brightness(v);
+            ui.set_ui_dim(((100 - v) as f32) / 100.0);
+            unsafe { slint_bridge_set_display_brightness(v as u8) };
         });
     }
 
@@ -1987,6 +2010,10 @@ pub extern "C" fn slint_ui_run() {
 
     let mut line_buffer = vec![Rgb565Pixel::default(); 480];
     let mut last_touch = false;
+    let mut debug_pressed = false;
+    let mut debug_x_i32: i32 = 0;
+    let mut debug_y_i32: i32 = 0;
+    let mut debug_last_update = Instant::now();
     let mut last_x: u16 = 0;
     let mut last_y: u16 = 0;
     let mut filtered_x: i32 = 0;
@@ -2057,19 +2084,23 @@ pub extern "C" fn slint_ui_run() {
         let mut x: u16 = 0;
         let mut y: u16 = 0;
         let mut z: u16 = 0;
-        let pressed = unsafe {
+        let raw_pressed = unsafe {
             if calib_active {
                 display_driver_touch_probe_raw(&mut x, &mut y, &mut z)
             } else {
                 display_driver_touch_probe(&mut x, &mut y, &mut z)
             }
         };
+        let pressed = raw_pressed;
 
         if let Some(ui) = ui_weak.upgrade() {
             ui.set_touch_x(x as i32);
             ui.set_touch_y(y as i32);
             ui.set_touch_z(z as i32);
             ui.set_touch_pressed(pressed);
+            if !calib_active && ui.get_view() == View::Calibration {
+                ui.set_view(View::Dashboard);
+            }
 
             if pressed {
                 last_touch_activity = Instant::now();
@@ -2179,6 +2210,26 @@ pub extern "C" fn slint_ui_run() {
                 filtered_y = yi;
             }
 
+            if z >= TOUCH_DEBUG_MIN_Z {
+                let (dbg_x, dbg_y) = if have_last_sent {
+                    (last_sent_x, last_sent_y)
+                } else {
+                    (filtered_x, filtered_y)
+                };
+                let now = Instant::now();
+                let dx = (dbg_x - debug_x_i32).abs();
+                let dy = (dbg_y - debug_y_i32).abs();
+                if dx >= TOUCH_DEBUG_DEADZONE_PX
+                    || dy >= TOUCH_DEBUG_DEADZONE_PX
+                    || debug_last_update.elapsed() >= Duration::from_millis(TOUCH_DEBUG_UPDATE_MIN_MS)
+                {
+                    debug_x_i32 = dbg_x;
+                    debug_y_i32 = dbg_y;
+                    debug_last_update = now;
+                }
+            }
+            debug_pressed = pressed && z >= TOUCH_DEBUG_MIN_Z;
+
             let mut send_x_i32 = filtered_x;
             if !calib_active && active_view == View::Settings {
                 // Settings list should scroll only vertically.
@@ -2212,6 +2263,15 @@ pub extern "C" fn slint_ui_run() {
             have_last_sent = false;
         }
         last_touch = pressed;
+        if !pressed {
+            debug_pressed = false;
+        }
+
+        if let Some(ui) = ui_weak.upgrade() {
+            ui.set_touch_debug_x(debug_x_i32);
+            ui.set_touch_debug_y(debug_y_i32);
+            ui.set_touch_debug_pressed(debug_pressed);
+        }
 
         // Status update
         if last_state_update.elapsed() >= Duration::from_millis(500) {

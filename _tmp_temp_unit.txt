@@ -1,0 +1,41 @@
+ent_time: "00:00";
+    in-out property <string> current_date: "--.--.----";
+
+
+
+    in-out property <float> temp: 24.5;
+
+
+
+    in-out property <string> temp_label: "24.5";
+    in-out property <string> temp_unit: "C";
+    in-out property <string> temp_unit_label: "°C";
+    in-out property <string> rate_unit_label: "°C/h";
+    in-out property <string> rate_unit_label_min: "°C/min";
+    in-out property <string> time_format: "24";
+    in-out property <string> date_format: "DMY";
+
+
+
+    in-out property <int> target: 0;
+    in-out property <int> active_segment_target: 0;
+
+
+
+    in-out property <string> status_label: "IDLE";
+
+
+
+    in-out property <bool> is_idle: true;
+
+
+
+    in-out property <int> step_index: 0;
+
+
+
+    in-out property <int> total_steps: 0;
+
+
+
+    in-out property <string> time_rema

@@ -11,6 +11,10 @@ void display_driver_init(void);
 
 bool display_driver_blit_rgb565(int x, int y, int w, int h, const uint16_t *data);
 
+// Backlight control (0..100%).
+uint8_t display_driver_get_backlight_percent(void);
+void display_driver_set_backlight_percent(uint8_t percent);
+
 // Display orientation helpers (persisted in NVS).
 void display_driver_get_mirror(bool *mirror_x, bool *mirror_y);
 void display_driver_set_mirror(bool mirror_x, bool mirror_y);

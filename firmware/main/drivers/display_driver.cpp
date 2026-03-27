@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "driver/gpio.h"
+#include "driver/ledc.h"
 #include "driver/spi_master.h"
 #include "esp_check.h"
 #include "esp_lcd_io_spi.h"
@@ -44,6 +45,25 @@ static bool s_mirror_x = false;
 static bool s_mirror_y = false;
 static int s_lcd_x_offset = 0;
 static int s_lcd_y_offset = 0;
+static uint8_t s_backlight_percent = 100;
+static bool s_backlight_inited = false;
+
+static constexpr ledc_mode_t kBacklightMode = LEDC_LOW_SPEED_MODE;
+static constexpr ledc_timer_t kBacklightTimer = LEDC_TIMER_2;
+static constexpr ledc_channel_t kBacklightChannel = LEDC_CHANNEL_2;
+static constexpr ledc_timer_bit_t kBacklightDutyRes = LEDC_TIMER_10_BIT; // 0..1023
+static constexpr uint32_t kBacklightPwmHz = 5000;
+static constexpr uint16_t kTouchMinZ1 = 80;
+static constexpr uint8_t kTouchDebounceSamples = 2;
+static constexpr int kTouchSpikeMax = 80;
+static constexpr uint16_t kTouchSpikeWeakZ1 = 120;
+static constexpr int kTouchSampleSpanMax = 50;
+static constexpr uint16_t kTouchStableZ1 = 160;
+
+static uint8_t s_touch_press_streak = 0;
+static uint8_t s_touch_release_streak = 0;
+static bool s_touch_debounced = false;
+static bool s_backlight_pwm_enabled = false;
 
 static int s_touch_spi_mode = 0;
 static int s_touch_spi_hz = TOUCH_SPI_CLOCK_HZ;
@@ -104,6 +124,10 @@ static void load_mirror_from_nvs() {
     int32_t yoff = 0;
     if (nvs_get_i32(h, "xoff", &xoff) == ESP_OK) s_lcd_x_offset = (int)xoff;
     if (nvs_get_i32(h, "yoff", &yoff) == ESP_OK) s_lcd_y_offset = (int)yoff;
+    uint8_t bl = 100;
+    if (nvs_get_u8(h, "bl", &bl) == ESP_OK) {
+        s_backlight_percent = (uint8_t)std::clamp<int>(bl, 0, 100);
+    }
     s_lcd_x_offset = std::clamp(s_lcd_x_offset, -40, 40);
     s_lcd_y_offset = std::clamp(s_lcd_y_offset, -40, 40);
     nvs_close(h);
@@ -116,6 +140,14 @@ static void save_mirror_to_nvs() {
     (void)nvs_set_u8(h, "my", s_mirror_y ? 1 : 0);
     (void)nvs_set_i32(h, "xoff", (int32_t)s_lcd_x_offset);
     (void)nvs_set_i32(h, "yoff", (int32_t)s_lcd_y_offset);
+    (void)nvs_commit(h);
+    nvs_close(h);
+}
+
+static void save_backlight_to_nvs() {
+    nvs_handle_t h;
+    if (nvs_open("display", NVS_READWRITE, &h) != ESP_OK) return;
+    (void)nvs_set_u8(h, "bl", s_backlight_percent);
     (void)nvs_commit(h);
     nvs_close(h);
 }
@@ -423,6 +455,60 @@ static void display_gpio_init(void) {
     }
 }
 
+static uint32_t backlight_duty_from_percent(uint8_t percent) {
+    if (percent >= 100) return (1u << kBacklightDutyRes) - 1u;
+    return (uint32_t)percent * (((1u << kBacklightDutyRes) - 1u)) / 100u;
+}
+
+static void backlight_apply() {
+    if (TFT_BL == GPIO_NUM_NC || !GPIO_IS_VALID_OUTPUT_GPIO(TFT_BL)) return;
+    if (!s_backlight_pwm_enabled || !s_backlight_inited) {
+        gpio_set_level(TFT_BL, s_backlight_percent > 0 ? 1 : 0);
+        return;
+    }
+    const uint32_t duty = backlight_duty_from_percent(s_backlight_percent);
+    (void)ledc_set_duty(kBacklightMode, kBacklightChannel, duty);
+    (void)ledc_update_duty(kBacklightMode, kBacklightChannel);
+}
+
+static void backlight_init() {
+    if (TFT_BL == GPIO_NUM_NC || !GPIO_IS_VALID_OUTPUT_GPIO(TFT_BL)) {
+        ESP_LOGW(TAG, "Backlight pin not available");
+        return;
+    }
+    if (!s_backlight_pwm_enabled) {
+        gpio_set_level(TFT_BL, s_backlight_percent > 0 ? 1 : 0);
+        return;
+    }
+
+    ledc_timer_config_t timer = {};
+    timer.speed_mode = kBacklightMode;
+    timer.timer_num = kBacklightTimer;
+    timer.duty_resolution = kBacklightDutyRes;
+    timer.freq_hz = kBacklightPwmHz;
+    timer.clk_cfg = LEDC_AUTO_CLK;
+    if (ledc_timer_config(&timer) != ESP_OK) {
+        ESP_LOGW(TAG, "Backlight ledc_timer_config failed");
+        return;
+    }
+
+    ledc_channel_config_t ch = {};
+    ch.speed_mode = kBacklightMode;
+    ch.channel = kBacklightChannel;
+    ch.timer_sel = kBacklightTimer;
+    ch.intr_type = LEDC_INTR_DISABLE;
+    ch.gpio_num = (int)TFT_BL;
+    ch.duty = 0;
+    ch.hpoint = 0;
+    if (ledc_channel_config(&ch) != ESP_OK) {
+        ESP_LOGW(TAG, "Backlight ledc_channel_config failed");
+        return;
+    }
+
+    s_backlight_inited = true;
+    backlight_apply();
+}
+
 static esp_err_t display_spi_init(void) {
     ESP_LOGI(TAG, "Initializing SPI bus for display...");
     ESP_LOGI(TAG, "SPI pins: SCLK=%d, MOSI=%d, MISO=%d, CS=%d, DC=%d, RST=%d, BL=%d", 
@@ -577,6 +663,7 @@ void display_driver_init(void) {
 
     load_touch_from_nvs();
     display_gpio_init();
+    backlight_init();
     
     esp_err_t err = display_spi_init();
     if (err != ESP_OK) {
@@ -598,8 +685,20 @@ void display_driver_init(void) {
         ESP_LOGW(TAG, "Failed to initialize touch controller: %s", esp_err_to_name(err));
     }
 
-    gpio_set_level(TFT_BL, 1);
+    display_driver_set_backlight_percent(s_backlight_percent);
     ESP_LOGI(TAG, "Display initialized successfully");
+}
+
+uint8_t display_driver_get_backlight_percent(void) {
+    return s_backlight_percent;
+}
+
+void display_driver_set_backlight_percent(uint8_t percent) {
+    if (percent < 50) percent = 50;
+    if (percent > 100) percent = 100;
+    s_backlight_percent = percent;
+    backlight_apply();
+    save_backlight_to_nvs();
 }
 
 bool display_driver_blit_rgb565(int x, int y, int w, int h, const uint16_t *data) {
@@ -699,6 +798,12 @@ bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) 
     int lx = median3(x0, x1, x2);
     int ly = median3(y0, y1, y2);
     uint16_t lz = (uint16_t)median3((int)z0, (int)z1v, (int)z2);
+    const int raw_x_min = std::min({x0, x1, x2});
+    const int raw_x_max = std::max({x0, x1, x2});
+    const int raw_y_min = std::min({y0, y1, y2});
+    const int raw_y_max = std::max({y0, y1, y2});
+    const bool sample_noisy =
+        (raw_x_max - raw_x_min) > kTouchSampleSpanMax || (raw_y_max - raw_y_min) > kTouchSampleSpanMax;
 
     // Depending on XPT2046 config, driver may return raw ADC (0..4095) or already-scaled coords.
     // Clamp broadly, then apply our calibration into display coordinates.
@@ -707,10 +812,31 @@ bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) 
     ly = std::clamp(ly, 0, RAW_MAX);
     apply_touch_calibration(lx, ly);
 
-    s_touch_last_pressed = pressed;
-    s_touch_last_raw_x = (uint16_t)lx;
-    s_touch_last_raw_y = (uint16_t)ly;
-    s_touch_last_z1 = lz;
+    const bool filtered_pressed =
+        pressed && (lz >= kTouchMinZ1) && !(sample_noisy && lz < kTouchStableZ1);
+    if (filtered_pressed && s_touch_last_pressed) {
+        const int dx = lx - (int)s_touch_last_raw_x;
+        const int dy = ly - (int)s_touch_last_raw_y;
+        if ((std::abs(dx) > kTouchSpikeMax || std::abs(dy) > kTouchSpikeMax) && lz < kTouchSpikeWeakZ1) {
+            lx = (int)s_touch_last_raw_x;
+            ly = (int)s_touch_last_raw_y;
+            lz = s_touch_last_z1;
+        }
+    }
+    if (filtered_pressed) {
+        s_touch_press_streak = std::min<uint8_t>(s_touch_press_streak + 1, 255);
+        s_touch_release_streak = 0;
+        if (s_touch_press_streak >= kTouchDebounceSamples) s_touch_debounced = true;
+    } else {
+        s_touch_release_streak = std::min<uint8_t>(s_touch_release_streak + 1, 255);
+        s_touch_press_streak = 0;
+        if (s_touch_release_streak >= kTouchDebounceSamples) s_touch_debounced = false;
+    }
+
+    s_touch_last_pressed = s_touch_debounced;
+    s_touch_last_raw_x = s_touch_debounced ? (uint16_t)lx : 0;
+    s_touch_last_raw_y = s_touch_debounced ? (uint16_t)ly : 0;
+    s_touch_last_z1 = s_touch_debounced ? lz : 0;
 
     // Raw SPI bytes are not exposed by esp_lcd_touch; keep legacy fields zeroed.
     s_touch_last_z1_bytes[0] = 0;
@@ -723,10 +849,10 @@ bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) 
     s_touch_last_y_bytes[1] = 0;
     s_touch_last_y_bytes[2] = 0;
 
-    if (raw_x) *raw_x = (uint16_t)lx;
-    if (raw_y) *raw_y = (uint16_t)ly;
-    if (z1) *z1 = lz;
-    return true;
+    if (raw_x) *raw_x = s_touch_debounced ? (uint16_t)lx : 0;
+    if (raw_y) *raw_y = s_touch_debounced ? (uint16_t)ly : 0;
+    if (z1) *z1 = s_touch_debounced ? lz : 0;
+    return s_touch_debounced;
 }
 
 bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) {
@@ -742,7 +868,7 @@ bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *
     esp_lcd_touch_point_data_t points[1]{};
     uint8_t point_cnt = 0;
     (void)esp_lcd_touch_get_data(s_touch, points, &point_cnt, 1);
-    const bool pressed = point_cnt > 0;
+    bool pressed = point_cnt > 0;
 
     int lx = pressed ? (int)points[0].x : 0;
     int ly = pressed ? (int)points[0].y : 0;
@@ -754,15 +880,26 @@ bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *
         ly = std::clamp(ly, 0, RAW_MAX);
     }
 
-    s_touch_last_pressed = pressed;
-    s_touch_last_raw_x = (uint16_t)lx;
-    s_touch_last_raw_y = (uint16_t)ly;
-    s_touch_last_z1 = lz;
+    if (pressed && lz < kTouchMinZ1) pressed = false;
+    if (pressed) {
+        s_touch_press_streak = std::min<uint8_t>(s_touch_press_streak + 1, 255);
+        s_touch_release_streak = 0;
+        if (s_touch_press_streak >= kTouchDebounceSamples) s_touch_debounced = true;
+    } else {
+        s_touch_release_streak = std::min<uint8_t>(s_touch_release_streak + 1, 255);
+        s_touch_press_streak = 0;
+        if (s_touch_release_streak >= kTouchDebounceSamples) s_touch_debounced = false;
+    }
 
-    if (raw_x) *raw_x = (uint16_t)lx;
-    if (raw_y) *raw_y = (uint16_t)ly;
-    if (z1) *z1 = lz;
-    return pressed;
+    s_touch_last_pressed = s_touch_debounced;
+    s_touch_last_raw_x = s_touch_debounced ? (uint16_t)lx : 0;
+    s_touch_last_raw_y = s_touch_debounced ? (uint16_t)ly : 0;
+    s_touch_last_z1 = s_touch_debounced ? lz : 0;
+
+    if (raw_x) *raw_x = s_touch_debounced ? (uint16_t)lx : 0;
+    if (raw_y) *raw_y = s_touch_debounced ? (uint16_t)ly : 0;
+    if (z1) *z1 = s_touch_debounced ? lz : 0;
+    return s_touch_debounced;
 }
 
 void display_driver_get_touch_debug(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1, bool *pressed) {

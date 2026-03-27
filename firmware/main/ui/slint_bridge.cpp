@@ -25,6 +25,7 @@ static constexpr const char *UI_PREF_LANG_KEY = "lang";
 static constexpr const char *UI_PREF_TEMP_UNIT_KEY = "temp_unit";
 static constexpr const char *UI_PREF_TIME_FMT_KEY = "time_fmt";
 static constexpr const char *UI_PREF_DATE_FMT_KEY = "date_fmt";
+static constexpr const char *UI_PREF_TOUCH_RESTORE_V1 = "touch_restore_v1";
 static constexpr uint8_t TEMP_UNIT_C = 0;
 static constexpr uint8_t TEMP_UNIT_F = 1;
 static constexpr uint8_t TIME_FMT_24H = 0;
@@ -55,6 +56,58 @@ static void ui_pref_set_u8(const char *key, uint8_t value) {
     nvs_close(h);
 }
 
+static void restore_touch_from_backup_once() {
+    if (ui_pref_get_u8(UI_PREF_TOUCH_RESTORE_V1, 0) != 0) {
+        return;
+    }
+
+    nvs_handle_t h = 0;
+    if (nvs_open("touch", NVS_READWRITE, &h) != ESP_OK) {
+        return;
+    }
+
+    // Values extracted from backup_full_com5.bin (previous firmware).
+    (void)nvs_set_u8(h, "mode", 0);
+    (void)nvs_set_u32(h, "hz", 250000);
+    (void)nvs_set_u8(h, "swap", 1);
+    (void)nvs_set_u8(h, "mx", 0);
+    (void)nvs_set_u8(h, "my", 0);
+
+    (void)nvs_set_u8(h, "cal_en", 1);
+    (void)nvs_set_u16(h, "cal_l", 233);
+    (void)nvs_set_u16(h, "cal_r", 3970);
+    (void)nvs_set_u16(h, "cal_t", 150);
+    (void)nvs_set_u16(h, "cal_b", 3920);
+
+    (void)nvs_set_u8(h, "aff_en", 0);
+    const float aff_a = 1.0f;
+    const float aff_b = 0.0f;
+    const float aff_c = 0.0f;
+    const float aff_d = 0.0f;
+    const float aff_e = 1.0f;
+    const float aff_f = 0.0f;
+    (void)nvs_set_blob(h, "aff_a", &aff_a, sizeof(float));
+    (void)nvs_set_blob(h, "aff_b", &aff_b, sizeof(float));
+    (void)nvs_set_blob(h, "aff_c", &aff_c, sizeof(float));
+    (void)nvs_set_blob(h, "aff_d", &aff_d, sizeof(float));
+    (void)nvs_set_blob(h, "aff_e", &aff_e, sizeof(float));
+    (void)nvs_set_blob(h, "aff_f", &aff_f, sizeof(float));
+
+    (void)nvs_set_u8(h, "grid_en", 0);
+    const float grid_zero[9] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    (void)nvs_set_blob(h, "grid_dx", grid_zero, sizeof(grid_zero));
+    (void)nvs_set_blob(h, "grid_dy", grid_zero, sizeof(grid_zero));
+
+    (void)nvs_set_i32(h, "sclk", 12);
+    (void)nvs_set_i32(h, "mosi", 11);
+    (void)nvs_set_i32(h, "miso", 13);
+
+    (void)nvs_commit(h);
+    nvs_close(h);
+
+    ui_pref_set_u8(UI_PREF_TOUCH_RESTORE_V1, 1);
+}
+
 static void fault_clear_worker_task(void *) {
     const bool cleared = thermalCtrl.clearFault();
     if (cleared) {
@@ -74,6 +127,7 @@ static bool notify_slint_command(const char *action,
 }
 
 extern "C" void slint_bridge_display_init(void) {
+    restore_touch_from_backup_once();
     display_driver_init();
     s_ui_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
 }
@@ -395,4 +449,12 @@ extern "C" void slint_bridge_set_date_format(uint8_t fmt) {
     if (fmt == DATE_FMT_MDY) v = DATE_FMT_MDY;
     if (fmt == DATE_FMT_YMD) v = DATE_FMT_YMD;
     ui_pref_set_u8(UI_PREF_DATE_FMT_KEY, v);
+}
+
+extern "C" uint8_t slint_bridge_get_display_brightness(void) {
+    return display_driver_get_backlight_percent();
+}
+
+extern "C" void slint_bridge_set_display_brightness(uint8_t percent) {
+    display_driver_set_backlight_percent(percent);
 }

@@ -32,6 +32,7 @@
 - Windows build: `firmware/components/slint_ui/CMakeLists.txt` injects `RUSTFLAGS=-Cdebuginfo=0 -Clink-arg=/PDB:NONE` to avoid `LNK1140` during Rust host/build-script link.
 - Touch input uses XPT2046 RAW coordinates + calibrated mapping (box; optional affine; optional 3x3 grid warp), all persisted in NVS and configurable via HTTP API.
 - Touch calibration uses the effective XPT2046 range (~50..4045) because samples near ADC rails are rejected by the driver.
+- One-time touch calibration restore: `slint_bridge_display_init` writes previous NVS touch profile (from `backup_full_com5.bin`) once using flag `touch_restore_v1`, then `display_driver_init` loads it.
 - Slint MCU/software renderer does not support `Path` items; icons must be implemented with rectangles/text or glyph-fonts.
 - Slint UI (panel): Wi‑Fi icon opens an on-device Settings screen; language toggle is placed next to the time; editor uses full-screen text/numeric keyboards for touch input; fan manual override is available from the panel UI.
 - Slint editor keyboard opening is deferred by one UI tick to avoid re-entrant overlay creation during touch release on ESP32-S3; text keyboard rows are sized to stay within 480x320 without overlap.
@@ -42,6 +43,9 @@
 - Captive portal scan flow fixed in `wifi_setup.html`: start scan via `/scan_wifi`, then poll `/scan_results` until completion; avoids false "scan error" on phones.
 - Wi-Fi scan backend guard added: avoid launching overlapping scan tasks (`scan already in progress`) to reduce scan race failures from repeated mobile requests.
 - Wi-Fi Settings layout updated: right-side connection status chip (`Connected/Disconnected`), dedicated web URL row + QR button, action buttons moved below with spacing, and visible right-side scroll indicator for Settings page.
+- Slint panel UI style pass (2026-03-27): Settings view now uses shared layout metrics (equal left/right margins, reduced gap under title, unified content width), with long Wi-Fi texts elided to avoid clipping on 480x320.
+- Top header is now minimal (`NOVA KILN` only), while keeping hidden touch access to open Settings.
+- Boot splash and standby now share a consistent NOVA KILN logo mark/wordmark treatment.
 - On-device QR overlay added (generated in Rust via `qrcodegen`): when Wi‑Fi is connected QR points to current web UI URL; when disconnected QR points to setup portal `http://192.168.4.1`.
 - Server URL detection improved in firmware networking: prefer current STA IP from `WIFI_STA_DEF`, fallback to AP IP from `WIFI_AP_DEF`, then `http://192.168.4.1`.
 - Command debounce/rate-limit added on both sides: Slint start/stop/keyboard anti-bounce plus HTTP API rate-limit for start/stop/skip/add-temp/add-time.
@@ -96,6 +100,7 @@
 - P1: Autotune UX: show progress/result in Settings/Dashboard (cycles, Ku/Pu, final PID) + add STOP button calling `/api/autotune/stop`.
 - P1: PID controls: `GET /api/pid` + `POST /api/pid/reset` in UI with clear "default vs tuned" indicator.
 - P1: UI polish: consistent typography sizes/contrast on the 480x320 panel; unify icon set (glyph-font based) across target + simulator; remove any debug-only overlays from release UI.
+- P1: Hardware check for new Slint Settings/standby/boot layout on real 480x320 panel (verify no clipping in UA/EN strings and touch hit zones).
 - P1: Re-test editor input on hardware after UI changes: numeric keypad open/close, long program names, UA/EN keyboard rows, and touch-release edge cases.
 - P1: Persist fan curve + mode at boot explicitly (load config before fan init or defer fan init until LittleFS config is applied).
 - P1: Remote access hardening: broker TLS cert pinning/CA upload, per-device command auth (signed nonce), and role-based command allowlist.
