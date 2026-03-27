@@ -1,4 +1,4 @@
-﻿# trae_controller - project memory
+# trae_controller - project memory
 
 ## Context
 - Target: ESP32-S3 controller for a muffle furnace (safety-critical heating control).
@@ -46,6 +46,11 @@
 - Slint panel UI style pass (2026-03-27): Settings view now uses shared layout metrics (equal left/right margins, reduced gap under title, unified content width), with long Wi-Fi texts elided to avoid clipping on 480x320.
 - Top header is now minimal (`NOVA KILN` only), while keeping hidden touch access to open Settings.
 - Boot splash and standby now share a consistent NOVA KILN logo mark/wordmark treatment.
+- Standby layout updated: top `NOVAKILN`, centered current temperature, bottom row with `power W` (left), kiln status in framed chip (center), and target temperature (right); icon removed.
+- Slint UI design-system primitives added in `app.slint`: `UiButton` and `UiCard` for consistent button/card styling and safer text layout.
+- Global UI layout/style tokens extended in `AppWindow` (`edge_gap`, `top_bar_h`, `page_content_h`, `settings_btn_*`) and should be reused instead of ad-hoc dimensions.
+- Settings actions migration started to shared `UiButton` (header nav buttons, fault/touch actions, Wi-Fi actions, display calibration, overlay close buttons) to reduce style drift.
+- Settings container and Wi-Fi overlays now explicitly use shared page height (`page_content_h`) and clipping to prevent overflow outside 480x320 viewport.
 - On-device QR overlay added (generated in Rust via `qrcodegen`): when Wi‑Fi is connected QR points to current web UI URL; when disconnected QR points to setup portal `http://192.168.4.1`.
 - Server URL detection improved in firmware networking: prefer current STA IP from `WIFI_STA_DEF`, fallback to AP IP from `WIFI_AP_DEF`, then `http://192.168.4.1`.
 - Command debounce/rate-limit added on both sides: Slint start/stop/keyboard anti-bounce plus HTTP API rate-limit for start/stop/skip/add-temp/add-time.
@@ -100,6 +105,8 @@
 - P1: Autotune UX: show progress/result in Settings/Dashboard (cycles, Ku/Pu, final PID) + add STOP button calling `/api/autotune/stop`.
 - P1: PID controls: `GET /api/pid` + `POST /api/pid/reset` in UI with clear "default vs tuned" indicator.
 - P1: UI polish: consistent typography sizes/contrast on the 480x320 panel; unify icon set (glyph-font based) across target + simulator; remove any debug-only overlays from release UI.
+- P1: Complete migration of panel UI actions to shared `UiButton`/`UiCard` across `Dashboard/Schedules/Editor/RunningEditor` for full style consistency.
+- P1: Add a tiny “screen-safe checklist” in PR flow: verify `480x320` bounds, `clip` where needed, and `overflow: elide` on UA/EN long labels.
 - P1: Hardware check for new Slint Settings/standby/boot layout on real 480x320 panel (verify no clipping in UA/EN strings and touch hit zones).
 - P1: Re-test editor input on hardware after UI changes: numeric keypad open/close, long program names, UA/EN keyboard rows, and touch-release edge cases.
 - P1: Persist fan curve + mode at boot explicitly (load config before fan init or defer fan init until LittleFS config is applied).
