@@ -377,7 +377,10 @@ export component AppWindow inherits Window {
 
     // Shared settings layout metrics (keeps panels symmetric and avoids clipping).
     property <length> settings_side_gap: root.edge_gap;
-    property <length> settings_content_width: 460px;
+    property <length> settings_right_gap: 18px;
+    property <length> settings_content_width: 480px - root.settings_side_gap - root.settings_right_gap;
+    property <length> settings_grid_gap: 8px;
+    property <length> settings_col_width: (root.settings_content_width - root.settings_grid_gap) / 2;
     property <length> settings_title_y: 8px;
     property <length> settings_content_y: 44px;
     property <length> settings_content_height: 214px;
@@ -696,14 +699,14 @@ export component AppWindow inherits Window {
     // Header bar
     Rectangle {
         x: 0px; y: 0px;
-        width: 480px; height: 40px;
+        width: 480px; height: root.top_bar_h;
         background: #111118;
         border-color: #27272A;
         border-width: 1px;
 
         Text {
-            x: 12px; y: 4px;
-            width: 190px; height: 32px;
+            x: 12px; y: 0px;
+            width: 190px; height: parent.height;
             text: "NOVA KILN";
             color: #FFFFFF;
             font-family: "PT Sans";
@@ -716,10 +719,10 @@ export component AppWindow inherits Window {
 
         HorizontalBox {
             x: parent.width - self.width - 10px;
-            y: 4px;
+            y: 0px;
             width: 268px;
-            height: 32px;
-            alignment: end;
+            height: parent.height;
+            alignment: center;
             spacing: 6px;
 
             Rectangle {
@@ -2454,14 +2457,14 @@ export component AppWindow inherits Window {
                             x: 0px;
                             width: root.settings_content_width;
                             alignment: start;
-                            spacing: 8px;
+                            spacing: root.settings_grid_gap;
 
                             VerticalBox {
                                 alignment: start;
                                 spacing: 8px;
 
                                 Rectangle {
-                                    width: 226px; height: 56px;
+                                    width: root.settings_col_width; height: 56px;
                                     background: #111118;
                                     border-color: #27272A;
                                     border-width: 1px;
@@ -2479,7 +2482,7 @@ export component AppWindow inherits Window {
                                 }
 
                                 Rectangle {
-                                    width: 226px; height: 56px;
+                                    width: root.settings_col_width; height: 56px;
                                     background: #111118;
                                     border-color: #27272A;
                                     border-width: 1px;
@@ -2497,7 +2500,7 @@ export component AppWindow inherits Window {
                                 }
 
                                 Rectangle {
-                                    width: 226px; height: 56px;
+                                    width: root.settings_col_width; height: 56px;
                                     background: #111118;
                                     border-color: #27272A;
                                     border-width: 1px;
@@ -2520,7 +2523,7 @@ export component AppWindow inherits Window {
                                 spacing: 8px;
 
                                 Rectangle {
-                                    width: 226px; height: 56px;
+                                    width: root.settings_col_width; height: 56px;
                                     background: #111118;
                                     border-color: #27272A;
                                     border-width: 1px;
@@ -2538,7 +2541,7 @@ export component AppWindow inherits Window {
                                 }
 
                                 Rectangle {
-                                    width: 226px; height: 56px;
+                                    width: root.settings_col_width; height: 56px;
                                     background: #111118;
                                     border-color: #27272A;
                                     border-width: 1px;
