@@ -22,6 +22,8 @@ component PlayIcon {
 
     Text {
 
+        width: parent.width; height: parent.height;
+
         text: "\u{e037}";
 
         color: root.color;
@@ -49,6 +51,8 @@ component StopIcon {
     height: 16px;
 
     Text {
+
+        width: parent.width; height: parent.height;
 
         text: "\u{e047}";
 
@@ -78,6 +82,8 @@ component ActivityIcon {
 
     Text {
 
+        width: parent.width; height: parent.height;
+
         text: "\u{eaa2}";
 
         color: root.color;
@@ -105,6 +111,8 @@ component WifiIcon {
     height: 18px;
     Text {
 
+        width: parent.width; height: parent.height;
+
         text: "\u{e63e}";
 
         color: root.color;
@@ -124,6 +132,7 @@ component SettingsIcon {
     in property <color> color: #FFFFFF;
     width: 24px; height: 24px;
     Text {
+        width: parent.width; height: parent.height;
         text: "\u{e8b8}";
         color: root.color;
         font-family: "Material Icons";
@@ -144,6 +153,8 @@ component ThermometerIcon {
     height: 16px;
 
     Text {
+
+        width: parent.width; height: parent.height;
 
         text: "\u{e1ff}";
 
@@ -359,6 +370,7 @@ export component AppWindow inherits Window {
 
     in-out property <int> target: 0;
     in-out property <int> active_segment_target: 0;
+    in-out property <int> standby_power_watts: 0;
 
 
 
@@ -646,13 +658,14 @@ export component AppWindow inherits Window {
 
         HorizontalBox {
             x: parent.width - self.width - 10px;
-            y: 8px;
+            y: 0px;
             width: 268px;
-            height: 24px;
+            height: parent.height;
+            alignment: end;
             spacing: 6px;
 
             Rectangle {
-                width: 120px; height: 24px;
+                width: 120px; height: parent.height;
                 background: #00000000;
                 Text {
                     x: 0px; y: 0px; width: parent.width; height: parent.height;
@@ -666,7 +679,7 @@ export component AppWindow inherits Window {
             }
 
             Rectangle {
-                width: 38px; height: 24px;
+                width: 38px; height: parent.height;
                 background: #27272A;
                 border-radius: 6px;
                 Text {
@@ -681,7 +694,7 @@ export component AppWindow inherits Window {
             }
 
             Rectangle {
-                width: 32px; height: 24px;
+                width: 32px; height: parent.height;
                 background: #00000000;
                 WifiIcon {
                     x: (parent.width - self.width) / 2;
@@ -698,7 +711,7 @@ export component AppWindow inherits Window {
             }
 
             Rectangle {
-                width: 32px; height: 24px;
+                width: 32px; height: parent.height;
                 background: #00000000;
                 SettingsIcon {
                     x: (parent.width - self.width) / 2;
@@ -2323,9 +2336,11 @@ export component AppWindow inherits Window {
 
                 HorizontalBox {
                     x: root.settings_side_gap; y: root.settings_title_y;
+                    width: root.settings_content_width; height: 28px;
+                    alignment: start;
                     spacing: 6px;
-                    if (root.settings_page == "wifi") : WifiIcon { color: root.wifi_ok ? #10B981 : #52525B; }
-                    if (root.settings_page != "wifi") : SettingsIcon { color: #A1A1AA; }
+                    if (root.settings_page == "wifi") : WifiIcon { width: 24px; height: 28px; color: root.wifi_ok ? #10B981 : #52525B; }
+                    if (root.settings_page != "wifi") : SettingsIcon { width: 24px; height: 28px; color: #A1A1AA; }
                     Text {
                         text: root.settings_page == "wifi" ? "Wi‑Fi"
                             : root.settings_page == "display" ? (root.is_ua ? "Режим відображення" : "Display mode")
@@ -2339,6 +2354,7 @@ export component AppWindow inherits Window {
                         font-family: "PT Sans";
                         font-size: 18px;
                         width: 270px;
+                        height: 28px;
                         vertical-alignment: center;
                         overflow: elide;
                     }
@@ -2370,14 +2386,17 @@ export component AppWindow inherits Window {
                     settings_box := VerticalBox {
                         x: 0px;
                         width: root.settings_content_width;
+                        alignment: start;
                         spacing: 8px;
 
                         if (root.settings_page == "all") : HorizontalBox {
                             x: 0px;
                             width: root.settings_content_width;
+                            alignment: start;
                             spacing: 8px;
 
                             VerticalBox {
+                                alignment: start;
                                 spacing: 8px;
 
                                 Rectangle {
@@ -2436,6 +2455,7 @@ export component AppWindow inherits Window {
                             }
 
                             VerticalBox {
+                                alignment: start;
                                 spacing: 8px;
 
                                 Rectangle {
@@ -2476,7 +2496,7 @@ export component AppWindow inherits Window {
                             }
                         }
 
-if (root.settings_page == "display") : VerticalBox {
+                        if (root.settings_page == "display") : VerticalBox {
                             width: root.settings_content_width;
                             spacing: 8px;
 
@@ -2575,7 +2595,7 @@ if (root.settings_page == "display") : VerticalBox {
                             }
                         }
 
-if (root.settings_page == "fan") : Rectangle {
+                        if (root.settings_page == "fan") : Rectangle {
                         width: root.settings_content_width; height: 86px;
                         background: #111118;
                         border-color: #27272A;
@@ -2930,6 +2950,7 @@ if (root.settings_page == "fan") : Rectangle {
                 // (scrollbar hidden)
                 if (root.settings_page == "display_hw") : VerticalBox {
                     x: root.settings_side_gap; y: root.settings_content_y; width: root.settings_content_width;
+                    alignment: start;
                     spacing: 10px;
 
                     Rectangle {
@@ -4128,40 +4149,35 @@ if (root.settings_page == "fan") : Rectangle {
             z: 5150;
 
             Rectangle {
-                x: 88px; y: 14px; width: 304px; height: 48px;
+                x: 0px; y: 12px; width: 480px; height: 52px;
                 background: #00000000;
-                Rectangle {
-                    x: 0px; y: 6px;
-                    width: 36px; height: 36px;
-                    background: #00D084;
-                    border-color: #6EE7B7;
-                    border-width: 1px;
-                    border-radius: 12px;
-                    Text {
-                        x: 0px; y: 0px; width: parent.width; height: parent.height;
-                        text: "\u{ef55}";
-                        color: #02120D;
-                        font-family: "Material Icons";
-                        font-size: 24px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
+                Text {
+                    x: 0px; y: 1px; width: parent.width; height: 50px;
+                    text: "NOVAKILN";
+                    color: #00D084;
+                    opacity: 0.26;
+                    font-family: "PT Sans";
+                    font-size: 36px;
+                    font-weight: 700;
+                    letter-spacing: 2.0px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
                 Text {
-                    x: 50px; y: 0px; width: 254px; height: 48px;
-                    text: "NOVA KILN";
-                    color: #3FEBC4;
+                    x: 0px; y: 0px; width: parent.width; height: 50px;
+                    text: "NOVAKILN";
+                    color: #FFFFFF;
                     font-family: "PT Sans";
-                    font-size: 30px;
+                    font-size: 34px;
                     font-weight: 700;
-                    letter-spacing: 1.4px;
-                    horizontal-alignment: left;
+                    letter-spacing: 2.0px;
+                    horizontal-alignment: center;
                     vertical-alignment: center;
                 }
             }
 
             Text {
-                x: 0px; y: 86px; width: 480px; height: 120px;
+                x: 0px; y: 88px; width: 480px; height: 126px;
                 text: root.temp_label + root.temp_unit_label;
                 color: #FFFFFF;
                 font-family: "PT Sans";
@@ -4172,32 +4188,65 @@ if (root.settings_page == "fan") : Rectangle {
             }
 
             Text {
-                x: 0px; y: 204px; width: 480px; height: 22px;
-                text: root.status_label;
+                x: 18px; y: 278px; width: 146px; height: 28px;
+                text: root.standby_power_watts + " W";
                 color: #A1A1AA;
                 font-family: "PT Sans";
-                font-size: 16px;
-                font-weight: 600;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-
-            Text {
-                x: 24px; y: 228px; width: 200px; height: 20px;
-                text: root.is_ua ? "\u{0421}\u{043f}\u{043e}\u{0436}\u{0438}\u{0432}\u{0430}\u{043d}\u{043d}\u{044f}: 0 W" : "Power: 0 W";
-                color: #A1A1AA;
-                font-family: "PT Sans";
-                font-size: 14px;
+                font-size: 20px;
+                font-weight: 700;
                 horizontal-alignment: left;
                 vertical-alignment: center;
             }
 
+            Rectangle {
+                x: root.is_ua
+                    ? (root.status_label == "IDLE" ? 187px
+                       : root.status_label == "COOL" ? 187px
+                       : root.status_label == "COMPLETE" ? 191px
+                       : root.status_label == "ERROR" ? 197px
+                       : 199px)
+                    : (root.status_label == "ERROR" ? 201px : 205px);
+                y: 278px;
+                width: root.is_ua
+                    ? (root.status_label == "IDLE" ? 106px
+                       : root.status_label == "COOL" ? 106px
+                       : root.status_label == "COMPLETE" ? 98px
+                       : root.status_label == "ERROR" ? 86px
+                       : 82px)
+                    : (root.status_label == "ERROR" ? 78px : 70px);
+                height: 26px;
+                background: root.status_bg;
+                border-color: root.status_fg;
+                border-width: root.status_label == "ERROR" ? 2px : 1px;
+                border-radius: 13px;
+
+                Text {
+                    text: root.is_ua
+                        ? (root.status_label == "IDLE" ? "ОЧІКУВАННЯ"
+                          : root.status_label == "PREHEAT" ? "ПІДІГРІВ"
+                          : root.status_label == "RAMP" ? "НАГРІВ"
+                          : root.status_label == "HOLD" ? "ВИТРИМКА"
+                          : root.status_label == "COOL" ? "ОХОЛОДЖЕННЯ"
+                          : root.status_label == "COMPLETE" ? "ЗАВЕРШЕНО"
+                          : root.status_label == "ERROR" ? "ПОМИЛКА"
+                          : root.status_label == "TUNING" ? "АВТОНАЛ."
+                          : root.status_label)
+                        : root.status_label;
+                    color: root.status_fg;
+                    font-family: "PT Sans";
+                    font-size: root.is_ua ? 12px : 14px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
             Text {
-                x: 256px; y: 228px; width: 200px; height: 20px;
-                text: root.is_ua ? ("\u{0426}\u{0456}\u{043b}\u{044c}: " + root.target + root.temp_unit_label) : ("Target: " + root.target + root.temp_unit_label);
+                x: 314px; y: 278px; width: 148px; height: 28px;
+                text: root.target + root.temp_unit_label;
                 color: #A1A1AA;
                 font-family: "PT Sans";
-                font-size: 14px;
+                font-size: 20px;
+                font-weight: 700;
                 horizontal-alignment: right;
                 vertical-alignment: center;
             }
@@ -4215,46 +4264,29 @@ if (root.settings_page == "fan") : Rectangle {
             z: 5200;
 
             Rectangle {
-                x: 72px; y: 118px; width: 336px; height: 84px;
+                x: 54px; y: 116px; width: 372px; height: 88px;
                 background: #00000000;
-                Rectangle {
-                    x: 0px; y: 20px;
-                    width: 44px; height: 44px;
-                    background: #00D084;
-                    border-color: #6EE7B7;
-                    border-width: 1px;
-                    border-radius: 14px;
-                    Text {
-                        x: 0px; y: 0px; width: parent.width; height: parent.height;
-                        text: "\u{ef55}";
-                        color: #02120D;
-                        font-family: "Material Icons";
-                        font-size: 28px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                    }
-                }
                 Text {
-                    x: 58px; y: 8px; width: 278px; height: 68px;
-                    text: "NOVA KILN";
-                    color: #3FEBC4;
-                    opacity: 0.22;
+                    x: 0px; y: 8px; width: parent.width; height: 72px;
+                    text: "NOVAKILN";
+                    color: #00D084;
+                    opacity: 0.30;
                     font-family: "PT Sans";
-                    font-size: 46px;
+                    font-size: 54px;
                     font-weight: 700;
-                    letter-spacing: 1.8px;
-                    horizontal-alignment: left;
+                    letter-spacing: 2.2px;
+                    horizontal-alignment: center;
                     vertical-alignment: center;
                 }
                 Text {
-                    x: 58px; y: 10px; width: 278px; height: 68px;
-                    text: "NOVA KILN";
-                    color: #3FEBC4;
+                    x: 0px; y: 7px; width: parent.width; height: 72px;
+                    text: "NOVAKILN";
+                    color: #FFFFFF;
                     font-family: "PT Sans";
-                    font-size: 42px;
+                    font-size: 50px;
                     font-weight: 700;
-                    letter-spacing: 1.8px;
-                    horizontal-alignment: left;
+                    letter-spacing: 2.2px;
+                    horizontal-alignment: center;
                     vertical-alignment: center;
                 }
             }
