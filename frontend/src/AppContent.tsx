@@ -1,10 +1,11 @@
 import React from 'react';
 import { Routes, Route, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Flame, Settings as SettingsIcon, Globe, ShieldAlert, Activity, History as HistoryIcon } from 'lucide-react';
+import { LayoutDashboard, Calendar, Flame, Settings as SettingsIcon, Globe, ShieldAlert, Activity, History as HistoryIcon, Monitor } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import ScheduleEditor from './components/ScheduleEditor';
 import Settings from './components/Settings';
 import History from './components/History';
+import ControllerScreen from './components/ControllerScreen';
 import { useLanguage } from './contexts/LanguageContext';
 import toast from 'react-hot-toast';
 import { postCommand } from './api/commands';
@@ -55,7 +56,7 @@ const MainLayout = () => {
       <nav className="h-16 border-b border-kiln-border flex items-center justify-between px-6 bg-kiln-bg z-50 shrink-0">
         {/* Logo */}
         <div className="flex items-center gap-3 select-none">
-          <div className="bg-kiln-accent p-1.5 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+          <div className="h-9 w-9 bg-kiln-accent rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] flex items-center justify-center shrink-0">
             <Flame className="text-black fill-black" size={20} />
           </div>
           <span className="text-xl font-bold tracking-tight text-white">KilnPro</span>
@@ -75,6 +76,9 @@ const MainLayout = () => {
           <NavLink to="/settings" className={navLinkClass}>
             <SettingsIcon size={16} /> <span>{t.nav.settings}</span>
           </NavLink>
+          <NavLink to="/controller" className={navLinkClass}>
+            <Monitor size={16} /> <span>Controller</span>
+          </NavLink>
         </div>
 
         {/* Right Actions */}
@@ -83,7 +87,7 @@ const MainLayout = () => {
           {/* E-STOP BUTTON */}
           <button 
             onClick={handleEmergencyStop}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-md font-bold transition-all shadow-[0_0_15px_rgba(220,38,38,0.5)] active:scale-95 text-xs md:text-sm"
+            className="h-9 flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-3 md:px-4 rounded-md font-bold transition-all shadow-[0_0_15px_rgba(220,38,38,0.5)] active:scale-95 text-xs md:text-sm"
           >
             <ShieldAlert size={16} /> STOP
           </button>
@@ -92,7 +96,7 @@ const MainLayout = () => {
 
           <button 
             onClick={toggleLanguage}
-            className="flex items-center gap-2 hover:text-white transition-colors uppercase"
+            className="h-9 flex items-center gap-2 hover:text-white transition-colors uppercase px-2 rounded-md"
           >
             <Globe size={16} /> <span className="hidden md:inline">{language}</span>
           </button>
@@ -118,6 +122,9 @@ const MainLayout = () => {
         <NavLink to="/settings" className={mobileNavLinkClass}>
             <SettingsIcon size={20} /> <span className="text-[10px]">{t.nav.settings}</span>
         </NavLink>
+        <NavLink to="/controller" className={mobileNavLinkClass}>
+            <Monitor size={20} /> <span className="text-[10px]">Controller</span>
+        </NavLink>
       </div>
     </div>
   );
@@ -131,6 +138,7 @@ function AppContent() {
         <Route path="/schedules" element={<ScheduleEditor />} />
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/controller" element={<ControllerScreen />} />
       </Route>
     </Routes>
   );
