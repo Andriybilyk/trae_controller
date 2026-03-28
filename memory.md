@@ -87,6 +87,9 @@
 - ESP-IDF migration baseline updated to v6.0: `dependencies.lock` now resolves `idf (6.0.0)` and firmware builds/flashes with toolchain v6.
 - Partition layout changed for v6-sized firmware: switched from dual OTA slots (`app0/app1`) to single large `factory` app partition (`0xCA0000`) + LittleFS storage (`0x350000`) to fit current Slint/Rust image.
 
+- Settings spacing follow-up: the top block offset now comes from shared Settings metrics, and the display temperature/time/date card was widened to the same right visual edge used by the header close button.
+- Library graph action now opens a dedicated Slint `ScheduleGraph` screen with a read-only time/temperature preview generated from the selected program steps.
+
 ## TODO
 - P0: Verify Slint embedded build for `xtensa-esp32s3-espidf` and confirm Slint software renderer + touch input on hardware.
 - P0: Touch accuracy: finalize a repeatable calibration flow (web 9‑point) and document the recommended reset/apply order (calibration/affine/grid).
@@ -105,6 +108,7 @@
 - P1: Autotune UX: show progress/result in Settings/Dashboard (cycles, Ku/Pu, final PID) + add STOP button calling `/api/autotune/stop`.
 - P1: PID controls: `GET /api/pid` + `POST /api/pid/reset` in UI with clear "default vs tuned" indicator.
 - P1: UI polish: consistent typography sizes/contrast on the 480x320 panel; unify icon set (glyph-font based) across target + simulator; remove any debug-only overlays from release UI.
+- P1: Verify the new `ScheduleGraph` page on real hardware with long programs and both UA/EN locales (marker overlap, duration text fit, touch hit zones).
 - P1: Complete migration of panel UI actions to shared `UiButton`/`UiCard` across `Dashboard/Schedules/Editor/RunningEditor` for full style consistency.
 - P1: Add a tiny “screen-safe checklist” in PR flow: verify `480x320` bounds, `clip` where needed, and `overflow: elide` on UA/EN long labels.
 - P1: Hardware check for new Slint Settings/standby/boot layout on real 480x320 panel (verify no clipping in UA/EN strings and touch hit zones).

@@ -22,6 +22,14 @@ fn make_editor_step(rate: i32, target: i32, hold: i32) -> EditorStepRow {
     }
 }
 
+fn make_graph_rect(x: i32, y: i32, width: i32, height: i32) -> ScheduleGraphRect {
+    ScheduleGraphRect { x, y, width, height }
+}
+
+fn make_graph_marker(x: i32, y: i32, label: &str) -> ScheduleGraphMarker {
+    ScheduleGraphMarker { x, y, label: label.into() }
+}
+
 fn parse_int(text: &str, min: i32, max: i32, fallback: i32) -> i32 {
     match text.trim().parse::<i32>() {
         Ok(v) => v.clamp(min, max),
@@ -50,6 +58,26 @@ fn main() {
     ui.set_wifi_ok(true);
     ui.set_fault_active(false);
     ui.set_fault_reason("".into());
+    ui.set_schedule_graph_peak_temp(760);
+    ui.set_schedule_graph_total_label("4h 20m".into());
+    ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(vec![
+        make_graph_rect(0, 56, 40, 3),
+        make_graph_rect(38, 44, 3, 3),
+        make_graph_rect(44, 34, 3, 3),
+        make_graph_rect(50, 24, 3, 3),
+        make_graph_rect(56, 14, 3, 3),
+        make_graph_rect(62, 8, 42, 3),
+        make_graph_rect(104, 8, 3, 3),
+        make_graph_rect(112, 20, 3, 3),
+        make_graph_rect(120, 32, 3, 3),
+        make_graph_rect(128, 44, 3, 3),
+        make_graph_rect(136, 56, 50, 3),
+    ])));
+    ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(vec![
+        make_graph_marker(40, 56, "1"),
+        make_graph_marker(104, 8, "2"),
+        make_graph_marker(186, 56, "3"),
+    ])));
 
     let schedules_state = Rc::new(RefCell::new(vec![
         make_schedule("Glass 90 polish", 8, false),
@@ -121,6 +149,19 @@ fn main() {
         ui.on_edit_schedule(move |_index| {
             let Some(ui) = ui_weak.upgrade() else { return; };
             ui.set_view(View::Editor);
+        });
+    }
+
+    {
+        let ui_weak = ui.as_weak();
+        let schedules = schedules_state.clone();
+        ui.on_open_schedule_graph(move |index| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            if let Some(item) = schedules.borrow().get(index as usize) {
+                ui.set_selected_schedule_name(item.name.clone());
+                ui.set_selected_steps_count(item.steps_count);
+            }
+            ui.set_view(View::ScheduleGraph);
         });
     }
 

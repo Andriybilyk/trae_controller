@@ -180,6 +180,7 @@ struct AppState {
     schedules: Vec<ScheduleFile>,
     selected_index: Option<usize>,
     editing_index: Option<usize>,
+    graph_index: Option<usize>,
     editor_steps: Vec<EditorStepRow>,
     display_temp_c: f32,
     display_temp_valid: bool,
@@ -290,6 +291,7 @@ fn apply_temp_unit_change(ui: &AppWindow, state: &mut AppState, new_unit: TempUn
 
     state.temp_unit = new_unit;
     update_unit_labels(ui, new_unit);
+    refresh_schedule_graph_model(ui, state);
 }
 
 struct EspPlatform {
@@ -434,6 +436,229 @@ fn save_schedules(schedules: &[ScheduleFile]) -> bool {
         return false;
     };
     std::fs::write(path, json).is_ok()
+}
+
+fn truncate_preview(mut text: String, max_chars: usize) -> String {
+    if text.chars().count() > max_chars {
+        text = text.chars().take(max_chars).collect::<String>();
+        text.push_str("\n...");
+    }
+    text
+}
+
+fn compact_duration_label(seconds: i64, is_ua: bool) -> String {
+    if seconds <= 0 {
+        return if is_ua { "тривалість невідома".to_string() } else { "duration unknown".to_string() };
+    }
+    let hours = seconds / 3600;
+    let minutes = (seconds % 3600) / 60;
+    if hours > 0 {
+        if is_ua {
+            format!("{} год {} хв", hours, minutes)
+        } else {
+            format!("{}h {}m", hours, minutes)
+        }
+    } else if is_ua {
+        format!("{} хв", minutes.max(1))
+    } else {
+        format!("{} min", minutes.max(1))
+    }
+}
+
+fn history_status_label(status: &str, is_ua: bool) -> String {
+    match status {
+        "COMPLETE" => if is_ua { "ГОТОВО".to_string() } else { "COMPLETE".to_string() },
+        "STOPPED" => if is_ua { "ЗУПИНЕНО".to_string() } else { "STOPPED".to_string() },
+        "ERROR" => if is_ua { "ПОМИЛКА".to_string() } else { "ERROR".to_string() },
+        "COOL" => if is_ua { "ОХОЛОДЖ.".to_string() } else { "COOL".to_string() },
+        other if !other.is_empty() => other.to_string(),
+        _ => if is_ua { "НЕВІДОМО".to_string() } else { "UNKNOWN".to_string() },
+    }
+}
+
+fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
+    let Ok(data) = std::fs::read_to_string("/littlefs/history.json") else {
+        return vec![HistoryPreviewCard {
+            title: (if is_ua { "Історія відпалів поки порожня." } else { "Firing history is empty." }).into(),
+            status: "".into(),
+            subtitle: "".into(),
+        }];
+    };
+    let trimmed = data.trim();
+    if trimmed.is_empty() || trimmed == "[]" {
+        return vec![HistoryPreviewCard {
+            title: (if is_ua { "Історія відпалів поки порожня." } else { "Firing history is empty." }).into(),
+            status: "".into(),
+            subtitle: "".into(),
+        }];
+    }
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+        if let Some(items) = value.as_array() {
+            let mut cards = Vec::new();
+            for item in items.iter().rev().take(3) {
+                let name = item
+                    .get("name")
+                    .or_else(|| item.get("scheduleName"))
+                    .or_else(|| item.get("program"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(if is_ua { "Без назви" } else { "Untitled" });
+                let raw_status = item
+                    .get("status")
+                    .or_else(|| item.get("result"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let duration = item.get("duration").and_then(|v| v.as_i64()).unwrap_or(0);
+                let peak_temp = item.get("peakTemp").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let total_steps = item.get("totalSteps").and_then(|v| v.as_i64()).unwrap_or(0);
+                let completed_steps = item.get("completedSteps").and_then(|v| v.as_i64()).unwrap_or(0);
+
+                let mut subtitle_parts = Vec::new();
+                subtitle_parts.push(compact_duration_label(duration, is_ua));
+                if peak_temp > 0.0 {
+                    subtitle_parts.push(if is_ua {
+                        format!("пік {:.0}°C", peak_temp)
+                    } else {
+                        format!("peak {:.0}°C", peak_temp)
+                    });
+                }
+                if total_steps > 0 {
+                    subtitle_parts.push(if is_ua {
+                        format!("кроки {}/{}", completed_steps.max(0), total_steps)
+                    } else {
+                        format!("steps {}/{}", completed_steps.max(0), total_steps)
+                    });
+                }
+
+                cards.push(HistoryPreviewCard {
+                    title: truncate_preview(name.to_string(), 48).into(),
+                    status: history_status_label(raw_status, is_ua).into(),
+                    subtitle: truncate_preview(subtitle_parts.join(" • "), 72).into(),
+                });
+            }
+            if !cards.is_empty() {
+                return cards;
+            }
+        }
+    }
+    vec![HistoryPreviewCard {
+        title: truncate_preview(trimmed.to_string(), 64).into(),
+        status: "".into(),
+        subtitle: "".into(),
+    }]
+}
+
+fn fault_status_label(ok: bool, is_ua: bool) -> String {
+    if ok {
+        "OK".to_string()
+    } else if is_ua {
+        "ЗБІЙ".to_string()
+    } else {
+        "FAULT".to_string()
+    }
+}
+
+fn uptime_label(ms: u64) -> String {
+    let total_seconds = ms / 1000;
+    let minutes = total_seconds / 60;
+    let seconds = total_seconds % 60;
+    if minutes > 0 {
+        format!("t+{}m {}s", minutes, seconds)
+    } else {
+        format!("t+{}s", seconds)
+    }
+}
+
+fn prettify_token(token: &str) -> String {
+    token
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn load_fault_log_items(is_ua: bool) -> Vec<FaultLogPreviewCard> {
+    let mut combined = String::new();
+    for path in ["/littlefs/logs/audit.log", "/littlefs/logs/audit.log.1"] {
+        if let Ok(data) = std::fs::read_to_string(path) {
+            if !data.trim().is_empty() {
+                if !combined.is_empty() {
+                    combined.push('\n');
+                }
+                combined.push_str(&data);
+            }
+        }
+    }
+    if combined.trim().is_empty() {
+        return vec![FaultLogPreviewCard {
+            title: (if is_ua { "Логи помилок поки порожні." } else { "Fault logs are empty." }).into(),
+            status: "".into(),
+            subtitle: "".into(),
+        }];
+    }
+    let mut cards = Vec::new();
+    for line in combined.lines().rev().filter(|line| !line.trim().is_empty()).take(3) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
+            let ok = value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+            let action = value.get("action").and_then(|v| v.as_str()).unwrap_or("");
+            let source = value.get("source").and_then(|v| v.as_str()).unwrap_or("");
+            let code = value.get("code").and_then(|v| v.as_str()).unwrap_or("");
+            let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("");
+            let ts_ms = value.get("ts_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+
+            let title = if !message.is_empty() && message != "settings_changed" {
+                prettify_token(message)
+            } else if !action.is_empty() {
+                prettify_token(action)
+            } else if is_ua {
+                "Подія без назви".to_string()
+            } else {
+                "Unnamed event".to_string()
+            };
+
+            let mut subtitle_parts = Vec::new();
+            if !action.is_empty() {
+                subtitle_parts.push(prettify_token(action));
+            }
+            if !source.is_empty() {
+                subtitle_parts.push(source.to_uppercase());
+            }
+            if !code.is_empty() && code != "ok" {
+                subtitle_parts.push(prettify_token(code));
+            }
+            if ts_ms > 0 {
+                subtitle_parts.push(uptime_label(ts_ms));
+            }
+
+            cards.push(FaultLogPreviewCard {
+                title: truncate_preview(title, 44).into(),
+                status: fault_status_label(ok, is_ua).into(),
+                subtitle: truncate_preview(subtitle_parts.join(" • "), 76).into(),
+            });
+        } else {
+            cards.push(FaultLogPreviewCard {
+                title: truncate_preview(line.trim().to_string(), 44).into(),
+                status: if is_ua { "ЗБІЙ".into() } else { "FAULT".into() },
+                subtitle: "".into(),
+            });
+        }
+    }
+
+    if cards.is_empty() {
+        vec![FaultLogPreviewCard {
+            title: (if is_ua { "Логи помилок поки порожні." } else { "Fault logs are empty." }).into(),
+            status: "".into(),
+            subtitle: "".into(),
+        }]
+    } else {
+        cards
+    }
 }
 
 fn schedule_to_row(schedule: &ScheduleFile, selected: bool) -> ScheduleRow {
@@ -661,6 +886,137 @@ fn refresh_schedule_model(ui: &AppWindow, state: &AppState) {
 
 fn refresh_editor_model(ui: &AppWindow, state: &AppState) {
     ui.set_editor_steps(ModelRc::new(VecModel::from(state.editor_steps.clone())));
+}
+
+fn format_minutes_label(total_minutes: i32, is_ua: bool) -> String {
+    let mins = total_minutes.max(0);
+    let hours = mins / 60;
+    let rem = mins % 60;
+    if hours > 0 {
+        if is_ua {
+            format!("{} год {} хв", hours, rem)
+        } else {
+            format!("{}h {}m", hours, rem)
+        }
+    } else if is_ua {
+        format!("{} хв", rem)
+    } else {
+        format!("{} min", rem)
+    }
+}
+
+fn sample_graph_line(rects: &mut Vec<ScheduleGraphRect>, x0: i32, y0: i32, x1: i32, y1: i32) {
+    let steps = (x1 - x0).abs().max((y1 - y0).abs()).clamp(1, 64);
+    for i in 0..=steps {
+        let t = i as f32 / steps as f32;
+        let x = (x0 as f32 + (x1 - x0) as f32 * t).round() as i32;
+        let y = (y0 as f32 + (y1 - y0) as f32 * t).round() as i32;
+        rects.push(ScheduleGraphRect {
+            x: (x - 1).max(0),
+            y: (y - 1).max(0),
+            width: 3,
+            height: 3,
+        });
+    }
+}
+
+fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
+    const GRAPH_W: i32 = 382;
+    const GRAPH_H: i32 = 84;
+    const START_TEMP_C: f32 = 25.0;
+    const MIN_PEAK_TEMP_C: f32 = 100.0;
+
+    let Some(idx) = state.graph_index else {
+        ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(Vec::<ScheduleGraphRect>::new())));
+        ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(Vec::<ScheduleGraphMarker>::new())));
+        ui.set_schedule_graph_peak_temp(0);
+        ui.set_schedule_graph_total_label("0 min".into());
+        return;
+    };
+
+    let Some(schedule) = state.schedules.get(idx) else {
+        ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(Vec::<ScheduleGraphRect>::new())));
+        ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(Vec::<ScheduleGraphMarker>::new())));
+        ui.set_schedule_graph_peak_temp(0);
+        ui.set_schedule_graph_total_label("0 min".into());
+        return;
+    };
+
+    let mut points: Vec<(f32, f32)> = vec![(0.0, START_TEMP_C)];
+    let mut current_time_h = 0.0f32;
+    let mut current_temp_c = START_TEMP_C;
+    let mut peak_temp_c = START_TEMP_C;
+
+    for step in &schedule.steps {
+        let target_c = step.target.unwrap_or(current_temp_c.round() as i32) as f32;
+        let rate_c_per_hour = step.rate.unwrap_or(0).abs() as f32;
+        let hold_minutes = step.hold_time.unwrap_or(0).max(0) as f32;
+
+        let diff = (target_c - current_temp_c).abs();
+        let ramp_duration_h = diff / if rate_c_per_hour > 0.0 { rate_c_per_hour } else { 100.0 };
+        current_time_h += ramp_duration_h;
+        current_temp_c = target_c;
+        peak_temp_c = peak_temp_c.max(current_temp_c);
+        points.push((current_time_h, current_temp_c));
+
+        if hold_minutes > 0.0 {
+            current_time_h += hold_minutes / 60.0;
+            points.push((current_time_h, current_temp_c));
+        }
+    }
+
+    let total_minutes = (current_time_h * 60.0).ceil().max(1.0) as i32;
+    let peak_display = temp_to_display_i32(peak_temp_c.max(MIN_PEAK_TEMP_C) as i32, state.temp_unit);
+    let peak_scale_c = peak_temp_c.max(MIN_PEAK_TEMP_C);
+
+    let x_scale = if current_time_h <= 0.0 {
+        0.0
+    } else {
+        (GRAPH_W - 1) as f32 / current_time_h
+    };
+    let y_scale = if peak_scale_c <= 0.0 {
+        0.0
+    } else {
+        (GRAPH_H - 1) as f32 / peak_scale_c
+    };
+
+    let map_x = |hour: f32| -> i32 { (hour * x_scale).round() as i32 };
+    let map_y = |temp_c: f32| -> i32 { GRAPH_H - 1 - (temp_c * y_scale).round() as i32 };
+
+    let mut rects: Vec<ScheduleGraphRect> = Vec::new();
+    for window in points.windows(2) {
+        let (start_h, start_temp_c) = window[0];
+        let (end_h, end_temp_c) = window[1];
+        let x0 = map_x(start_h).clamp(0, GRAPH_W - 1);
+        let y0 = map_y(start_temp_c).clamp(0, GRAPH_H - 1);
+        let x1 = map_x(end_h).clamp(0, GRAPH_W - 1);
+        let y1 = map_y(end_temp_c).clamp(0, GRAPH_H - 1);
+
+        if y0 == y1 {
+            rects.push(ScheduleGraphRect {
+                x: x0.min(x1),
+                y: (y0 - 1).max(0),
+                width: (x1 - x0).abs().max(3),
+                height: 3,
+            });
+        } else {
+            sample_graph_line(&mut rects, x0, y0, x1, y1);
+        }
+    }
+
+    let marker_rows: Vec<ScheduleGraphMarker> = points
+        .into_iter()
+        .map(|(hour, temp_c)| ScheduleGraphMarker {
+            x: map_x(hour).clamp(0, GRAPH_W - 1),
+            y: map_y(temp_c).clamp(0, GRAPH_H - 1),
+            label: "".into(),
+        })
+        .collect();
+
+    ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
+    ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(marker_rows)));
+    ui.set_schedule_graph_peak_temp(peak_display);
+    ui.set_schedule_graph_total_label(format_minutes_label(total_minutes, ui.get_is_ua()).into());
 }
 
 fn c_buf_to_string(buf: &[u8]) -> String {
@@ -1116,6 +1472,7 @@ pub extern "C" fn slint_ui_run() {
         schedules: load_schedules(),
         selected_index: None,
         editing_index: None,
+        graph_index: None,
         editor_steps: Vec::new(),
         display_temp_c: 0.0,
         display_temp_valid: false,
@@ -1204,6 +1561,46 @@ pub extern "C" fn slint_ui_run() {
                 }
             }
             ui.set_view(View::Schedules);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_open_history(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_history_items(ModelRc::new(VecModel::from(load_history_items(ui.get_is_ua()))));
+            ui.set_settings_page("history".into());
+            ui.set_view(View::Settings);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_open_fault_logs(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_fault_log_items(ModelRc::new(VecModel::from(load_fault_log_items(ui.get_is_ua()))));
+            ui.set_settings_page("fault_logs".into());
+            ui.set_view(View::Settings);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_open_schedule_graph(move |index| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let mut state = app_state.borrow_mut();
+            let idx = index as usize;
+            if idx < state.schedules.len() {
+                state.selected_index = Some(idx);
+                state.graph_index = None;
+                let schedule = state.schedules[idx].clone();
+                state.graph_index = Some(idx);
+                ui.set_selected_schedule_name(schedule.name.clone().into());
+                ui.set_selected_steps_count(schedule_steps_count(&schedule));
+                refresh_schedule_graph_model(&ui, &state);
+                ui.set_view(View::ScheduleGraph);
+            }
         });
     }
 
@@ -1573,6 +1970,7 @@ pub extern "C" fn slint_ui_run() {
             let idx = index as usize;
             if idx < state.schedules.len() {
                 state.editing_index = Some(idx);
+                state.graph_index = None;
                 let schedule = state.schedules[idx].clone();
                 state.editor_steps = to_editor_steps(&schedule, state.temp_unit);
                 ui.set_selected_schedule_name(schedule.name.clone().into());
@@ -1614,6 +2012,12 @@ pub extern "C" fn slint_ui_run() {
                 other => other,
             };
 
+            state.graph_index = match state.graph_index {
+                Some(graph) if graph == idx => None,
+                Some(graph) if graph > idx => Some(graph - 1),
+                other => other,
+            };
+
             if let Some(sel) = state.selected_index {
                 if let Some(schedule) = state.schedules.get(sel) {
                     ui.set_selected_schedule_name(schedule.name.clone().into());
@@ -1647,6 +2051,7 @@ pub extern "C" fn slint_ui_run() {
             let base_name = if ui.get_is_ua() { "Нова програма" } else { "New Program" };
             let name = make_unique_schedule_name(&state.schedules, base_name);
             let id = make_safe_id(&name);
+            state.graph_index = None;
             state.schedules.push(ScheduleFile {
                 id,
                 name: name.clone(),
