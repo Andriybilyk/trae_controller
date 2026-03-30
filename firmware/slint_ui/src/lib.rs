@@ -225,6 +225,7 @@ struct AppState {
     editing_index: Option<usize>,
     graph_index: Option<usize>,
     history_graph_id: Option<String>,
+    history_detail_id: Option<String>,
     editor_steps: Vec<EditorStepRow>,
     display_temp_c: f32,
     display_temp_valid: bool,
@@ -1028,8 +1029,8 @@ fn downsample_graph_points(points: &[(f32, f32)], max_points: usize) -> Vec<(f32
 }
 
 fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
-    const GRAPH_W: i32 = 382;
-    const GRAPH_H: i32 = 84;
+    const GRAPH_W: i32 = 422;
+    const GRAPH_H: i32 = 182;
     const START_TEMP_C: f32 = 25.0;
     const MIN_PEAK_TEMP_C: f32 = 100.0;
     const PLAN_COLOR: Color = Color::from_rgb_u8(0x60, 0xA5, 0xFA);
@@ -1195,6 +1196,22 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
     let mut rects: Vec<ScheduleGraphRect> = Vec::new();
     let mut marker_rows: Vec<ScheduleGraphMarker> = Vec::new();
     draw_series(&mut rects, &mut marker_rows, &points, &map_x, &map_y, PLAN_COLOR);
+
+    let unit_label = match state.temp_unit {
+        TempUnit::C => "°C",
+        TempUnit::F => "°F",
+    };
+    for (idx, (hour, temp_c)) in points.iter().enumerate() {
+        if idx == 0 && points.len() > 1 {
+            continue;
+        }
+        let x = map_x(*hour).clamp(0, GRAPH_W - 1);
+        let y = map_y(*temp_c).clamp(0, GRAPH_H - 1);
+        let temp_label = format!("{}{}", temp_to_display_i32(temp_c.round() as i32, state.temp_unit), unit_label);
+        let time_label = format_minutes_label((hour * 60.0).round().max(0.0) as i32, ui.get_is_ua());
+        marker_rows.push(ScheduleGraphMarker { x, y, label: temp_label.into(), color: PLAN_COLOR.into() });
+        marker_rows.push(ScheduleGraphMarker { x, y: GRAPH_H - 1, label: time_label.into(), color: PLAN_COLOR.into() });
+    }
 
     ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
     ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(marker_rows)));
@@ -1688,6 +1705,7 @@ pub extern "C" fn slint_ui_run() {
         editing_index: None,
         graph_index: None,
         history_graph_id: None,
+        history_detail_id: None,
         editor_steps: Vec::new(),
         display_temp_c: 0.0,
         display_temp_valid: false,
@@ -1847,6 +1865,52 @@ pub extern "C" fn slint_ui_run() {
             }
             refresh_schedule_graph_model(&ui, &state);
             ui.set_view(View::ScheduleGraph);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_open_history_detail(move |index| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let idx = index as usize;
+            let Some(id) = load_history_item_id_by_preview_index(idx) else { return; };
+            let detail = load_history_detail(&id);
+            let mut state = app_state.borrow_mut();
+            state.history_detail_id = Some(id.clone());
+            if let Some(detail) = detail {
+                let title = if detail.summary.schedule_name.is_empty() {
+                    if ui.get_is_ua() { "Випал" } else { "Firing" }
+                } else {
+                    detail.summary.schedule_name.as_str()
+                };
+                ui.set_history_detail_title(title.into());
+                ui.set_history_detail_status(detail.summary.status.clone().into());
+                let duration_label = format_minutes_label(detail.summary.duration.max(0) as i32, ui.get_is_ua());
+                ui.set_history_detail_duration(duration_label.into());
+                ui.set_history_detail_steps(detail.summary.total_steps.max(0).to_string().into());
+                let energy_label = if ui.get_is_ua() { "-- кВт·год" } else { "-- kWh" };
+                ui.set_history_detail_energy(energy_label.into());
+                let step_label = if detail.summary.total_steps > 0 && detail.summary.duration > 0 {
+                    let avg = (detail.summary.duration as f32 / detail.summary.total_steps as f32).round() as i32;
+                    if ui.get_is_ua() {
+                        format!("≈{} хв/крок", avg)
+                    } else {
+                        format!("≈{} min/step", avg)
+                    }
+                } else {
+                    if ui.get_is_ua() { "-- хв/крок" } else { "-- min/step" }.to_string()
+                };
+                ui.set_history_detail_step_durations(step_label.into());
+            } else {
+                ui.set_history_detail_title((if ui.get_is_ua() { "Випал" } else { "Firing" }).into());
+                ui.set_history_detail_status("--".into());
+                ui.set_history_detail_duration("--".into());
+                ui.set_history_detail_steps("--".into());
+                ui.set_history_detail_energy(if ui.get_is_ua() { "-- кВт·год" } else { "-- kWh" }.into());
+                ui.set_history_detail_step_durations(if ui.get_is_ua() { "-- хв/крок" } else { "-- min/step" }.into());
+            }
+            ui.set_view(View::HistoryDetail);
         });
     }
 

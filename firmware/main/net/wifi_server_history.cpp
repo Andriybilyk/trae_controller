@@ -8,6 +8,98 @@
 #include <string>
 #include <unistd.h>
 
+static std::string format_duration_label(int minutes, bool is_ua) {
+    const int safe_minutes = minutes < 0 ? 0 : minutes;
+    const int hours = safe_minutes / 60;
+    const int mins = safe_minutes % 60;
+    if (hours > 0) {
+        if (is_ua) {
+            return std::to_string(hours) + " год " + std::to_string(mins) + " хв";
+        }
+        return std::to_string(hours) + "h " + std::to_string(mins) + "m";
+    }
+    if (is_ua) {
+        return std::to_string(std::max(1, mins)) + " хв";
+    }
+    return std::to_string(std::max(1, mins)) + " min";
+}
+
+static std::string to_upper_ascii(std::string s) {
+    for (char &c : s) {
+        if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
+    }
+    return s;
+}
+
+static void replace_item(cJSON *obj, const char *key, cJSON *item) {
+    if (!obj || !key) return;
+    cJSON_DeleteItemFromObjectCaseSensitive(obj, key);
+    cJSON_AddItemToObject(obj, key, item);
+}
+
+static std::string build_history_list_enriched(const std::string &raw) {
+    cJSON *root = cJSON_Parse(raw.c_str());
+    if (!cJSON_IsArray(root)) {
+        if (root) cJSON_Delete(root);
+        return raw;
+    }
+    cJSON *out = cJSON_CreateArray();
+    const int n = cJSON_GetArraySize(root);
+    for (int i = 0; i < n; ++i) {
+        cJSON *item = cJSON_GetArrayItem(root, i);
+        cJSON *obj = cJSON_Duplicate(item, true);
+        if (!cJSON_IsObject(obj)) {
+            if (obj) cJSON_Delete(obj);
+            obj = cJSON_CreateObject();
+        }
+        const cJSON *name = cJSON_GetObjectItemCaseSensitive(obj, "name");
+        if (!cJSON_IsString(name)) name = cJSON_GetObjectItemCaseSensitive(obj, "scheduleName");
+        if (!cJSON_IsString(name)) name = cJSON_GetObjectItemCaseSensitive(obj, "program");
+        const std::string title = (cJSON_IsString(name) && name->valuestring && name->valuestring[0])
+            ? name->valuestring
+            : "Untitled";
+        const cJSON *status = cJSON_GetObjectItemCaseSensitive(obj, "status");
+        if (!cJSON_IsString(status)) status = cJSON_GetObjectItemCaseSensitive(obj, "result");
+        const std::string status_raw = (cJSON_IsString(status) && status->valuestring) ? status->valuestring : "";
+        const std::string status_code = to_upper_ascii(status_raw);
+        const int duration = cJSON_GetObjectItemCaseSensitive(obj, "duration")
+                                 ? cJSON_GetObjectItemCaseSensitive(obj, "duration")->valueint
+                                 : 0;
+        const double peak_temp = cJSON_GetObjectItemCaseSensitive(obj, "peakTemp")
+                                     ? cJSON_GetObjectItemCaseSensitive(obj, "peakTemp")->valuedouble
+                                     : 0.0;
+        const int total_steps = cJSON_GetObjectItemCaseSensitive(obj, "totalSteps")
+                                    ? cJSON_GetObjectItemCaseSensitive(obj, "totalSteps")->valueint
+                                    : 0;
+        const int completed_steps = cJSON_GetObjectItemCaseSensitive(obj, "completedSteps")
+                                        ? cJSON_GetObjectItemCaseSensitive(obj, "completedSteps")->valueint
+                                        : 0;
+
+        std::string subtitle_en = format_duration_label(duration, false);
+        std::string subtitle_ua = format_duration_label(duration, true);
+        if (peak_temp > 0.0) {
+            subtitle_en += " • peak " + std::to_string(static_cast<int>(peak_temp + 0.5)) + "°C";
+            subtitle_ua += " • пік " + std::to_string(static_cast<int>(peak_temp + 0.5)) + "°C";
+        }
+        if (total_steps > 0) {
+            subtitle_en += " • steps " + std::to_string(std::max(0, completed_steps)) + "/" + std::to_string(total_steps);
+            subtitle_ua += " • кроки " + std::to_string(std::max(0, completed_steps)) + "/" + std::to_string(total_steps);
+        }
+
+        replace_item(obj, "title", cJSON_CreateString(title.c_str()));
+        replace_item(obj, "statusCode", cJSON_CreateString(status_code.c_str()));
+        replace_item(obj, "subtitle_en", cJSON_CreateString(subtitle_en.c_str()));
+        replace_item(obj, "subtitle_ua", cJSON_CreateString(subtitle_ua.c_str()));
+        cJSON_AddItemToArray(out, obj);
+    }
+    char *rendered = cJSON_PrintUnformatted(out);
+    std::string output = rendered ? rendered : raw;
+    if (rendered) free(rendered);
+    cJSON_Delete(out);
+    cJSON_Delete(root);
+    return output;
+}
+
 static std::string uri_suffix_after(const char *uri, const char *prefix) {
     if (!uri || !prefix) return {};
     const std::string up(uri);
@@ -57,10 +149,11 @@ static int clear_history_files() {
 
 esp_err_t WiFiServerManager::api_history_list_handler(httpd_req_t *req) {
     const std::string file = kiln_fs_read_text("/littlefs/history.json");
+    const std::string payload = file.empty() ? "[]" : build_history_list_enriched(file);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, file.empty() ? "[]" : file.c_str());
+    httpd_resp_sendstr(req, payload.c_str());
     return ESP_OK;
 }
 
@@ -114,6 +207,57 @@ esp_err_t WiFiServerManager::api_history_detail_handler(httpd_req_t *req) {
         httpd_resp_sendstr(req, "{\"error\":\"not_found\"}");
         return ESP_OK;
     }
+
+    cJSON *root = cJSON_Parse(file.c_str());
+    if (cJSON_IsObject(root)) {
+        cJSON *data = cJSON_GetObjectItemCaseSensitive(root, "data");
+        if (cJSON_IsArray(data) && cJSON_GetArraySize(data) > 0) {
+            const cJSON *first = cJSON_GetArrayItem(data, 0);
+            const cJSON *first_ts_item = first ? cJSON_GetObjectItemCaseSensitive(first, "timestamp") : nullptr;
+            const double first_ts = first_ts_item ? first_ts_item->valuedouble : 0.0;
+            cJSON *planned = cJSON_CreateArray();
+            cJSON *actual = cJSON_CreateArray();
+            const int n = cJSON_GetArraySize(data);
+            int last_min = 0;
+            for (int i = 0; i < n; ++i) {
+                const cJSON *row = cJSON_GetArrayItem(data, i);
+                const cJSON *ts = cJSON_GetObjectItemCaseSensitive(row, "timestamp");
+                const cJSON *temp = cJSON_GetObjectItemCaseSensitive(row, "temp");
+                const cJSON *target = cJSON_GetObjectItemCaseSensitive(row, "target");
+                const double tmin = ts ? (ts->valuedouble - first_ts) / 60.0 : 0.0;
+                last_min = std::max(last_min, static_cast<int>(tmin + 0.5));
+                cJSON *p = cJSON_CreateObject();
+                cJSON_AddNumberToObject(p, "t", tmin);
+                cJSON_AddNumberToObject(p, "temp", target ? target->valuedouble : 0.0);
+                cJSON_AddItemToArray(planned, p);
+                cJSON *a = cJSON_CreateObject();
+                cJSON_AddNumberToObject(a, "t", tmin);
+                cJSON_AddNumberToObject(a, "temp", temp ? temp->valuedouble : 0.0);
+                cJSON_AddItemToArray(actual, a);
+            }
+            replace_item(root, "planned", planned);
+            replace_item(root, "actual", actual);
+
+            cJSON *summary = cJSON_GetObjectItemCaseSensitive(root, "summary");
+            if (!cJSON_IsObject(summary)) {
+                summary = cJSON_CreateObject();
+                replace_item(root, "summary", summary);
+            }
+            if (!cJSON_GetObjectItemCaseSensitive(summary, "duration")) {
+                cJSON_AddNumberToObject(summary, "duration", last_min);
+            }
+        }
+        char *rendered = cJSON_PrintUnformatted(root);
+        std::string output = rendered ? rendered : file;
+        if (rendered) free(rendered);
+        cJSON_Delete(root);
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_set_hdr(req, "Pragma", "no-cache");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, output.c_str());
+        return ESP_OK;
+    }
+    if (root) cJSON_Delete(root);
 
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
