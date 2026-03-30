@@ -1,5 +1,4 @@
 import { VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
-// UI layout tweaks for touch usability
 
 import "../../data/fonts/sketch_260307b/FontFiles/PTSans-Regular.ttf";
 
@@ -10,6 +9,57 @@ import "../../data/fonts/sketch_260307b/FontFiles/PTSans-Bold.ttf";
 
 
 import "fonts/MaterialIcons-Regular.ttf";
+
+export global Theme {
+    in property <color> color_bg: #0D1B2A;
+    in property <color> color_surface: #1B263B;
+    in property <color> color_accent: #34DFAC;
+    in property <color> color_text: #FFFFFF;
+    in property <length> padding_safe: 8px;
+    in property <length> spacing_elements: 6px;
+    in property <length> header_height: 44px;
+    in property <length> nav_bar_width: 60px;
+    in property <length> nav_bar_height: 50px;
+    in property <length> settings_side_gap: 6px;
+    in property <length> settings_grid_gap: 6px;
+    in property <length> settings_vertical_gap: 2px;
+    in property <length> settings_header_h: 32px;
+    in property <length> settings_title_y: 4px;
+    in property <length> settings_header_gap: 2px;
+    in property <length> settings_icon_size: 24px;
+    in property <length> settings_nav_btn_w: 40px;
+    in property <length> settings_nav_btn_h: 28px;
+    in property <length> settings_nav_gap: 10px;
+    in property <length> settings_inner_pad: 12px;
+    in property <length> settings_card_h: 64px;
+    in property <length> settings_card_gap: 8px;
+    in property <length> settings_list_row_h: 68px;
+    in property <length> settings_list_gap: 8px;
+    in property <length> settings_display_row_h: 64px;
+    in property <length> settings_primary_card_h: 84px;
+    in property <length> settings_label_y: 8px;
+    in property <length> settings_fan_card_h: 82px;
+    in property <length> settings_fan_toggle_w: 96px;
+    in property <length> settings_fan_controls_y: 42px;
+    in property <length> settings_fan_minus_w: 60px;
+    in property <length> settings_fan_value_w: 64px;
+    in property <length> settings_fan_plus_w: 66px;
+    in property <length> settings_autotune_card_h: 90px;
+    in property <length> settings_autotune_input_y: 32px;
+    in property <length> settings_autotune_value_w: 130px;
+    in property <length> settings_autotune_action_h: 44px;
+    in property <length> settings_display_hw_h: 162px;
+    in property <length> settings_display_hw_controls_y: 38px;
+    in property <length> settings_display_hw_step_w: 64px;
+    in property <length> settings_display_hw_value_w: 136px;
+    in property <length> settings_display_hw_max_w: 140px;
+    in property <length> settings_display_hw_calib_h: 70px;
+    in property <length> settings_action_btn_h: 50px;
+    in property <length> settings_action_btn_radius: 12px;
+    in property <length> settings_btn_height: 34px;
+    in property <length> settings_btn_radius: 10px;
+    in property <length> settings_btn_text_size: 14px;
+}
 
 
 
@@ -310,17 +360,21 @@ export struct ScheduleGraphRect {
     y: int,
     width: int,
     height: int,
+    color: color,
 }
 
 export struct ScheduleGraphMarker {
     x: int,
     y: int,
     label: string,
+    color: color,
 }
 
 export struct HistoryPreviewCard {
+    id: string,
     title: string,
     status: string,
+    status_code: string,
     subtitle: string,
 }
 
@@ -342,64 +396,85 @@ export component AppWindow inherits Window {
 
 
     width: 480px;
-
-
-
     height: 320px;
-
-
-
-    background: #000000;
-
-
-
+    background: Theme.color_bg;
     default-font-family: "PT Sans";
 
-
-
-    // Theme (keep it explicit; easier to tweak without hunting literals).
-
-    // Use mostly neutral greys (R=G=B) so the panel looks consistent and doesn't drift "blue/yellow".
-
-    property <color> c_bg: #000000;
-
-    property <color> c_panel: #000000;
-
-    property <color> c_card: #111118;
-
-    property <color> c_border: #27272A;
-
-    property <color> c_text: #FFFFFF;
-
-    property <color> c_muted: #A1A1AA;
-
-    property <color> c_subtle: #71717A;
-
-    property <color> c_accent: #00D084;
-
+    property <color> c_bg: Theme.color_bg;
+    property <color> c_panel: Theme.color_surface;
+    property <color> c_card: Theme.color_surface;
+    property <color> c_border: #24344F;
+    property <color> c_text: Theme.color_text;
+    property <color> c_muted: #9FB1C7;
+    property <color> c_subtle: #7D8CA6;
+    property <color> c_accent: Theme.color_accent;
     property <color> c_warn: #F59E0B;
-
     property <color> c_danger: #DC2626;
-    property <length> edge_gap: 10px;
-    property <length> top_bar_h: 40px;
-    property <length> page_content_h: 280px;
+    property <length> edge_gap: Theme.padding_safe;
+    property <length> top_bar_h: Theme.header_height;
+    property <length> page_content_h: root.height - root.top_bar_h;
 
-    // Shared settings layout metrics (keeps panels symmetric and avoids clipping).
-    property <length> settings_side_gap: 10px;
-    property <length> settings_right_gap: root.edge_gap;
+    // Shared settings layout metrics (single source of truth for all Settings pages):
+    // header row, nav buttons, content bounds, and first-block vertical rhythm.
+    property <length> settings_side_gap: Theme.settings_side_gap;
+    property <length> settings_right_gap: root.settings_side_gap;
     property <length> settings_content_width: 480px - root.settings_side_gap - root.settings_right_gap;
-    property <length> settings_grid_gap: 8px;
+    property <length> settings_grid_gap: Theme.settings_grid_gap;
+    property <length> settings_vertical_gap: Theme.settings_vertical_gap;
+    property <length> settings_header_h: Theme.settings_header_h;
+    property <length> settings_icon_size: Theme.settings_icon_size;
+    property <length> settings_title_x: root.settings_side_gap + root.settings_icon_size + 6px;
+    property <length> settings_title_width: root.settings_content_width - root.settings_icon_size - (root.settings_nav_btn_w * 2 + root.settings_nav_gap) - 12px;
+    property <length> settings_nav_btn_w: Theme.settings_nav_btn_w;
+    property <length> settings_nav_btn_h: Theme.settings_nav_btn_h;
+    property <length> settings_nav_gap: Theme.settings_nav_gap;
+    property <length> settings_close_btn_x: root.settings_side_gap + root.settings_content_width - root.settings_nav_btn_w;
+    property <length> settings_back_btn_x: root.settings_close_btn_x - root.settings_nav_gap - root.settings_nav_btn_w;
+    property <length> settings_panel_x: root.settings_side_gap;
+    property <length> settings_panel_y: root.settings_first_block_y;
+    property <length> settings_panel_w: root.settings_content_width;
+    property <length> settings_primary_card_h: Theme.settings_primary_card_h;
+    property <length> settings_secondary_row_y: root.settings_primary_card_h + root.settings_vertical_gap;
+    property <length> settings_display_row_h: Theme.settings_display_row_h;
+    property <length> settings_display_row_step: root.settings_display_row_h + root.settings_vertical_gap;
+    property <length> settings_display_btn_y: (root.settings_display_row_h - root.settings_btn_height) / 2;
     property <length> settings_col_width: (root.settings_content_width - root.settings_grid_gap) / 2;
-    property <length> settings_inner_pad: 12px;
+    property <length> settings_inner_pad: Theme.settings_inner_pad;
     property <length> settings_two_col_btn_w: (root.settings_content_width - root.settings_inner_pad * 2 - root.settings_grid_gap - 8px) / 2;
-    property <length> settings_title_y: 8px;
-    property <length> settings_header_gap: 4px;
-    property <length> settings_content_y: root.settings_title_y + 28px + root.settings_header_gap;
-    property <length> settings_first_block_y: root.settings_content_y + 8px;
+    property <length> settings_title_y: Theme.settings_title_y;
+    property <length> settings_header_gap: Theme.settings_header_gap;
+    property <length> settings_content_y: root.settings_title_y + root.settings_header_h + root.settings_header_gap;
+    property <length> settings_first_block_y: root.settings_content_y;
     property <length> settings_content_height: root.page_content_h - root.settings_first_block_y - root.settings_side_gap;
-    property <length> settings_btn_height: 34px;
-    property <length> settings_btn_radius: 10px;
-    property <length> settings_btn_text_size: 14px;
+    property <length> settings_btn_height: Theme.settings_btn_height;
+    property <length> settings_btn_radius: Theme.settings_btn_radius;
+    property <length> settings_btn_text_size: Theme.settings_btn_text_size;
+    property <length> settings_editor_content_w: 480px - root.settings_side_gap * 2 - (132px + root.settings_nav_gap + root.settings_nav_btn_w + root.settings_grid_gap * 2);
+    property <length> settings_card_h: Theme.settings_card_h;
+    property <length> settings_card_gap: Theme.settings_card_gap;
+    property <length> settings_card_step: root.settings_card_h + root.settings_card_gap;
+    property <length> settings_list_row_h: Theme.settings_list_row_h;
+    property <length> settings_list_gap: Theme.settings_list_gap;
+    property <length> settings_list_step: root.settings_list_row_h + root.settings_list_gap;
+    property <length> settings_label_y: Theme.settings_label_y;
+    property <length> settings_fan_card_h: Theme.settings_fan_card_h;
+    property <length> settings_fan_toggle_w: Theme.settings_fan_toggle_w;
+    property <length> settings_fan_controls_y: Theme.settings_fan_controls_y;
+    property <length> settings_fan_minus_w: Theme.settings_fan_minus_w;
+    property <length> settings_fan_value_w: Theme.settings_fan_value_w;
+    property <length> settings_fan_plus_w: Theme.settings_fan_plus_w;
+    property <length> settings_autotune_card_h: Theme.settings_autotune_card_h;
+    property <length> settings_autotune_input_y: Theme.settings_autotune_input_y;
+    property <length> settings_autotune_value_w: Theme.settings_autotune_value_w;
+    property <length> settings_autotune_action_h: Theme.settings_autotune_action_h;
+    property <length> settings_display_hw_h: Theme.settings_display_hw_h;
+    property <length> settings_display_hw_controls_y: Theme.settings_display_hw_controls_y;
+    property <length> settings_display_hw_step_w: Theme.settings_display_hw_step_w;
+    property <length> settings_display_hw_value_w: Theme.settings_display_hw_value_w;
+    property <length> settings_display_hw_max_w: Theme.settings_display_hw_max_w;
+    property <length> settings_display_hw_calib_h: Theme.settings_display_hw_calib_h;
+    property <length> settings_action_btn_h: Theme.settings_action_btn_h;
+    property <length> settings_action_btn_radius: Theme.settings_action_btn_radius;
 
     // Status styling (based on status_label coming from firmware: IDLE/RAMP/ERROR/...).
 
@@ -446,6 +521,10 @@ export component AppWindow inherits Window {
     in-out property <int> target: 0;
     in-out property <int> active_segment_target: 0;
     in-out property <int> standby_power_watts: 0;
+    in-out property <string> pzem_power_label: "-- W";
+    in-out property <string> pzem_current_label: "-- A";
+    in-out property <string> pzem_voltage_label: "-- V";
+    in-out property <string> pzem_phase_label: "Phase: --";
     in-out property <[HistoryPreviewCard]> history_items;
     in-out property <[FaultLogPreviewCard]> fault_log_items;
 
@@ -580,6 +659,7 @@ export component AppWindow inherits Window {
     in-out property <[ScheduleGraphMarker]> schedule_graph_markers;
     in-out property <int> schedule_graph_peak_temp: 0;
     in-out property <string> schedule_graph_total_label: "0 min";
+    in-out property <bool> schedule_graph_back_to_history: false;
 
     callback toggle_language();
     callback display_brightness_changed(int);
@@ -600,6 +680,7 @@ export component AppWindow inherits Window {
     callback open_history();
     callback open_fault_logs();
     callback open_schedule_graph(int);
+    callback open_history_graph(int);
 
     callback set_temp_unit(string);
     callback set_time_format(string);
@@ -734,15 +815,17 @@ export component AppWindow inherits Window {
     // Header bar
     Rectangle {
         x: 0px; y: 0px;
-        width: 480px; height: root.top_bar_h;
-        background: #111118;
-        border-color: #27272A;
+        width: parent.width;
+        height: root.top_bar_h;
+        background: root.c_panel;
+        border-color: root.c_border;
         border-width: 1px;
+        z: 100;
 
         Text {
-            x: 12px; y: 0px;
+            x: 12px; y: -1px;
             width: 190px; height: parent.height;
-            text: "NOVA KILN";
+            text: "KILN PRO";
             color: #FFFFFF;
             font-family: "PT Sans";
             font-size: 16px;
@@ -753,22 +836,32 @@ export component AppWindow inherits Window {
         }
 
         Rectangle {
-            x: 230px; y: 0px;
+            x: 210px; y: 0px;
             width: 120px; height: parent.height;
             background: #00000000;
             Text {
-                x: 0px; y: 0px; width: parent.width; height: parent.height;
+                x: 0px; y: -1px; width: parent.width; height: parent.height;
                 text: root.current_time + "  " + root.current_date;
-                color: #A1A1AA;
+                color: root.c_muted;
                 font-family: "PT Sans";
                 font-size: 12px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
             }
+            TouchArea {
+                width: parent.width;
+                height: parent.height;
+                clicked => {
+                    if (!root.wifi_ok) {
+                        root.settings_page = "clock";
+                        root.view = View.Settings;
+                    }
+                }
+            }
         }
 
         Rectangle {
-            x: 356px; y: 8px;
+            x: 342px; y: 8px;
             width: 38px; height: 24px;
             background: #27272A;
             border-radius: 6px;
@@ -785,14 +878,14 @@ export component AppWindow inherits Window {
         }
 
         Rectangle {
-            x: 400px; y: 0px;
+            x: 392px; y: 0px;
             width: 32px; height: parent.height;
             background: #00000000;
             WifiIcon {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: 22px; height: 22px;
-                color: root.wifi_ok ? #10B981 : #52525B;
+                color: root.wifi_ok ? root.c_accent : #52525B;
             }
             TouchArea {
                 x: -6px; y: -6px;
@@ -803,14 +896,14 @@ export component AppWindow inherits Window {
         }
 
         Rectangle {
-            x: 438px; y: 0px;
+            x: 436px; y: 0px;
             width: 32px; height: parent.height;
             background: #00000000;
             SettingsIcon {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 width: 22px; height: 22px;
-                color: #A1A1AA;
+                color: root.c_muted;
             }
             TouchArea {
                 x: -6px; y: -6px;
@@ -893,14 +986,8 @@ export component AppWindow inherits Window {
 
 
     Rectangle {
-
-
-
-        x: 0px; y: 40px;
-
-
-
-        width: 480px; height: 280px;
+        x: 0px; y: root.top_bar_h;
+        width: 480px; height: root.page_content_h;
 
 
 
@@ -1073,6 +1160,16 @@ export component AppWindow inherits Window {
 
                 }
 
+                Text {
+                    x: 16px; y: 128px;
+                    text: root.is_ua
+                        ? ("Ціль: " + (root.display_target_value > 0 ? (root.display_target_value + root.temp_unit_label) : "--"))
+                        : ("Target: " + (root.display_target_value > 0 ? (root.display_target_value + root.temp_unit_label) : "--"));
+                    color: root.c_muted;
+                    font-family: "PT Sans";
+                    font-size: 18px;
+                }
+
 
 
                 Rectangle {
@@ -1104,14 +1201,8 @@ export component AppWindow inherits Window {
 
 
                     Text {
-
-
-
                         x: 12px; y: 10px;
-
-
-
-                        text: root.is_ua ? "Температура" : "Temperature";
+                        text: root.is_ua ? "Електрика" : "Power";
 
 
 
@@ -1132,28 +1223,43 @@ export component AppWindow inherits Window {
 
 
                     Text {
-
-
-
-                        x: 140px; y: 8px;
-
-
-
-                        text: root.display_target_value + root.temp_unit_label;
-
-
+                        x: 12px; y: 32px;
+                        width: 92px; height: 16px;
+                        text: root.pzem_power_label;
                         color: root.c_text;
-
-
-
                         font-family: "PT Sans";
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
 
+                    Text {
+                        x: 12px; y: 50px;
+                        width: 92px; height: 16px;
+                        text: root.pzem_current_label;
+                        color: root.c_text;
+                        font-family: "PT Sans";
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
 
+                    Text {
+                        x: 110px; y: 32px;
+                        width: 92px; height: 16px;
+                        text: root.pzem_voltage_label;
+                        color: root.c_text;
+                        font-family: "PT Sans";
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
 
-                        font-size: 18px;
-
-
-
+                    Text {
+                        x: 110px; y: 50px;
+                        width: 92px; height: 16px;
+                        text: root.pzem_phase_label;
+                        color: root.c_text;
+                        font-family: "PT Sans";
+                        font-size: 12px;
+                        vertical-alignment: center;
                     }
 
 
@@ -2018,105 +2124,61 @@ export component AppWindow inherits Window {
 
 
         if (root.view == View.Schedules) : Rectangle {
+                x: 0px; y: 0px; width: 480px; height: root.page_content_h;
+                background: root.c_bg;
 
 
 
-                x: 0px; y: 0px; width: 480px; height: 280px;
+                Rectangle {
+                    x: 0px; y: root.settings_title_y;
+                    width: 480px; height: root.settings_header_h;
+                    background: #00000000;
 
-
-
-                background: #000000;
-
-
-
-                HorizontalBox {
-
-
-
-                    x: 14px; y: 10px;
-
-
-
-                    spacing: 6px;
-
-
-
-                    ThermometerIcon { color: #10B981; }
-
-
-
-                    Text {
-
-
-
-                        text: root.is_ua ? "Бібліотека" : "Library";
-
-
-
-                        color: #FFFFFF;
-
-
-
-                        font-family: "PT Sans";
-
-
-
-                        font-size: 18px;
-
-
-
+                    ThermometerIcon {
+                        x: root.settings_side_gap;
+                        y: (parent.height - root.settings_icon_size) / 2;
+                        width: root.settings_icon_size; height: root.settings_icon_size;
+                        color: #10B981;
                     }
 
-
-
+                    Text {
+                        x: root.settings_title_x;
+                        y: 0px;
+                        width: 300px; height: parent.height;
+                        text: root.is_ua ? "Бібліотека" : "Library";
+                        color: #FFFFFF;
+                        font-family: "PT Sans";
+                        font-size: 18px;
+                        vertical-alignment: center;
+                    }
                 }
 
 
 
                 Rectangle {
-
-
-
-                    x: 420px; y: 8px; width: 40px; height: 28px;
-
-
-
+                    x: 480px - root.settings_side_gap - root.settings_nav_btn_w;
+                    y: root.settings_title_y + (root.settings_header_h - root.settings_nav_btn_h) / 2;
+                    width: root.settings_nav_btn_w; height: root.settings_nav_btn_h;
                     background: #27272A;
-
-
-
-                    border-radius: 10px;
-
-
-
+                    border-radius: root.settings_action_btn_radius;
                     Text { text: "X"; color: #FFFFFF; font-family: "PT Sans"; horizontal-alignment: center; vertical-alignment: center; }
-
-
-
-                    TouchArea {
-
-
-
-                width: parent.width; height: parent.height; clicked => { root.view = View.Dashboard; } }
-
-
-
+                    TouchArea { width: parent.width; height: parent.height; clicked => { root.view = View.Dashboard; } }
                 }
 
 
 
                 ScrollView { // schedules-list
-                    x: 10px; y: 48px; width: 460px; height: parent.height - 58px;
+                    x: root.settings_side_gap; y: root.settings_content_y;
+                    width: 480px - root.settings_side_gap * 2;
+                    height: parent.height - root.settings_content_y - root.settings_side_gap;
                     horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
                     vertical-scrollbar-policy: ScrollBarPolicy.always-off;
-                    mouse-drag-pan-enabled: true;
+                    mouse-drag-pan-enabled: false;
                     VerticalBox {
-                        spacing: 6px;
+                        width: 480px - root.settings_side_gap * 2;
+                        spacing: root.settings_grid_gap;
                         for schedule[i] in root.schedules : Rectangle {
-
-
-
-                            width: 440px; height: 80px;
+                            width: 480px - root.settings_side_gap * 4; height: root.settings_list_row_h + 12px;
 
 
                             background: schedule.selected ? #1F2937 : #0F0F0F;
@@ -2136,97 +2198,46 @@ export component AppWindow inherits Window {
 
 
                             Text {
-
-
-
-                                x: 12px; y: 12px;
-
-
+                                x: root.settings_inner_pad; y: root.settings_label_y;
                                 text: schedule.name;
-
-
                                 color: #FFFFFF;
-
-
-
                                 font-family: "PT Sans";
-
-
-
                                 font-size: 18px;
                                 font-weight: 700;
-
-
-
                             }
 
-
-
                             Text {
-
-
-
-                                x: 12px; y: 58px;
-
-
-                                text: schedule.steps_count + " " + (root.is_ua ? "\u{043a}\u{0440}\u{043e}\u{043a}\u{0456}\u{0432}" : "segments");
-
-
-                                color: #A1A1AA;
-
-
-
-                                font-size: 14px;
-
-
-                            }
-
-
-
-                            Text {
-
-
-
-                                x: 12px; y: 36px;
+                                x: root.settings_inner_pad; y: root.settings_label_y + 18px;
                                 width: parent.width - 196px;
-
-
                                 text: root.is_ua ? "\u{041a}\u{043e}\u{0440}\u{0438}\u{0441}\u{0442}\u{0443}\u{0432}\u{0430}\u{0446}\u{044c}\u{043a}\u{0430}" : "Custom";
-
-
                                 color: #A1A1AA;
-
-
-
                                 font-size: 14px;
-
-
                                 horizontal-alignment: left;
+                            }
 
-
-
+                            Text {
+                                x: root.settings_inner_pad; y: root.settings_label_y + 34px;
+                                text: schedule.steps_count + " " + (root.is_ua ? "\u{043a}\u{0440}\u{043e}\u{043a}\u{0456}\u{0432}" : "segments");
+                                color: #A1A1AA;
+                                font-size: 14px;
                             }
 
 
 
                             Rectangle {
                                 z: 2;
-                                x: parent.width - self.width - 126px;
+                                x: parent.width - root.settings_inner_pad - (root.settings_action_btn_h * 3 + root.settings_grid_gap * 2);
                                 y: (parent.height - self.height) / 2;
-                                width: 52px; height: 52px;
+                                width: root.settings_action_btn_h; height: root.settings_action_btn_h;
                                 background: #1F2937;
-                                border-radius: 26px;
+                                border-radius: root.settings_action_btn_h / 2;
 
-                                Text {
-                                    x: 0px; y: 0px;
-                                    width: parent.width; height: parent.height;
-                                    text: "\u{223F}";
-                                    color: #FFFFFF;
-                                    font-family: "PT Sans";
-                                    font-size: 24px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
-                                }
+                                Rectangle { x: 14px; y: 32px; width: 24px; height: 2px; background: #FFFFFF; border-radius: 1px; }
+                                Rectangle { x: 16px; y: 28px; width: 4px; height: 4px; background: #FFFFFF; border-radius: 2px; }
+                                Rectangle { x: 24px; y: 24px; width: 4px; height: 4px; background: #FFFFFF; border-radius: 2px; }
+                                Rectangle { x: 32px; y: 18px; width: 4px; height: 4px; background: #FFFFFF; border-radius: 2px; }
+                                Rectangle { x: 20px; y: 26px; width: 6px; height: 2px; background: #FFFFFF; border-radius: 1px; }
+                                Rectangle { x: 28px; y: 22px; width: 6px; height: 2px; background: #FFFFFF; border-radius: 1px; }
 
                                 TouchArea {
                     width: parent.width; height: parent.height; clicked => { root.open_schedule_graph(i); } }
@@ -2234,11 +2245,11 @@ export component AppWindow inherits Window {
 
                             Rectangle {
                                 z: 2;
-                                x: parent.width - self.width - 68px;
+                                x: parent.width - root.settings_inner_pad - (root.settings_action_btn_h * 2 + root.settings_grid_gap);
                                 y: (parent.height - self.height) / 2;
-                                width: 52px; height: 52px;
+                                width: root.settings_action_btn_h; height: root.settings_action_btn_h;
                                 background: #3A1C1C;
-                                border-radius: 26px;
+                                border-radius: root.settings_action_btn_h / 2;
 
                                 Text {
                                     x: 0px; y: 0px;
@@ -2256,19 +2267,17 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-
                                 z: 2;
-
-                                x: parent.width - self.width - 10px;
+                                x: parent.width - root.settings_inner_pad - root.settings_action_btn_h;
                                 y: (parent.height - self.height) / 2;
-                                width: 52px; height: 52px;
+                                width: root.settings_action_btn_h; height: root.settings_action_btn_h;
 
 
                                 background: schedule.selected ? #10B981 : #27272A;
 
 
 
-                                border-radius: 26px;
+                                border-radius: root.settings_action_btn_h / 2;
 
 
                                 PlayIcon {
@@ -2303,7 +2312,8 @@ export component AppWindow inherits Window {
 
 
                             TouchArea {
-                                width: parent.width - 184px; height: parent.height;
+                                width: parent.width - (root.settings_inner_pad + root.settings_action_btn_h * 3 + root.settings_grid_gap * 2);
+                                height: parent.height;
 
 
                                 x: 0px; y: 0px;
@@ -2317,10 +2327,7 @@ export component AppWindow inherits Window {
 
 
                         Rectangle {
-
-
-
-                            width: 440px; height: 80px;
+                            width: 480px - root.settings_side_gap * 4; height: root.settings_list_row_h + 12px;
 
 
                             background: #000000;
@@ -2339,7 +2346,7 @@ export component AppWindow inherits Window {
 
 
 
-                            Text { text: root.is_ua ? "Нова програма" : "New Program"; color: #A1A1AA; font-family: "PT Sans"; font-size: 18px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
+                            Text { text: root.is_ua ? "Нова програма" : "New Program"; color: #A1A1AA; font-family: "PT Sans"; font-size: 16px; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; }
 
 
                             TouchArea {
@@ -2388,7 +2395,7 @@ export component AppWindow inherits Window {
                     radius: 10px;
                     label: "<";
                     text_size: 16px;
-                    tapped => { root.view = View.Schedules; }
+                    tapped => { root.view = root.schedule_graph_back_to_history ? View.Settings : View.Schedules; }
                 }
 
                 UiButton {
@@ -2475,14 +2482,19 @@ export component AppWindow inherits Window {
 
                             Rectangle { x: 0px; y: 0px; width: 1px; height: parent.height; background: #27272A; }
                             Rectangle { x: 0px; y: parent.height - 1px; width: parent.width; height: 1px; background: #27272A; }
+                            Rectangle { x: parent.width / 4; y: 0px; width: 1px; height: parent.height; background: #16161E; }
+                            Rectangle { x: parent.width / 2; y: 0px; width: 1px; height: parent.height; background: #16161E; }
+                            Rectangle { x: parent.width * 3 / 4; y: 0px; width: 1px; height: parent.height; background: #16161E; }
                             Rectangle { x: 0px; y: parent.height / 2; width: parent.width; height: 1px; background: #1F2937; }
+                            Rectangle { x: 0px; y: parent.height / 4; width: parent.width; height: 1px; background: #16161E; }
+                            Rectangle { x: 0px; y: parent.height * 3 / 4; width: parent.width; height: 1px; background: #16161E; }
 
                             for rect in root.schedule_graph_rects : Rectangle {
                                 x: rect.x * 1px;
                                 y: rect.y * 1px;
                                 width: rect.width * 1px;
                                 height: rect.height * 1px;
-                                background: #10B981;
+                                background: rect.color;
                                 border-radius: 1px;
                             }
 
@@ -2491,7 +2503,7 @@ export component AppWindow inherits Window {
                                 y: marker.y * 1px - 3px;
                                 width: 6px;
                                 height: 6px;
-                                background: #10B981;
+                                background: marker.color;
                                 border-radius: 3px;
                             }
                         }
@@ -2551,6 +2563,23 @@ export component AppWindow inherits Window {
                         font-weight: 700;
                         vertical-alignment: center;
                         overflow: elide;
+                    }
+
+                    Rectangle { x: parent.width - 210px; y: 9px; width: 12px; height: 12px; background: #60A5FA; border-radius: 3px; }
+                    Text {
+                        x: parent.width - 194px; y: 7px; width: 64px; height: 16px;
+                        text: root.is_ua ? "План" : "Planned";
+                        color: #A1A1AA;
+                        font-family: "PT Sans";
+                        font-size: 11px;
+                    }
+                    Rectangle { x: parent.width - 124px; y: 9px; width: 12px; height: 12px; background: #10B981; border-radius: 3px; }
+                    Text {
+                        x: parent.width - 108px; y: 7px; width: 74px; height: 16px;
+                        text: root.is_ua ? "Факт" : "Actual";
+                        color: #A1A1AA;
+                        font-family: "PT Sans";
+                        font-size: 11px;
                     }
                 }
 
@@ -2631,31 +2660,32 @@ export component AppWindow inherits Window {
         // Settings View
         if (root.view == View.Settings) : Rectangle {
                 x: 0px; y: 0px; width: 480px; height: root.page_content_h;
-                background: #000000;
+                background: root.c_bg;
                 clip: true;
 
                 if (root.settings_page == "wifi") : WifiIcon {
                     x: root.settings_side_gap;
-                    y: root.settings_title_y + 2px;
-                    width: 24px;
-                    height: 24px;
+                    y: root.settings_title_y + (root.settings_header_h - root.settings_icon_size) / 2;
+                    width: root.settings_icon_size;
+                    height: root.settings_icon_size;
                     color: root.wifi_ok ? #10B981 : #52525B;
                 }
 
                 if (root.settings_page != "wifi") : SettingsIcon {
                     x: root.settings_side_gap;
-                    y: root.settings_title_y + 2px;
-                    width: 24px;
-                    height: 24px;
+                    y: root.settings_title_y + (root.settings_header_h - root.settings_icon_size) / 2;
+                    width: root.settings_icon_size;
+                    height: root.settings_icon_size;
                     color: #A1A1AA;
                 }
 
                 Text {
-                    x: root.settings_side_gap + 30px;
+                    x: root.settings_title_x;
                     y: root.settings_title_y;
-                    width: root.settings_content_width - 120px;
-                    height: 28px;
+                    width: root.settings_title_width;
+                    height: root.settings_header_h;
                     text: root.settings_page == "wifi" ? "Wi-Fi"
+                        : root.settings_page == "clock" ? (root.is_ua ? "Час і дата" : "Time & Date")
                         : root.settings_page == "display" ? (root.is_ua ? "\u{0420}\u{0435}\u{0436}\u{0438}\u{043c}\u{0020}\u{0432}\u{0456}\u{0434}\u{043e}\u{0431}\u{0440}\u{0430}\u{0436}\u{0435}\u{043d}\u{043d}\u{044f}" : "Display mode")
                         : root.settings_page == "display_hw" ? (root.is_ua ? "\u{0414}\u{0438}\u{0441}\u{043f}\u{043b}\u{0435}\u{0439}" : "Display")
                         : root.settings_page == "fan" ? (root.is_ua ? "\u{0412}\u{0435}\u{043d}\u{0442}\u{0438}\u{043b}\u{044f}\u{0442}\u{043e}\u{0440}" : "Fan")
@@ -2668,12 +2698,15 @@ export component AppWindow inherits Window {
                     color: #FFFFFF;
                     font-family: "PT Sans";
                     font-size: 18px;
+                    horizontal-alignment: center;
                     vertical-alignment: center;
                     overflow: elide;
                 }
 
                 if (root.settings_page != "all" && root.settings_page != "wifi") : UiButton {
-                    x: root.settings_side_gap + root.settings_content_width - 90px; y: root.settings_title_y; width: 40px; height: 28px;
+                    x: root.settings_back_btn_x;
+                    y: root.settings_title_y + (root.settings_header_h - root.settings_nav_btn_h) / 2;
+                    width: root.settings_nav_btn_w; height: root.settings_nav_btn_h;
                     background: #1F2937;
                     radius: 10px;
                     label: "<";
@@ -2682,7 +2715,9 @@ export component AppWindow inherits Window {
                 }
 
                 UiButton {
-                    x: root.settings_side_gap + root.settings_content_width - 40px; y: root.settings_title_y; width: 40px; height: 28px;
+                    x: root.settings_close_btn_x;
+                    y: root.settings_title_y + (root.settings_header_h - root.settings_nav_btn_h) / 2;
+                    width: root.settings_nav_btn_w; height: root.settings_nav_btn_h;
                     background: #27272A;
                     radius: 10px;
                     label: "X";
@@ -2690,9 +2725,9 @@ export component AppWindow inherits Window {
                     tapped => { root.view = View.Dashboard; }
                 }
 
-                if (root.settings_page != "display_hw" && root.settings_page != "fan" && root.settings_page != "autotune" && root.settings_page != "fault") : Rectangle {
-                    x: root.settings_side_gap; y: root.settings_first_block_y;
-                    width: root.settings_content_width; height: root.settings_content_height;
+                if (root.settings_page != "display_hw") : Rectangle {
+                    x: root.settings_panel_x; y: root.settings_panel_y;
+                    width: root.settings_panel_w; height: root.settings_content_height;
                     background: #00000000;
                     clip: true;
 
@@ -2704,12 +2739,12 @@ export component AppWindow inherits Window {
 
                         if (root.settings_page == "all") : Rectangle {
                             width: root.settings_content_width;
-                            height: 208px;
+                            height: root.settings_card_h * 3 + root.settings_card_gap * 2;
                             background: #00000000;
 
                             Rectangle {
                                 x: 0px; y: 0px;
-                                width: root.settings_col_width; height: 64px;
+                                width: root.settings_col_width; height: root.settings_card_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2728,7 +2763,7 @@ export component AppWindow inherits Window {
 
                             Rectangle {
                                 x: root.settings_col_width + root.settings_grid_gap; y: 0px;
-                                width: root.settings_col_width; height: 64px;
+                                width: root.settings_col_width; height: root.settings_card_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2746,8 +2781,8 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                x: 0px; y: 72px;
-                                width: root.settings_col_width; height: 64px;
+                                x: 0px; y: root.settings_card_step;
+                                width: root.settings_col_width; height: root.settings_card_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2765,8 +2800,8 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                x: root.settings_col_width + root.settings_grid_gap; y: 72px;
-                                width: root.settings_col_width; height: 64px;
+                                x: root.settings_col_width + root.settings_grid_gap; y: root.settings_card_step;
+                                width: root.settings_col_width; height: root.settings_card_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2784,8 +2819,8 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                x: 0px; y: 144px;
-                                width: root.settings_col_width; height: 64px;
+                                x: 0px; y: root.settings_card_step * 2;
+                                width: root.settings_col_width; height: root.settings_card_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2803,15 +2838,68 @@ export component AppWindow inherits Window {
                             }
                         }
 
-                        if (root.settings_page == "display") : Rectangle {
+                        if (root.settings_page == "clock") : Rectangle {
                             x: 0px;
                             width: root.settings_content_width;
-                            height: 196px;
+                            height: root.settings_display_row_h * 2 + root.settings_vertical_gap;
                             background: #00000000;
 
                             Rectangle {
                                 y: 0px;
-                                width: parent.width; height: 60px;
+                                width: parent.width; height: root.settings_display_row_h;
+                                background: #111118;
+                                border-color: root.c_border;
+                                border-width: 1px;
+                                border-radius: 12px;
+                                Text {
+                                    x: 12px; y: 0px; width: 220px; height: parent.height;
+                                    text: root.is_ua ? "Час" : "Time";
+                                    color: root.c_muted;
+                                    font-size: 16px;
+                                    vertical-alignment: center;
+                                }
+                                Rectangle {
+                                    x: parent.width - 160px; y: root.settings_display_btn_y; width: 148px; height: root.settings_btn_height;
+                                    background: #27272A;
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: root.current_time; color: #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
+                                    TouchArea { width: parent.width; height: parent.height; clicked => { root.kb_open("clock_time", -1, root.current_time); } }
+                                }
+                            }
+
+                            Rectangle {
+                                y: root.settings_display_row_step;
+                                width: parent.width; height: root.settings_display_row_h;
+                                background: #111118;
+                                border-color: root.c_border;
+                                border-width: 1px;
+                                border-radius: 12px;
+                                Text {
+                                    x: 12px; y: 0px; width: 220px; height: parent.height;
+                                    text: root.is_ua ? "Дата" : "Date";
+                                    color: root.c_muted;
+                                    font-size: 16px;
+                                    vertical-alignment: center;
+                                }
+                                Rectangle {
+                                    x: parent.width - 200px; y: root.settings_display_btn_y; width: 188px; height: root.settings_btn_height;
+                                    background: #27272A;
+                                    border-radius: root.settings_btn_radius;
+                                    Text { text: root.current_date; color: #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
+                                    TouchArea { width: parent.width; height: parent.height; clicked => { root.kb_open("clock_date", -1, root.current_date); } }
+                                }
+                            }
+                        }
+
+                        if (root.settings_page == "display") : Rectangle {
+                            x: 0px;
+                            width: root.settings_content_width;
+                            height: root.settings_display_row_h * 3 + root.settings_vertical_gap * 2;
+                            background: #00000000;
+
+                            Rectangle {
+                                y: 0px;
+                                width: parent.width; height: root.settings_display_row_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2824,14 +2912,14 @@ export component AppWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 Rectangle {
-                                    x: parent.width - 154px; y: 13px; width: 68px; height: root.settings_btn_height;
+                                    x: parent.width - 154px; y: root.settings_display_btn_y; width: 68px; height: root.settings_btn_height;
                                     background: root.temp_unit == "C" ? #10B981 : #27272A;
                                     border-radius: root.settings_btn_radius;
                                     Text { text: "C\u{00B0}"; color: root.temp_unit == "C" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.temp_unit = "C"; root.set_temp_unit("C"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 80px; y: 13px; width: 68px; height: root.settings_btn_height;
+                                    x: parent.width - 80px; y: root.settings_display_btn_y; width: 68px; height: root.settings_btn_height;
                                     background: root.temp_unit == "F" ? #10B981 : #27272A;
                                     border-radius: root.settings_btn_radius;
                                     Text { text: "F\u{00B0}"; color: root.temp_unit == "F" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
@@ -2840,8 +2928,8 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                y: 68px;
-                                width: parent.width; height: 60px;
+                                y: root.settings_display_row_step;
+                                width: parent.width; height: root.settings_display_row_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2854,14 +2942,14 @@ export component AppWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 Rectangle {
-                                    x: parent.width - 154px; y: 13px; width: 68px; height: root.settings_btn_height;
+                                    x: parent.width - 154px; y: root.settings_display_btn_y; width: 68px; height: root.settings_btn_height;
                                     background: root.time_format == "24" ? #10B981 : #27272A;
                                     border-radius: root.settings_btn_radius;
                                     Text { text: "24h"; color: root.time_format == "24" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.time_format = "24"; root.set_time_format("24"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 80px; y: 13px; width: 68px; height: root.settings_btn_height;
+                                    x: parent.width - 80px; y: root.settings_display_btn_y; width: 68px; height: root.settings_btn_height;
                                     background: root.time_format == "12" ? #10B981 : #27272A;
                                     border-radius: root.settings_btn_radius;
                                     Text { text: "12h"; color: root.time_format == "12" ? #000000 : #FFFFFF; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
@@ -2870,8 +2958,8 @@ export component AppWindow inherits Window {
                             }
 
                             Rectangle {
-                                y: 136px;
-                                width: parent.width; height: 60px;
+                                y: root.settings_display_row_step * 2;
+                                width: parent.width; height: root.settings_display_row_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -2884,21 +2972,21 @@ export component AppWindow inherits Window {
                                     vertical-alignment: center;
                                 }
                                 Rectangle {
-                                    x: parent.width - 216px; y: 13px; width: 64px; height: root.settings_btn_height;
+                                    x: parent.width - 216px; y: root.settings_display_btn_y; width: 64px; height: root.settings_btn_height;
                                     background: root.date_format == "DMY" ? #10B981 : #27272A;
                                     border-radius: root.settings_btn_radius;
                                     Text { text: "DD.MM"; color: root.date_format == "DMY" ? #000000 : #FFFFFF; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "DMY"; root.set_date_format("DMY"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 146px; y: 13px; width: 64px; height: root.settings_btn_height;
+                                    x: parent.width - 146px; y: root.settings_display_btn_y; width: 64px; height: root.settings_btn_height;
                                     background: root.date_format == "MDY" ? #10B981 : #27272A;
                                     border-radius: root.settings_btn_radius;
                                     Text { text: "MM/DD"; color: root.date_format == "MDY" ? #000000 : #FFFFFF; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
                                     TouchArea { width: parent.width; height: parent.height; clicked => { root.date_format = "MDY"; root.set_date_format("MDY"); } }
                                 }
                                 Rectangle {
-                                    x: parent.width - 76px; y: 13px; width: 64px; height: root.settings_btn_height;
+                                    x: parent.width - 76px; y: root.settings_display_btn_y; width: 64px; height: root.settings_btn_height;
                                     background: root.date_format == "YMD" ? #10B981 : #27272A;
                                     border-radius: root.settings_btn_radius;
                                     Text { text: "YYYY"; color: root.date_format == "YMD" ? #000000 : #FFFFFF; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
@@ -2908,7 +2996,7 @@ export component AppWindow inherits Window {
                         }
 
                         if (root.settings_page == "fan") : Rectangle {
-                        width: root.settings_content_width; height: 82px;
+                        width: root.settings_content_width; height: root.settings_fan_card_h;
                         background: #111118;
                         border-color: #27272A;
                         border-width: 1px;
@@ -2916,7 +3004,7 @@ export component AppWindow inherits Window {
 
 
                         Text {
-                            x: 12px; y: 10px;
+                            x: root.settings_inner_pad; y: root.settings_label_y;
                             text: root.fan_manual
                                 ? (root.is_ua ? "\u{0420}\u{0443}\u{0447}\u{043d}\u{0438}\u{0439}\u{0020}\u{0440}\u{0435}\u{0436}\u{0438}\u{043c}" : "Manual mode")
                                 : (root.is_ua ? "\u{0412}\u{0438}\u{043c}\u{043a}\u{043d}\u{0435}\u{043d}\u{043e}" : "Off");
@@ -2926,7 +3014,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: parent.width - 108px; y: 8px; width: 96px; height: root.settings_btn_height;
+                            x: parent.width - root.settings_inner_pad - root.settings_fan_toggle_w;
+                            y: root.settings_label_y;
+                            width: root.settings_fan_toggle_w; height: root.settings_btn_height;
                             background: root.fan_manual ? #10B981 : #27272A;
                             border-radius: root.settings_btn_radius;
                             Text {
@@ -2951,7 +3041,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // -
-                            x: parent.width - 214px; y: 42px; width: 60px; height: root.settings_btn_height;
+                            x: parent.width - root.settings_inner_pad - (root.settings_fan_minus_w + root.settings_fan_value_w + root.settings_fan_plus_w);
+                            y: root.settings_fan_controls_y;
+                            width: root.settings_fan_minus_w; height: root.settings_btn_height;
                             background: root.fan_manual ? #27272A : #18181B;
                             border-radius: root.settings_btn_radius;
                             Text { text: "−"; color: #FFFFFF; font-family: "PT Sans"; font-size: 26px; horizontal-alignment: center; vertical-alignment: center; }
@@ -2967,7 +3059,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // % (tap for keypad)
-                            x: parent.width - 148px; y: 42px; width: 64px; height: root.settings_btn_height;
+                            x: parent.width - root.settings_inner_pad - (root.settings_fan_value_w + root.settings_fan_plus_w);
+                            y: root.settings_fan_controls_y;
+                            width: root.settings_fan_value_w; height: root.settings_btn_height;
                             background: root.fan_manual ? #27272A : #18181B;
                             border-radius: root.settings_btn_radius;
                             Text { text: root.fan_power + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
@@ -2984,7 +3078,9 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle { // +
-                            x: parent.width - 78px; y: 42px; width: 66px; height: root.settings_btn_height;
+                            x: parent.width - root.settings_inner_pad - root.settings_fan_plus_w;
+                            y: root.settings_fan_controls_y;
+                            width: root.settings_fan_plus_w; height: root.settings_btn_height;
                             background: root.fan_manual ? #27272A : #18181B;
                             border-radius: root.settings_btn_radius;
                             Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 24px; horizontal-alignment: center; vertical-alignment: center; }
@@ -3001,7 +3097,8 @@ export component AppWindow inherits Window {
                     }
 
                         if (root.settings_page == "autotune") : Rectangle {
-                        width: root.settings_content_width; height: 90px;
+                        x: 0px; y: 0px;
+                        width: root.settings_content_width; height: root.settings_autotune_card_h;
                         background: #111118;
                         border-color: #27272A;
                         border-width: 1px;
@@ -3009,7 +3106,7 @@ export component AppWindow inherits Window {
 
 
                         Text {
-                            x: 12px; y: 10px;
+                            x: root.settings_inner_pad; y: root.settings_label_y;
                             text: root.is_ua
                                 ? ("\u{0426}\u{0456}\u{043b}\u{044c}\u{043e}\u{0432}\u{0430}\u{0020}\u{0442}\u{0435}\u{043c}\u{043f}\u{0435}\u{0440}\u{0430}\u{0442}\u{0443}\u{0440}\u{0430} (" + root.temp_unit_label + ")")
                                 : ("Target temperature (" + root.temp_unit_label + ")");
@@ -3019,7 +3116,7 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: 12px; y: 34px; width: 130px; height: root.settings_btn_height;
+                            x: root.settings_inner_pad; y: root.settings_autotune_input_y; width: root.settings_autotune_value_w; height: root.settings_btn_height;
                             background: #27272A;
                             border-radius: root.settings_btn_radius;
                             Text { text: root.autotune_target_c + root.temp_unit_label; color: #FFFFFF; font-family: "PT Sans"; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
@@ -3034,7 +3131,10 @@ export component AppWindow inherits Window {
                         }
 
                         Rectangle {
-                            x: 154px; y: 34px; width: 286px; height: 44px;
+                            x: root.settings_inner_pad + root.settings_autotune_value_w + root.settings_grid_gap;
+                            y: root.settings_autotune_input_y;
+                            width: root.settings_content_width - (root.settings_inner_pad * 2 + root.settings_autotune_value_w + root.settings_grid_gap);
+                            height: root.settings_autotune_action_h;
                             background: root.status_label == "TUNING" ? #7F1D1D : (root.fault_active ? #18181B : #14532D);
                             border-radius: root.settings_btn_radius;
                             Text {
@@ -3060,60 +3160,23 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                        if (root.settings_page == "fault") : Rectangle {
-                        width: root.settings_content_width; height: 60px;
-                        background: #111118;
-                        border-color: #27272A;
-                        border-width: 1px;
-                        border-radius: 12px;
-
-
-                        Text {
-                            x: 12px; y: 12px; width: parent.width - 24px; height: 36px;
-                            text: root.fault_active
-                                ? (root.fault_reason == "" ? (root.is_ua ? "\u{041f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0430}\u{0020}\u{0431}\u{0435}\u{0437}\u{0020}\u{043e}\u{043f}\u{0438}\u{0441}\u{0443}" : "Fault without details") : root.fault_reason)
-                                : (root.is_ua ? "\u{041d}\u{0435}\u{043c}\u{0430}\u{0454}\u{0020}\u{0430}\u{043a}\u{0442}\u{0438}\u{0432}\u{043d}\u{043e}\u{0457}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0438}" : "No active fault");
-                            color: root.fault_active ? #FCA5A5 : #A1A1AA;
-                            font-family: "PT Sans";
-                            font-size: 14px;
-                            overflow: elide;
-                            horizontal-alignment: left;
-                            vertical-alignment: center;
-                        }
-                        }
-
-                        if (root.settings_page == "fault") : UiButton {
-                        x: root.settings_inner_pad; y: 72px;
-                        width: root.settings_content_width - root.settings_inner_pad * 2; height: 50px;
-                        background: root.fault_active ? #7F1D1D : #18181B;
-                        foreground: root.fault_active ? #FFFFFF : #71717A;
-                        radius: 12px;
-                        label: root.is_ua ? "\u{0421}\u{043a}\u{0438}\u{043d}\u{0443}\u{0442}\u{0438}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0443}" : "Clear Fault";
-                        text_size: root.settings_btn_text_size;
-                        tapped => {
-                            if (root.fault_active) {
-                                root.clear_fault();
-                            }
-                        }
-                        }
-
                         if (root.settings_page == "touch") : UiButton {
                         x: root.settings_inner_pad;
-                        width: root.settings_content_width - root.settings_inner_pad * 2; height: 50px;
+                        width: root.settings_content_width - root.settings_inner_pad * 2; height: root.settings_action_btn_h;
                         background: #27272A;
-                        radius: 12px;
+                        radius: root.settings_action_btn_radius;
                         label: root.is_ua ? "Калібрування тач" : "Touch Calibration";
                         text_size: root.settings_btn_text_size;
                         tapped => { root.show_touch_confirm = true; }
                         }
 
                         if (root.settings_page == "history") : Rectangle {
-                            width: root.settings_content_width; height: 220px;
+                            width: root.settings_content_width; height: root.settings_list_step * 3;
                             background: #00000000;
 
                             for item[i] in root.history_items : Rectangle {
-                                x: 0px; y: i * 76px;
-                                width: parent.width; height: 68px;
+                                x: 0px; y: i * root.settings_list_step;
+                                width: parent.width; height: root.settings_list_row_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -3121,7 +3184,7 @@ export component AppWindow inherits Window {
                                 clip: true;
 
                                 Text {
-                                    x: 12px; y: 10px; width: parent.width - 132px; height: 24px;
+                                    x: 12px; y: 10px; width: parent.width - 174px; height: 24px;
                                     text: item.title;
                                     color: #FFFFFF;
                                     font-family: "PT Sans";
@@ -3131,10 +3194,10 @@ export component AppWindow inherits Window {
                                     overflow: elide;
                                 }
 
-                                if (item.status != "") : Rectangle {
-                                    x: parent.width - 104px; y: 10px; width: 92px; height: 24px;
-                                    background: item.status == "COMPLETE" || item.status == "ГОТОВО" ? #14532D
-                                        : item.status == "STOPPED" || item.status == "ЗУПИНЕНО" ? #3F3F46
+                                if (item.status_code != "") : Rectangle {
+                                    x: parent.width - 154px; y: 10px; width: 96px; height: 24px;
+                                    background: item.status_code == "COMPLETE" ? #14532D
+                                        : item.status_code == "STOPPED" ? #3F3F46
                                         : #7F1D1D;
                                     border-radius: 8px;
 
@@ -3151,6 +3214,20 @@ export component AppWindow inherits Window {
                                     }
                                 }
 
+                                if (item.id != "") : Rectangle {
+                                    x: parent.width - 48px; y: 8px;
+                                    width: 36px; height: 36px;
+                                    background: #1F2937;
+                                    border-radius: 18px;
+                                    Rectangle { x: 10px; y: 22px; width: 16px; height: 2px; background: #FFFFFF; border-radius: 1px; }
+                                    Rectangle { x: 10px; y: 18px; width: 4px; height: 4px; background: #FFFFFF; border-radius: 2px; }
+                                    Rectangle { x: 16px; y: 14px; width: 4px; height: 4px; background: #FFFFFF; border-radius: 2px; }
+                                    Rectangle { x: 22px; y: 10px; width: 4px; height: 4px; background: #FFFFFF; border-radius: 2px; }
+                                    Rectangle { x: 12px; y: 17px; width: 6px; height: 2px; background: #FFFFFF; border-radius: 1px; }
+                                    Rectangle { x: 18px; y: 13px; width: 6px; height: 2px; background: #FFFFFF; border-radius: 1px; }
+                                    TouchArea { width: parent.width; height: parent.height; clicked => { root.open_history_graph(i); } }
+                                }
+
                                 Text {
                                     x: 12px; y: 38px; width: parent.width - 24px; height: 18px;
                                     text: item.subtitle;
@@ -3164,12 +3241,12 @@ export component AppWindow inherits Window {
                         }
 
                         if (root.settings_page == "fault_logs") : Rectangle {
-                            width: root.settings_content_width; height: 220px;
+                            width: root.settings_content_width; height: root.settings_list_step * 3;
                             background: #00000000;
 
                             for item[i] in root.fault_log_items : Rectangle {
-                                x: 0px; y: i * 76px;
-                                width: parent.width; height: 68px;
+                                x: 0px; y: i * root.settings_list_step;
+                                width: parent.width; height: root.settings_list_row_h;
                                 background: #111118;
                                 border-color: #27272A;
                                 border-width: 1px;
@@ -3218,6 +3295,7 @@ export component AppWindow inherits Window {
                         }
 
                         if (root.settings_page == "wifi") : Rectangle {
+                            x: 0px; y: 0px;
                             width: root.settings_content_width; height: 146px;
                             background: #0F0F0F;
                             border-color: #27272A;
@@ -3304,25 +3382,86 @@ export component AppWindow inherits Window {
                                 tapped => { root.wifi_disconnect(); }
                             }
                         }
+
+
+                    }
+                }
+
+                if (root.settings_page == "fault") : Rectangle {
+                    x: root.settings_panel_x; y: root.settings_panel_y;
+                    width: root.settings_panel_w; height: root.settings_display_row_h * 2 + root.settings_vertical_gap;
+                    background: #00000000;
+
+                    Rectangle {
+                        y: 0px;
+                        width: parent.width; height: root.settings_display_row_h;
+                        background: #111118;
+                        border-color: #27272A;
+                        border-width: 1px;
+                        border-radius: 12px;
+
+                        Text {
+                            x: 12px; y: 0px; width: parent.width - 24px; height: parent.height;
+                            text: root.fault_active
+                                ? (root.fault_reason == "" ? (root.is_ua ? "\u{041f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0430}\u{0020}\u{0431}\u{0435}\u{0437}\u{0020}\u{043e}\u{043f}\u{0438}\u{0441}\u{0443}" : "Fault without details") : root.fault_reason)
+                                : (root.is_ua ? "\u{041d}\u{0435}\u{043c}\u{0430}\u{0454}\u{0020}\u{0430}\u{043a}\u{0442}\u{0438}\u{0432}\u{043d}\u{043e}\u{0457}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0438}" : "No active fault");
+                            color: root.fault_active ? #FCA5A5 : #A1A1AA;
+                            font-family: "PT Sans";
+                            font-size: 14px;
+                            overflow: elide;
+                            horizontal-alignment: left;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        y: root.settings_display_row_step;
+                        width: parent.width; height: root.settings_display_row_h;
+                        background: #00000000;
+
+                        UiButton {
+                            x: root.settings_inner_pad; y: root.settings_display_btn_y;
+                            width: root.settings_two_col_btn_w; height: root.settings_btn_height;
+                            background: root.fault_active ? #7F1D1D : #18181B;
+                            foreground: root.fault_active ? #FFFFFF : #71717A;
+                            radius: root.settings_action_btn_radius;
+                            label: root.is_ua ? "\u{0421}\u{043a}\u{0438}\u{043d}\u{0443}\u{0442}\u{0438}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0443}" : "Clear Fault";
+                            text_size: root.settings_btn_text_size;
+                            tapped => {
+                                if (root.fault_active) {
+                                    root.clear_fault();
+                                }
+                            }
+                        }
+
+                        UiButton {
+                            x: root.settings_inner_pad + root.settings_two_col_btn_w + root.settings_grid_gap; y: root.settings_display_btn_y;
+                            width: root.settings_two_col_btn_w; height: root.settings_btn_height;
+                            background: #1F2937;
+                            radius: root.settings_action_btn_radius;
+                            label: root.is_ua ? "\u{041b}\u{043e}\u{0433}\u{0438}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043e}\u{043a}" : "Fault Logs";
+                            text_size: root.settings_btn_text_size;
+                            tapped => { root.open_fault_logs(); }
+                        }
                     }
                 }
 
                 // (scrollbar hidden)
                 if (root.settings_page == "display_hw") : Rectangle {
-                    x: root.settings_side_gap; y: root.settings_first_block_y; width: root.settings_content_width;
-                    height: 170px;
+                    x: root.settings_panel_x; y: root.settings_panel_y; width: root.settings_panel_w;
+                    height: root.settings_display_hw_h;
                     background: #00000000;
 
                     Rectangle {
                         y: 0px;
-                        width: root.settings_content_width; height: 84px;
+                        width: root.settings_panel_w; height: root.settings_primary_card_h;
                         background: #111118;
                         border-color: #27272A;
                         border-width: 1px;
                         border-radius: 12px;
-                        Text { x: 12px; y: 8px; text: root.is_ua ? "Яскравість" : "Brightness"; color: #A1A1AA; font-size: 13px; }
+                        Text { x: root.settings_inner_pad; y: root.settings_label_y; text: root.is_ua ? "Яскравість" : "Brightness"; color: #A1A1AA; font-size: 13px; }
                         Rectangle {
-                            x: 12px; y: 38px; width: 64px; height: root.settings_btn_height;
+                            x: root.settings_inner_pad; y: root.settings_display_hw_controls_y; width: root.settings_display_hw_step_w; height: root.settings_btn_height;
                             background: #27272A;
                             border-radius: root.settings_btn_radius;
                             Text { text: "-"; color: #FFFFFF; font-family: "PT Sans"; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
@@ -3336,13 +3475,17 @@ export component AppWindow inherits Window {
                             }
                         }
                         Rectangle {
-                            x: 84px; y: 38px; width: 136px; height: root.settings_btn_height;
+                            x: root.settings_inner_pad + root.settings_display_hw_step_w + root.settings_grid_gap;
+                            y: root.settings_display_hw_controls_y;
+                            width: root.settings_display_hw_value_w; height: root.settings_btn_height;
                             background: #1F2937;
                             border-radius: root.settings_btn_radius;
                             Text { text: root.display_brightness + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
                         }
                         Rectangle {
-                            x: 228px; y: 38px; width: 64px; height: root.settings_btn_height;
+                            x: root.settings_inner_pad + root.settings_display_hw_step_w + root.settings_grid_gap + root.settings_display_hw_value_w + root.settings_grid_gap;
+                            y: root.settings_display_hw_controls_y;
+                            width: root.settings_display_hw_step_w; height: root.settings_btn_height;
                             background: #27272A;
                             border-radius: root.settings_btn_radius;
                             Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 22px; horizontal-alignment: center; vertical-alignment: center; }
@@ -3356,7 +3499,9 @@ export component AppWindow inherits Window {
                             }
                         }
                         Rectangle {
-                            x: 300px; y: 38px; width: 140px; height: root.settings_btn_height;
+                            x: root.settings_inner_pad + root.settings_display_hw_step_w + root.settings_grid_gap + root.settings_display_hw_value_w + root.settings_grid_gap + root.settings_display_hw_step_w + root.settings_grid_gap;
+                            y: root.settings_display_hw_controls_y;
+                            width: root.settings_display_hw_max_w; height: root.settings_btn_height;
                             background: #10B981;
                             border-radius: root.settings_btn_radius;
                             Text { text: root.is_ua ? "Макс" : "Max"; color: #000000; font-family: "PT Sans"; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
@@ -3371,219 +3516,14 @@ export component AppWindow inherits Window {
                     }
 
                     UiButton {
-                        y: 96px;
-                        x: root.settings_inner_pad;
-                        width: root.settings_content_width - root.settings_inner_pad * 2; height: 70px;
+                        y: root.settings_secondary_row_y;
+                        x: 0px;
+                        width: root.settings_panel_w; height: root.settings_display_hw_calib_h;
                         background: #27272A;
-                        radius: 12px;
+                        radius: root.settings_action_btn_radius;
                         label: root.is_ua ? "Калібрування дисплею" : "Display calibration";
-                        text_size: 16px;
+                        text_size: root.settings_btn_text_size;
                         tapped => { root.show_touch_confirm = true; }
-                    }
-                }
-
-                if (root.settings_page == "autotune") : Rectangle {
-                    x: root.settings_side_gap; y: root.settings_first_block_y;
-                    width: root.settings_content_width; height: 92px;
-                    background: #111118;
-                    border-color: #27272A;
-                    border-width: 1px;
-                    border-radius: 12px;
-
-                    Text {
-                        x: 12px; y: 10px;
-                        text: root.is_ua
-                            ? ("\u{0426}\u{0456}\u{043b}\u{044c}\u{043e}\u{0432}\u{0430}\u{0020}\u{0442}\u{0435}\u{043c}\u{043f}\u{0435}\u{0440}\u{0430}\u{0442}\u{0443}\u{0440}\u{0430} (" + root.temp_unit_label + ")")
-                            : ("Target temperature (" + root.temp_unit_label + ")");
-                        color: #A1A1AA;
-                        font-family: "PT Sans";
-                        font-size: 14px;
-                    }
-
-                    Rectangle {
-                        x: 12px; y: 34px; width: 130px; height: root.settings_btn_height;
-                        background: #27272A;
-                        border-radius: root.settings_btn_radius;
-                        Text { text: root.autotune_target_c + root.temp_unit_label; color: #FFFFFF; font-family: "PT Sans"; font-size: root.settings_btn_text_size; horizontal-alignment: center; vertical-alignment: center; }
-                        TouchArea {
-                            width: parent.width; height: parent.height;
-                            clicked => {
-                                if (!(root.kb_visible && root.kb_field == "autotune" && root.kb_step_index == -1)) {
-                                    root.kb_open("autotune", -1, root.autotune_target_c + "");
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        x: 154px; y: 34px; width: root.settings_content_width - 166px; height: 44px;
-                        background: root.status_label == "TUNING" ? #7F1D1D : (root.fault_active ? #18181B : #14532D);
-                        border-radius: root.settings_btn_radius;
-                        Text {
-                            text: root.status_label == "TUNING"
-                                ? (root.is_ua ? "\u{0417}\u{0443}\u{043f}\u{0438}\u{043d}\u{0438}\u{0442}\u{0438}\u{0020}\u{0430}\u{0432}\u{0442}\u{043e}\u{043d}\u{0430}\u{043b}\u{0430}\u{0448}\u{0442}\u{0443}\u{0432}\u{0430}\u{043d}\u{043d}\u{044f}" : "Stop autotune")
-                                : (root.is_ua ? "\u{0417}\u{0430}\u{043f}\u{0443}\u{0441}\u{0442}\u{0438}\u{0442}\u{0438}\u{0020}\u{0430}\u{0432}\u{0442}\u{043e}\u{043d}\u{0430}\u{043b}\u{0430}\u{0448}\u{0442}\u{0443}\u{0432}\u{0430}\u{043d}\u{043d}\u{044f}" : "Start autotune");
-                            color: root.status_label == "TUNING" ? #FFFFFF : (root.fault_active ? #71717A : #FFFFFF);
-                            font-family: "PT Sans";
-                            font-size: 14px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                        TouchArea {
-                            width: parent.width; height: parent.height;
-                            clicked => {
-                                if (root.status_label == "TUNING") {
-                                    root.autotune_stop();
-                                } else if (!root.fault_active) {
-                                    root.autotune_start(root.autotune_target_c);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (root.settings_page == "fan") : Rectangle {
-                    x: root.settings_side_gap; y: root.settings_first_block_y;
-                    width: root.settings_content_width; height: 82px;
-                    background: #111118;
-                    border-color: #27272A;
-                    border-width: 1px;
-                    border-radius: 12px;
-
-                    Text {
-                        x: 12px; y: 10px;
-                        text: root.fan_manual
-                            ? (root.is_ua ? "\u{0420}\u{0443}\u{0447}\u{043d}\u{0438}\u{0439}\u{0020}\u{0440}\u{0435}\u{0436}\u{0438}\u{043c}" : "Manual mode")
-                            : (root.is_ua ? "\u{0412}\u{0438}\u{043c}\u{043a}\u{043d}\u{0435}\u{043d}\u{043e}" : "Off");
-                        color: #A1A1AA;
-                        font-family: "PT Sans";
-                        font-size: 14px;
-                    }
-
-                    Rectangle {
-                        x: parent.width - 108px; y: 8px; width: 96px; height: root.settings_btn_height;
-                        background: root.fan_manual ? #10B981 : #27272A;
-                        border-radius: root.settings_btn_radius;
-                        Text {
-                            text: root.fan_manual ? (root.is_ua ? "\u{0412}\u{041a}\u{041b}" : "ON") : (root.is_ua ? "\u{0412}\u{0418}\u{041a}\u{041b}" : "OFF");
-                            color: root.fan_manual ? #000000 : #FFFFFF;
-                            font-family: "PT Sans";
-                            font-size: root.settings_btn_text_size;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                        TouchArea {
-                            width: parent.width; height: parent.height;
-                            clicked => {
-                                let new_manual = !root.fan_manual;
-                                root.fan_manual = new_manual;
-                                if (new_manual && root.fan_power == 0) { root.fan_power = 100; }
-                                if (!new_manual) { root.fan_power = 0; }
-                                root.fan_manual_changed(new_manual);
-                                root.fan_power_changed(root.fan_power);
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        x: parent.width - 214px; y: 42px; width: 60px; height: root.settings_btn_height;
-                        background: root.fan_manual ? #27272A : #18181B;
-                        border-radius: root.settings_btn_radius;
-                        Text { text: "-"; color: #FFFFFF; font-family: "PT Sans"; font-size: 26px; horizontal-alignment: center; vertical-alignment: center; }
-                        TouchArea {
-                            width: parent.width; height: parent.height;
-                            clicked => {
-                                if (root.fan_manual) {
-                                    root.fan_power = max(root.fan_power - 10, 0);
-                                    root.fan_power_changed(root.fan_power);
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        x: parent.width - 148px; y: 42px; width: 64px; height: root.settings_btn_height;
-                        background: root.fan_manual ? #27272A : #18181B;
-                        border-radius: root.settings_btn_radius;
-                        Text { text: root.fan_power + "%"; color: #FFFFFF; font-family: "PT Sans"; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
-                        TouchArea {
-                            width: parent.width; height: parent.height;
-                            clicked => {
-                                if (root.fan_manual) {
-                                    if (!(root.kb_visible && root.kb_field == "fan" && root.kb_step_index == -1)) {
-                                        root.kb_open("fan", -1, root.fan_power + "");
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        x: parent.width - 78px; y: 42px; width: 66px; height: root.settings_btn_height;
-                        background: root.fan_manual ? #27272A : #18181B;
-                        border-radius: root.settings_btn_radius;
-                        Text { text: "+"; color: #FFFFFF; font-family: "PT Sans"; font-size: 24px; horizontal-alignment: center; vertical-alignment: center; }
-                        TouchArea {
-                            width: parent.width; height: parent.height;
-                            clicked => {
-                                if (root.fan_manual) {
-                                    root.fan_power = min(root.fan_power + 10, 100);
-                                    root.fan_power_changed(root.fan_power);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (root.settings_page == "fault") : Rectangle {
-                    x: root.settings_side_gap; y: root.settings_first_block_y;
-                    width: root.settings_content_width; height: 146px;
-                    background: #00000000;
-
-                    Rectangle {
-                        width: parent.width; height: 84px;
-                        background: #111118;
-                        border-color: #27272A;
-                        border-width: 1px;
-                        border-radius: 12px;
-
-                        Text {
-                            x: 12px; y: 10px; width: parent.width - 24px; height: parent.height - 20px;
-                            text: root.fault_active
-                                ? (root.fault_reason == "" ? (root.is_ua ? "\u{041f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0430}\u{0020}\u{0431}\u{0435}\u{0437}\u{0020}\u{043e}\u{043f}\u{0438}\u{0441}\u{0443}" : "Fault without details") : root.fault_reason)
-                                : (root.is_ua ? "\u{041d}\u{0435}\u{043c}\u{0430}\u{0454}\u{0020}\u{0430}\u{043a}\u{0442}\u{0438}\u{0432}\u{043d}\u{043e}\u{0457}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0438}" : "No active fault");
-                            color: root.fault_active ? #FCA5A5 : #A1A1AA;
-                            font-family: "PT Sans";
-                            font-size: 14px;
-                            overflow: elide;
-                            horizontal-alignment: left;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    UiButton {
-                        x: root.settings_inner_pad; y: 96px;
-                        width: (root.settings_content_width - root.settings_inner_pad * 2 - root.settings_grid_gap) / 2; height: 50px;
-                        background: root.fault_active ? #7F1D1D : #18181B;
-                        foreground: root.fault_active ? #FFFFFF : #71717A;
-                        radius: 12px;
-                        label: root.is_ua ? "\u{0421}\u{043a}\u{0438}\u{043d}\u{0443}\u{0442}\u{0438}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043a}\u{0443}" : "Clear Fault";
-                        text_size: root.settings_btn_text_size;
-                        tapped => {
-                            if (root.fault_active) {
-                                root.clear_fault();
-                            }
-                        }
-                    }
-
-                    UiButton {
-                        x: root.settings_inner_pad + (root.settings_content_width - root.settings_inner_pad * 2 - root.settings_grid_gap) / 2 + root.settings_grid_gap; y: 96px;
-                        width: (root.settings_content_width - root.settings_inner_pad * 2 - root.settings_grid_gap) / 2; height: 50px;
-                        background: #1F2937;
-                        radius: 12px;
-                        label: root.is_ua ? "\u{041b}\u{043e}\u{0433}\u{0438}\u{0020}\u{043f}\u{043e}\u{043c}\u{0438}\u{043b}\u{043e}\u{043a}" : "Fault Logs";
-                        text_size: root.settings_btn_text_size;
-                        tapped => { root.open_fault_logs(); }
                     }
                 }
 
@@ -3708,22 +3648,15 @@ export component AppWindow inherits Window {
 
 
         if (root.view == View.Editor) : Rectangle {
-
-
-
-                x: 0px; y: 0px; width: 480px; height: 280px;
-
-
-
-                background: #000000;
+                x: 0px; y: 0px; width: 480px; height: root.page_content_h;
+                background: root.c_bg;
 
 
 
                 Rectangle {
-
-
-
-                    x: 10px; y: 6px; width: 266px; height: 34px;
+                    x: root.settings_side_gap; y: root.settings_title_y;
+                    width: root.settings_editor_content_w;
+                    height: root.settings_header_h;
 
 
                     background: #000000;
@@ -3738,20 +3671,15 @@ export component AppWindow inherits Window {
 
 
 
-                    border-radius: 8px;
+                    border-radius: root.settings_btn_radius;
 
 
 
                     property <string> name_display: (root.kb_visible && root.kb_field == "name") ? root.kb_value : root.selected_schedule_name;
 
                     TextInput { visible: false;
-
-
-
-                        x: 6px; y: 5px;
-
-
-                        width: parent.width - 12px; height: parent.height - 8px;
+                        x: 6px; y: 0px;
+                        width: parent.width - 12px; height: parent.height;
 
 
 
@@ -3777,8 +3705,8 @@ export component AppWindow inherits Window {
                     }
 
                     Text {
-                        x: 6px; y: 5px;
-                        width: parent.width - 12px; height: parent.height - 8px;
+                        x: 6px; y: 0px;
+                        width: parent.width - 12px; height: parent.height;
                         text: parent.name_display;
                         color: #FFFFFF;
                         font-family: "PT Sans";
@@ -3789,12 +3717,8 @@ export component AppWindow inherits Window {
                     }
 
                     if (self.name_display == "") : Text {
-
-
-
-                        x: 8px; y: 10px;
-
-
+                        x: 8px; y: 0px;
+                        height: parent.height;
                         text: root.is_ua ? "Назва програми" : "Program Name";
 
 
@@ -3829,17 +3753,11 @@ export component AppWindow inherits Window {
 
 
                 Rectangle {
-
-
-
-                    x: 286px; y: 6px; width: 132px; height: 34px;
-
-
+                    x: 480px - root.settings_side_gap - root.settings_nav_btn_w - root.settings_nav_gap - 132px;
+                    y: root.settings_title_y + (root.settings_header_h - root.settings_nav_btn_h) / 2;
+                    width: 132px; height: root.settings_nav_btn_h;
                     background: #10B981;
-
-
-
-                    border-radius: 10px;
+                    border-radius: root.settings_action_btn_radius;
 
 
 
@@ -3859,17 +3777,11 @@ export component AppWindow inherits Window {
 
 
                 Rectangle {
-
-
-
-                    x: 426px; y: 6px; width: 44px; height: 34px;
-
-
+                    x: 480px - root.settings_side_gap - root.settings_nav_btn_w;
+                    y: root.settings_title_y + (root.settings_header_h - root.settings_nav_btn_h) / 2;
+                    width: root.settings_nav_btn_w; height: root.settings_nav_btn_h;
                     background: #27272A;
-
-
-
-                    border-radius: 10px;
+                    border-radius: root.settings_action_btn_radius;
 
 
 
@@ -3890,17 +3802,17 @@ export component AppWindow inherits Window {
 
 
                 ScrollView {
-                    x: 10px; y: 48px; width: 460px; height: parent.height - 58px;
+                    x: root.settings_side_gap; y: root.settings_content_y;
+                    width: root.settings_content_width;
+                    height: parent.height - root.settings_content_y - root.settings_side_gap;
                     horizontal-scrollbar-policy: ScrollBarPolicy.always-off;
                     vertical-scrollbar-policy: ScrollBarPolicy.always-off;
-                    mouse-drag-pan-enabled: true;
+                    mouse-drag-pan-enabled: false;
                     VerticalBox {
-                        spacing: 6px;
+                        width: root.settings_content_width;
+                        spacing: root.settings_grid_gap;
                         if (root.editor_steps.length == 0) : Rectangle {
-
-
-
-                            width: 440px; height: 60px;
+                            width: root.settings_content_width; height: root.settings_list_row_h;
 
 
 
@@ -3929,10 +3841,7 @@ export component AppWindow inherits Window {
 
 
                         for step[i] in root.editor_steps : Rectangle {
-
-
-
-                            width: 440px; height: 92px;
+                            width: root.settings_content_width; height: 92px;
 
 
                             background: #0F0F0F;
@@ -3951,39 +3860,28 @@ export component AppWindow inherits Window {
 
 
 
+                            property <length> segment_pad_left: 6px;
+                            property <length> segment_index_w: 28px;
+                            property <length> segment_delete_w: 30px;
+                            property <length> segment_right_pad: 8px;
+                            property <length> segment_fields_x: segment_pad_left + segment_index_w + 8px;
+                            property <length> segment_field_w: (parent.width - segment_fields_x - segment_delete_w - segment_right_pad - root.settings_grid_gap * 2) / 3;
+
                             Rectangle {
-
-
-
-                                x: 8px;
-                                y: (parent.height - self.height) / 2;
-                                width: 32px; height: 32px;
-
-
+                                x: segment_pad_left;
+                                y: (parent.height - segment_index_w) / 2;
+                                width: segment_index_w; height: segment_index_w;
                                 background: (!root.is_idle && i == root.step_index) ? #10B981 : #27272A;
-
-
-
-                                border-radius: 16px;
-
-
-                                Text { text: (i + 1); color: (!root.is_idle && i == root.step_index) ? #000000 : #A1A1AA; font-size: 13px; horizontal-alignment: center; vertical-alignment: center; }
-
-
+                                border-radius: segment_index_w / 2;
+                                Text { text: (i + 1); color: (!root.is_idle && i == root.step_index) ? #000000 : #A1A1AA; font-size: 12px; horizontal-alignment: center; vertical-alignment: center; }
                             }
 
 
 
                             // Center the labels+values as a single block inside the segment row.
                             HorizontalBox {
-
-
-                                x: 44px;
-                                y: (parent.height - self.height) / 2 - 12px;
-                                height: 58px;
-
-
-                                spacing: 6px;
+                                x: segment_fields_x;
+                                spacing: root.settings_grid_gap;
 
 
 
@@ -3991,7 +3889,7 @@ export component AppWindow inherits Window {
 
 
 
-                                    width: 120px;
+                                    width: segment_field_w;
 
 
                                     spacing: 4px;
@@ -4001,10 +3899,7 @@ export component AppWindow inherits Window {
 
 
                                     Rectangle {
-
-
-
-                                        width: 120px; height: 42px;
+                                        width: segment_field_w; height: 42px;
 
 
                                         background: #000000;
@@ -4088,7 +3983,7 @@ export component AppWindow inherits Window {
 
 
 
-                                    width: 120px;
+                                    width: segment_field_w;
 
 
                                     spacing: 4px;
@@ -4098,10 +3993,7 @@ export component AppWindow inherits Window {
 
 
                                     Rectangle {
-
-
-
-                                        width: 120px; height: 42px;
+                                        width: segment_field_w; height: 42px;
 
 
                                         background: #000000;
@@ -4188,7 +4080,7 @@ export component AppWindow inherits Window {
 
 
 
-                                    width: 120px;
+                                    width: segment_field_w;
 
 
                                     spacing: 4px;
@@ -4198,10 +4090,7 @@ export component AppWindow inherits Window {
 
 
                                     Rectangle {
-
-
-
-                                        width: 120px; height: 42px;
+                                        width: segment_field_w; height: 42px;
 
 
                                         background: #000000;
@@ -4292,9 +4181,9 @@ export component AppWindow inherits Window {
 
 
 
-                                x: parent.width - self.width - 8px;
+                                x: parent.width - segment_delete_w - segment_right_pad;
                                 y: 6px;
-                                width: 30px; height: 30px;
+                                width: segment_delete_w; height: segment_delete_w;
 
 
                                 background: #27272A;
@@ -4325,10 +4214,7 @@ export component AppWindow inherits Window {
 
 
                         Rectangle {
-
-
-
-                        width: 440px; height: 44px;
+                        width: root.settings_content_width; height: 44px;
 
 
 
@@ -4543,7 +4429,8 @@ export component AppWindow inherits Window {
                                         : "";
             color: #A1A1AA;
             font-family: "PT Sans";
-            font-size: 14px;
+                        font-size: 14px;
+                        vertical-alignment: center;
         }
 
         Text {
@@ -4724,7 +4611,7 @@ export component AppWindow inherits Window {
             background: #000000B3;
             z: 5100;
             Rectangle {
-                x: 58px; y: 64px; width: 364px; height: 186px;
+                x: 58px; y: 54px; width: 364px; height: 212px;
                 background: #0B0B0B;
                 border-color: #3F3F46;
                 border-width: 1px;
@@ -4737,21 +4624,43 @@ export component AppWindow inherits Window {
                     font-size: 20px;
                     horizontal-alignment: center;
                 }
-                Text {
-                    x: 18px; y: 60px; width: parent.width - 36px;
-                    text: root.is_ua ? "Температура, швидкість і час буде змінено для поточного випалу." : "Temperature, rate and hold time will be updated for current firing.";
-                    color: #A1A1AA;
-                    font-size: 12px;
-                    horizontal-alignment: center;
+                VerticalBox {
+                    x: 18px; y: 58px; width: parent.width - 36px;
+                    spacing: 4px;
+                    alignment: start;
+                    Text {
+                        text: root.is_ua
+                            ? ("Швидкість: " + root.running_edit_rate + " " + root.rate_unit_label_min)
+                            : ("Rate: " + root.running_edit_rate + " " + root.rate_unit_label_min);
+                        color: #A1A1AA;
+                        font-size: 12px;
+                        horizontal-alignment: left;
+                    }
+                    if (root.running_edit_add_temp != 0) : Text {
+                        text: root.is_ua
+                            ? ("Додати температуру: " + root.running_edit_add_temp + root.temp_unit_label)
+                            : ("Add temperature: " + root.running_edit_add_temp + root.temp_unit_label);
+                        color: #A1A1AA;
+                        font-size: 12px;
+                        horizontal-alignment: left;
+                    }
+                    if (root.running_edit_add_time != 0) : Text {
+                        text: root.is_ua
+                            ? ("Додати час: " + root.running_edit_add_time + " хв")
+                            : ("Add time: " + root.running_edit_add_time + " min");
+                        color: #A1A1AA;
+                        font-size: 12px;
+                        horizontal-alignment: left;
+                    }
                 }
                 Rectangle {
-                    x: 22px; y: 124px; width: 152px; height: 44px;
+                    x: 22px; y: 156px; width: 152px; height: 44px;
                     background: #27272A; border-radius: 10px;
                     Text { text: root.is_ua ? "Скасувати" : "Cancel"; color: #FFFFFF; horizontal-alignment: center; vertical-alignment: center; }
                     TouchArea { width: parent.width; height: parent.height; clicked => { root.running_edit_cancel(); } }
                 }
                 Rectangle {
-                    x: 190px; y: 124px; width: 152px; height: 44px;
+                    x: 190px; y: 156px; width: 152px; height: 44px;
                     background: #10B981; border-radius: 10px;
                     Text { text: root.is_ua ? "Зберегти" : "Save"; color: #000000; horizontal-alignment: center; vertical-alignment: center; }
                     TouchArea { width: parent.width; height: parent.height; clicked => { root.running_edit_confirm(); } }
@@ -4769,11 +4678,11 @@ export component AppWindow inherits Window {
                 background: #00000000;
                 Text {
                     x: 0px; y: 1px; width: parent.width; height: 50px;
-                    text: "NOVAKILN";
-                    color: #00D084;
-                    opacity: 0.26;
+                    text: "KILN PRO";
+                    color: Theme.color_accent;
+                    opacity: 0.28;
                     font-family: "PT Sans";
-                    font-size: 36px;
+                    font-size: 38px;
                     font-weight: 700;
                     letter-spacing: 2.0px;
                     horizontal-alignment: center;
@@ -4781,10 +4690,10 @@ export component AppWindow inherits Window {
                 }
                 Text {
                     x: 0px; y: 0px; width: parent.width; height: 50px;
-                    text: "NOVAKILN";
-                    color: #FFFFFF;
+                    text: "KILN PRO";
+                    color: Theme.color_text;
                     font-family: "PT Sans";
-                    font-size: 34px;
+                    font-size: 36px;
                     font-weight: 700;
                     letter-spacing: 2.0px;
                     horizontal-alignment: center;
@@ -4817,13 +4726,46 @@ export component AppWindow inherits Window {
             }
 
             Text {
-                x: 18px; y: 278px; width: 146px; height: 28px;
-                text: root.standby_power_watts + " W";
+                x: 0px; y: 236px; width: 480px; height: 24px;
+                text: root.pzem_phase_label;
                 color: #A1A1AA;
                 font-family: "PT Sans";
-                font-size: 20px;
+                font-size: 18px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 18px; y: 278px; width: 146px; height: 24px;
+                text: root.pzem_power_label;
+                color: #A1A1AA;
+                font-family: "PT Sans";
+                font-size: 18px;
                 font-weight: 700;
                 horizontal-alignment: left;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 168px; y: 278px; width: 144px; height: 24px;
+                text: root.pzem_current_label;
+                color: #A1A1AA;
+                font-family: "PT Sans";
+                font-size: 18px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: 318px; y: 278px; width: 146px; height: 24px;
+                text: root.pzem_voltage_label;
+                color: #A1A1AA;
+                font-family: "PT Sans";
+                font-size: 18px;
+                font-weight: 700;
+                horizontal-alignment: right;
                 vertical-alignment: center;
             }
 
@@ -4883,26 +4825,26 @@ export component AppWindow inherits Window {
             z: 5200;
 
             Rectangle {
-                x: 54px; y: 116px; width: 372px; height: 88px;
+                x: 40px; y: 96px; width: 400px; height: 128px;
                 background: #00000000;
                 Text {
-                    x: 0px; y: 8px; width: parent.width; height: 72px;
-                    text: "NOVAKILN";
-                    color: #00D084;
+                    x: 0px; y: 10px; width: parent.width; height: 96px;
+                    text: "KILN PRO";
+                    color: Theme.color_accent;
                     opacity: 0.30;
                     font-family: "PT Sans";
-                    font-size: 54px;
+                    font-size: 68px;
                     font-weight: 700;
                     letter-spacing: 2.2px;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
                 Text {
-                    x: 0px; y: 7px; width: parent.width; height: 72px;
-                    text: "NOVAKILN";
-                    color: #FFFFFF;
+                    x: 0px; y: 8px; width: parent.width; height: 96px;
+                    text: "KILN PRO";
+                    color: Theme.color_text;
                     font-family: "PT Sans";
-                    font-size: 50px;
+                    font-size: 64px;
                     font-weight: 700;
                     letter-spacing: 2.2px;
                     horizontal-alignment: center;
@@ -5127,6 +5069,7 @@ export component AppWindow inherits Window {
         visible: root.ui_dim > 0.001 && root.view != View.Calibration;
         z: 900;
     }
+
 
     // Touch calibration
     if (root.view == View.Calibration) : Rectangle {

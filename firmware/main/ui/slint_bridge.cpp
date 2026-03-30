@@ -2,7 +2,9 @@
 
 #include "app/device_commands.h"
 #include "drivers/display_driver.h"
+#include "drivers/pzem004t_driver.h"
 #include "kiln_control/thermal_control.h"
+#include "drivers/rtc_ds3231.h"
 #include "net/wifi_connection.h"
 #include "net/wifi_server.h"
 #include "esp_task_wdt.h"
@@ -18,6 +20,7 @@
 #include <cstring>
 #include <string>
 #include <time.h>
+#include <sys/time.h>
 
 static std::atomic<uint64_t> s_ui_heartbeat_ms{0};
 static constexpr const char *UI_PREF_NS = "ui_pref";
@@ -129,6 +132,7 @@ static bool notify_slint_command(const char *action,
 extern "C" void slint_bridge_display_init(void) {
     restore_touch_from_backup_once();
     display_driver_init();
+    pzem004t_init();
     s_ui_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
 }
 
@@ -136,6 +140,8 @@ extern "C" void slint_bridge_get_state(slint_kiln_state_t *out) {
     if (!out) return;
     const KilnState st = thermalCtrl.getState();
     const SafetyStats safety = thermalCtrl.getSafetyStats();
+    pzem004t_reading_t reading = {};
+    const bool pzem_ok = pzem004t_get_reading(&reading);
 
     out->current_temp = st.currentTemp;
     out->target_temp = st.targetTemp;
@@ -155,6 +161,10 @@ extern "C" void slint_bridge_get_state(slint_kiln_state_t *out) {
     if (safety.faultReason[0]) {
         std::strncpy(out->fault_reason, safety.faultReason, sizeof(out->fault_reason) - 1);
     }
+    out->pzem_voltage = reading.voltage;
+    out->pzem_current = reading.current;
+    out->pzem_power = reading.power;
+    out->pzem_ok = pzem_ok;
 }
 
 extern "C" bool slint_bridge_start_schedule_json(const char *json) {
@@ -394,6 +404,63 @@ extern "C" bool slint_bridge_get_date_str(char *out, int32_t out_len) {
         std::snprintf(out, out_len, "%04d-%02d-%02d", year, local_tm.tm_mon + 1, local_tm.tm_mday);
     } else {
         std::snprintf(out, out_len, "%02d.%02d.%04d", local_tm.tm_mday, local_tm.tm_mon + 1, year);
+    }
+    return true;
+}
+
+static bool load_current_tm(struct tm *out_tm) {
+    if (!out_tm) return false;
+    time_t now = time(nullptr);
+    if (now >= 1577836800 && localtime_r(&now, out_tm)) {
+        out_tm->tm_isdst = -1;
+        return true;
+    }
+    bool rtc_valid = false;
+    if (rtc_ds3231_read_time(out_tm, &rtc_valid) && rtc_valid) {
+        out_tm->tm_isdst = -1;
+        return true;
+    }
+    std::memset(out_tm, 0, sizeof(*out_tm));
+    out_tm->tm_year = 124;
+    out_tm->tm_mon = 0;
+    out_tm->tm_mday = 1;
+    out_tm->tm_isdst = -1;
+    return false;
+}
+
+extern "C" bool slint_bridge_set_time_hm(uint8_t hour, uint8_t minute) {
+    if (hour > 23 || minute > 59) return false;
+    struct tm tmv = {};
+    (void)load_current_tm(&tmv);
+    tmv.tm_hour = hour;
+    tmv.tm_min = minute;
+    tmv.tm_sec = 0;
+    if (!rtc_ds3231_set_time(&tmv)) return false;
+    const time_t ts = mktime(&tmv);
+    if (ts >= 1577836800) {
+        struct timeval tv = {};
+        tv.tv_sec = ts;
+        tv.tv_usec = 0;
+        (void)settimeofday(&tv, nullptr);
+    }
+    return true;
+}
+
+extern "C" bool slint_bridge_set_date_ymd(uint16_t year, uint8_t month, uint8_t day) {
+    if (year < 2020 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+    struct tm tmv = {};
+    (void)load_current_tm(&tmv);
+    tmv.tm_year = (int)year - 1900;
+    tmv.tm_mon = (int)month - 1;
+    tmv.tm_mday = (int)day;
+    tmv.tm_sec = tmv.tm_sec < 0 ? 0 : tmv.tm_sec;
+    if (!rtc_ds3231_set_time(&tmv)) return false;
+    const time_t ts = mktime(&tmv);
+    if (ts >= 1577836800) {
+        struct timeval tv = {};
+        tv.tv_sec = ts;
+        tv.tv_usec = 0;
+        (void)settimeofday(&tv, nullptr);
     }
     return true;
 }

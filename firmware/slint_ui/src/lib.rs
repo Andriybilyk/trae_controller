@@ -1,6 +1,6 @@
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType, Rgb565Pixel, LineBufferProvider};
 use slint::platform::{Platform, PointerEventButton, WindowEvent};
-use slint::{Image, ModelRc, Rgb8Pixel, SharedPixelBuffer, Timer, VecModel};
+use slint::{Color, Image, ModelRc, Rgb8Pixel, SharedPixelBuffer, Timer, VecModel};
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -17,7 +17,7 @@ const TOUCH_FAST_MOVE_PX: i32 = 6;
 const TOUCH_DEBUG_MIN_Z: u16 = 140;
 const TOUCH_DEBUG_DEADZONE_PX: i32 = 2;
 const TOUCH_DEBUG_UPDATE_MIN_MS: u64 = 16;
-const STANDBY_TIMEOUT_MS: u64 = 60_000;
+const STANDBY_TIMEOUT_MS: u64 = 180_000;
 
 slint::include_modules!();
 
@@ -34,6 +34,10 @@ struct SlintKilnState {
     error_msg: [u8; 96],
     fault_active: bool,
     fault_reason: [u8; 96],
+    pzem_voltage: f32,
+    pzem_current: f32,
+    pzem_power: f32,
+    pzem_ok: bool,
 }
 
 #[repr(C)]
@@ -75,6 +79,10 @@ impl Default for SlintKilnState {
             error_msg: [0; 96],
             fault_active: false,
             fault_reason: [0; 96],
+            pzem_voltage: 0.0,
+            pzem_current: 0.0,
+            pzem_power: 0.0,
+            pzem_ok: false,
         }
     }
 }
@@ -122,6 +130,8 @@ extern "C" {
     fn slint_bridge_set_date_format(fmt: u8);
     fn slint_bridge_get_display_brightness() -> u8;
     fn slint_bridge_set_display_brightness(percent: u8);
+    fn slint_bridge_set_time_hm(hour: u8, minute: u8) -> bool;
+    fn slint_bridge_set_date_ymd(year: u16, month: u8, day: u8) -> bool;
 
     fn display_driver_touch_probe(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
     fn display_driver_touch_probe_raw(x: *mut u16, y: *mut u16, z: *mut u16) -> bool;
@@ -176,11 +186,45 @@ struct WifiScanAp {
     rssi: i32,
 }
 
+#[derive(Clone, serde::Deserialize, Default)]
+struct HistorySample {
+    #[serde(default)]
+    timestamp: i64,
+    #[serde(default)]
+    temp: f32,
+    #[serde(default)]
+    target: f32,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, serde::Deserialize, Default)]
+struct HistorySummary {
+    #[serde(default)]
+    id: String,
+    #[serde(rename = "scheduleName", default)]
+    schedule_name: String,
+    #[serde(default)]
+    duration: i64,
+    #[serde(default)]
+    status: String,
+    #[serde(rename = "totalSteps", default)]
+    total_steps: i64,
+}
+
+#[derive(Clone, serde::Deserialize, Default)]
+struct HistoryDetail {
+    #[serde(default)]
+    summary: HistorySummary,
+    #[serde(default)]
+    data: Vec<HistorySample>,
+}
+
 struct AppState {
     schedules: Vec<ScheduleFile>,
     selected_index: Option<usize>,
     editing_index: Option<usize>,
     graph_index: Option<usize>,
+    history_graph_id: Option<String>,
     editor_steps: Vec<EditorStepRow>,
     display_temp_c: f32,
     display_temp_valid: bool,
@@ -476,19 +520,27 @@ fn history_status_label(status: &str, is_ua: bool) -> String {
     }
 }
 
+fn history_status_code(raw: &str) -> String {
+    raw.trim().to_ascii_uppercase()
+}
+
 fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
     let Ok(data) = std::fs::read_to_string("/littlefs/history.json") else {
         return vec![HistoryPreviewCard {
+            id: "".into(),
             title: (if is_ua { "Історія відпалів поки порожня." } else { "Firing history is empty." }).into(),
             status: "".into(),
+            status_code: "".into(),
             subtitle: "".into(),
         }];
     };
     let trimmed = data.trim();
     if trimmed.is_empty() || trimmed == "[]" {
         return vec![HistoryPreviewCard {
+            id: "".into(),
             title: (if is_ua { "Історія відпалів поки порожня." } else { "Firing history is empty." }).into(),
             status: "".into(),
+            status_code: "".into(),
             subtitle: "".into(),
         }];
     }
@@ -507,6 +559,17 @@ fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
                     .or_else(|| item.get("result"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
+                let status_code = history_status_code(raw_status);
+                let id = item
+                    .get("id")
+                    .or_else(|| item.get("runId"))
+                    .or_else(|| item.get("historyId"))
+                    .map(|v| {
+                        v.as_str()
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| v.to_string().trim_matches('"').to_string())
+                    })
+                    .unwrap_or_default();
                 let duration = item.get("duration").and_then(|v| v.as_i64()).unwrap_or(0);
                 let peak_temp = item.get("peakTemp").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 let total_steps = item.get("totalSteps").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -530,8 +593,10 @@ fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
                 }
 
                 cards.push(HistoryPreviewCard {
+                    id: id.into(),
                     title: truncate_preview(name.to_string(), 48).into(),
                     status: history_status_label(raw_status, is_ua).into(),
+                    status_code: status_code.into(),
                     subtitle: truncate_preview(subtitle_parts.join(" • "), 72).into(),
                 });
             }
@@ -541,10 +606,35 @@ fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
         }
     }
     vec![HistoryPreviewCard {
+        id: "".into(),
         title: truncate_preview(trimmed.to_string(), 64).into(),
         status: "".into(),
+        status_code: "".into(),
         subtitle: "".into(),
     }]
+}
+
+fn load_history_item_id_by_preview_index(index: usize) -> Option<String> {
+    let data = std::fs::read_to_string("/littlefs/history.json").ok()?;
+    let value = serde_json::from_str::<serde_json::Value>(data.trim()).ok()?;
+    let items = value.as_array()?;
+    let rev_index = items.len().checked_sub(index + 1)?;
+    let item = items.get(rev_index)?;
+    item.get("id")
+        .or_else(|| item.get("runId"))
+        .or_else(|| item.get("historyId"))
+        .map(|v| {
+            v.as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| v.to_string().trim_matches('"').to_string())
+        })
+        .filter(|id| !id.is_empty())
+}
+
+fn load_history_detail(id: &str) -> Option<HistoryDetail> {
+    let path = format!("/littlefs/history_{}.json", id);
+    let data = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str::<HistoryDetail>(data.trim()).ok()
 }
 
 fn fault_status_label(ok: bool, is_ua: bool) -> String {
@@ -905,7 +995,7 @@ fn format_minutes_label(total_minutes: i32, is_ua: bool) -> String {
     }
 }
 
-fn sample_graph_line(rects: &mut Vec<ScheduleGraphRect>, x0: i32, y0: i32, x1: i32, y1: i32) {
+fn sample_graph_line(rects: &mut Vec<ScheduleGraphRect>, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
     let steps = (x1 - x0).abs().max((y1 - y0).abs()).clamp(1, 64);
     for i in 0..=steps {
         let t = i as f32 / steps as f32;
@@ -916,8 +1006,25 @@ fn sample_graph_line(rects: &mut Vec<ScheduleGraphRect>, x0: i32, y0: i32, x1: i
             y: (y - 1).max(0),
             width: 3,
             height: 3,
+            color: color.into(),
         });
     }
+}
+
+fn downsample_graph_points(points: &[(f32, f32)], max_points: usize) -> Vec<(f32, f32)> {
+    if points.len() <= max_points || max_points < 3 {
+        return points.to_vec();
+    }
+    let mut out = Vec::with_capacity(max_points);
+    out.push(points[0]);
+    let inner = max_points - 2;
+    let span = points.len() - 2;
+    for i in 0..inner {
+        let idx = 1 + (i * span) / inner;
+        out.push(points[idx]);
+    }
+    out.push(*points.last().unwrap_or(&points[0]));
+    out
 }
 
 fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
@@ -925,20 +1032,122 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
     const GRAPH_H: i32 = 84;
     const START_TEMP_C: f32 = 25.0;
     const MIN_PEAK_TEMP_C: f32 = 100.0;
+    const PLAN_COLOR: Color = Color::from_rgb_u8(0x60, 0xA5, 0xFA);
+    const ACTUAL_COLOR: Color = Color::from_rgb_u8(0x10, 0xB9, 0x81);
 
-    let Some(idx) = state.graph_index else {
+    let clear_graph = || {
         ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(Vec::<ScheduleGraphRect>::new())));
         ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(Vec::<ScheduleGraphMarker>::new())));
         ui.set_schedule_graph_peak_temp(0);
         ui.set_schedule_graph_total_label("0 min".into());
+    };
+
+    let draw_series = |rects: &mut Vec<ScheduleGraphRect>,
+                       markers: &mut Vec<ScheduleGraphMarker>,
+                       points: &[(f32, f32)],
+                       map_x: &dyn Fn(f32) -> i32,
+                       map_y: &dyn Fn(f32) -> i32,
+                       color: Color| {
+        for window in points.windows(2) {
+            let (start_h, start_temp_c) = window[0];
+            let (end_h, end_temp_c) = window[1];
+            let x0 = map_x(start_h).clamp(0, GRAPH_W - 1);
+            let y0 = map_y(start_temp_c).clamp(0, GRAPH_H - 1);
+            let x1 = map_x(end_h).clamp(0, GRAPH_W - 1);
+            let y1 = map_y(end_temp_c).clamp(0, GRAPH_H - 1);
+
+            if y0 == y1 {
+                rects.push(ScheduleGraphRect {
+                    x: x0.min(x1),
+                    y: (y0 - 1).max(0),
+                    width: (x1 - x0).abs().max(3),
+                    height: 3,
+                    color: color.into(),
+                });
+            } else {
+                sample_graph_line(rects, x0, y0, x1, y1, color);
+            }
+        }
+
+        let marker_step = (points.len() / 10).max(1);
+        for (idx, (hour, temp_c)) in points.iter().enumerate() {
+            if idx % marker_step == 0 || idx + 1 == points.len() {
+                markers.push(ScheduleGraphMarker {
+                    x: map_x(*hour).clamp(0, GRAPH_W - 1),
+                    y: map_y(*temp_c).clamp(0, GRAPH_H - 1),
+                    label: "".into(),
+                    color: color.into(),
+                });
+            }
+        }
+    };
+
+    if let Some(history_id) = state.history_graph_id.as_deref() {
+        let Some(detail) = load_history_detail(history_id) else {
+            clear_graph();
+            return;
+        };
+        if detail.data.is_empty() {
+            clear_graph();
+            return;
+        }
+
+        let first_ts = detail.data.first().map(|p| p.timestamp).unwrap_or(0);
+        let mut planned_points: Vec<(f32, f32)> = detail
+            .data
+            .iter()
+            .map(|p| (((p.timestamp - first_ts).max(0) as f32) / 3600.0, p.target.max(0.0)))
+            .collect();
+        let mut actual_points: Vec<(f32, f32)> = detail
+            .data
+            .iter()
+            .map(|p| (((p.timestamp - first_ts).max(0) as f32) / 3600.0, p.temp.max(0.0)))
+            .collect();
+        planned_points = downsample_graph_points(&planned_points, 120);
+        actual_points = downsample_graph_points(&actual_points, 120);
+
+        let last_hour = planned_points
+            .last()
+            .map(|(h, _)| *h)
+            .unwrap_or(0.0)
+            .max(actual_points.last().map(|(h, _)| *h).unwrap_or(0.0));
+        let peak_temp_c = planned_points
+            .iter()
+            .map(|(_, t)| *t)
+            .fold(0.0_f32, f32::max)
+            .max(actual_points.iter().map(|(_, t)| *t).fold(0.0_f32, f32::max));
+        let total_minutes = if detail.summary.duration > 0 {
+            detail.summary.duration as i32
+        } else {
+            (last_hour * 60.0).ceil().max(1.0) as i32
+        };
+        let peak_display = temp_to_display_i32(peak_temp_c.max(MIN_PEAK_TEMP_C) as i32, state.temp_unit);
+        let peak_scale_c = peak_temp_c.max(MIN_PEAK_TEMP_C);
+
+        let x_scale = if last_hour <= 0.0 { 0.0 } else { (GRAPH_W - 1) as f32 / last_hour };
+        let y_scale = if peak_scale_c <= 0.0 { 0.0 } else { (GRAPH_H - 1) as f32 / peak_scale_c };
+        let map_x = |hour: f32| -> i32 { (hour * x_scale).round() as i32 };
+        let map_y = |temp_c: f32| -> i32 { GRAPH_H - 1 - (temp_c * y_scale).round() as i32 };
+
+        let mut rects: Vec<ScheduleGraphRect> = Vec::new();
+        let mut markers: Vec<ScheduleGraphMarker> = Vec::new();
+        draw_series(&mut rects, &mut markers, &planned_points, &map_x, &map_y, PLAN_COLOR);
+        draw_series(&mut rects, &mut markers, &actual_points, &map_x, &map_y, ACTUAL_COLOR);
+
+        ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
+        ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(markers)));
+        ui.set_schedule_graph_peak_temp(peak_display);
+        ui.set_schedule_graph_total_label(format_minutes_label(total_minutes, ui.get_is_ua()).into());
+        return;
+    }
+
+    let Some(idx) = state.graph_index else {
+        clear_graph();
         return;
     };
 
     let Some(schedule) = state.schedules.get(idx) else {
-        ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(Vec::<ScheduleGraphRect>::new())));
-        ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(Vec::<ScheduleGraphMarker>::new())));
-        ui.set_schedule_graph_peak_temp(0);
-        ui.set_schedule_graph_total_label("0 min".into());
+        clear_graph();
         return;
     };
 
@@ -984,34 +1193,8 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
     let map_y = |temp_c: f32| -> i32 { GRAPH_H - 1 - (temp_c * y_scale).round() as i32 };
 
     let mut rects: Vec<ScheduleGraphRect> = Vec::new();
-    for window in points.windows(2) {
-        let (start_h, start_temp_c) = window[0];
-        let (end_h, end_temp_c) = window[1];
-        let x0 = map_x(start_h).clamp(0, GRAPH_W - 1);
-        let y0 = map_y(start_temp_c).clamp(0, GRAPH_H - 1);
-        let x1 = map_x(end_h).clamp(0, GRAPH_W - 1);
-        let y1 = map_y(end_temp_c).clamp(0, GRAPH_H - 1);
-
-        if y0 == y1 {
-            rects.push(ScheduleGraphRect {
-                x: x0.min(x1),
-                y: (y0 - 1).max(0),
-                width: (x1 - x0).abs().max(3),
-                height: 3,
-            });
-        } else {
-            sample_graph_line(&mut rects, x0, y0, x1, y1);
-        }
-    }
-
-    let marker_rows: Vec<ScheduleGraphMarker> = points
-        .into_iter()
-        .map(|(hour, temp_c)| ScheduleGraphMarker {
-            x: map_x(hour).clamp(0, GRAPH_W - 1),
-            y: map_y(temp_c).clamp(0, GRAPH_H - 1),
-            label: "".into(),
-        })
-        .collect();
+    let mut marker_rows: Vec<ScheduleGraphMarker> = Vec::new();
+    draw_series(&mut rects, &mut marker_rows, &points, &map_x, &map_y, PLAN_COLOR);
 
     ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
     ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(marker_rows)));
@@ -1116,6 +1299,37 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
     if initial_autotune_target_c.is_finite() {
         ui.set_autotune_target_c(temp_to_display(initial_autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32);
     }
+
+    let pzem_ok = state.pzem_ok && state.pzem_voltage.is_finite() && state.pzem_current.is_finite() && state.pzem_power.is_finite();
+    let power_label = if pzem_ok {
+        format!("{:.0} W", state.pzem_power.max(0.0))
+    } else {
+        "-- W".to_string()
+    };
+    let current_label = if pzem_ok {
+        format!("{:.2} A", state.pzem_current.max(0.0))
+    } else {
+        "-- A".to_string()
+    };
+    let voltage_label = if pzem_ok {
+        format!("{:.0} V", state.pzem_voltage.max(0.0))
+    } else {
+        "-- V".to_string()
+    };
+    let phase_label = if state.is_firing {
+        if pzem_ok && state.pzem_current > 0.20 {
+            if is_ua { "Фаза: OK".to_string() } else { "Phase: OK".to_string() }
+        } else {
+            if is_ua { "Фаза: НІ".to_string() } else { "Phase: NO".to_string() }
+        }
+    } else {
+        if is_ua { "Фаза: --".to_string() } else { "Phase: --".to_string() }
+    };
+    ui.set_pzem_power_label(power_label.into());
+    ui.set_pzem_current_label(current_label.into());
+    ui.set_pzem_voltage_label(voltage_label.into());
+    ui.set_pzem_phase_label(phase_label.into());
+    ui.set_standby_power_watts(state.pzem_power.round().max(0.0) as i32);
 }
 
 fn apply_command_result_to_ui(ui: &AppWindow, cmd: SlintCommandResult, is_ua: bool) {
@@ -1473,6 +1687,7 @@ pub extern "C" fn slint_ui_run() {
         selected_index: None,
         editing_index: None,
         graph_index: None,
+        history_graph_id: None,
         editor_steps: Vec::new(),
         display_temp_c: 0.0,
         display_temp_valid: false,
@@ -1594,13 +1809,44 @@ pub extern "C" fn slint_ui_run() {
             if idx < state.schedules.len() {
                 state.selected_index = Some(idx);
                 state.graph_index = None;
+                state.history_graph_id = None;
                 let schedule = state.schedules[idx].clone();
                 state.graph_index = Some(idx);
                 ui.set_selected_schedule_name(schedule.name.clone().into());
                 ui.set_selected_steps_count(schedule_steps_count(&schedule));
+                ui.set_schedule_graph_back_to_history(false);
                 refresh_schedule_graph_model(&ui, &state);
                 ui.set_view(View::ScheduleGraph);
             }
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_open_history_graph(move |index| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let idx = index as usize;
+            let Some(id) = load_history_item_id_by_preview_index(idx) else { return; };
+            let detail = load_history_detail(&id);
+            let mut state = app_state.borrow_mut();
+            state.graph_index = None;
+            state.history_graph_id = Some(id.clone());
+            ui.set_schedule_graph_back_to_history(true);
+            if let Some(detail) = detail {
+                let title = if detail.summary.schedule_name.is_empty() {
+                    if ui.get_is_ua() { "Випал" } else { "Firing" }
+                } else {
+                    detail.summary.schedule_name.as_str()
+                };
+                ui.set_selected_schedule_name(title.into());
+                ui.set_selected_steps_count(detail.summary.total_steps.max(0) as i32);
+            } else {
+                ui.set_selected_schedule_name((if ui.get_is_ua() { "Випал" } else { "Firing" }).into());
+                ui.set_selected_steps_count(0);
+            }
+            refresh_schedule_graph_model(&ui, &state);
+            ui.set_view(View::ScheduleGraph);
         });
     }
 
@@ -1945,6 +2191,7 @@ pub extern "C" fn slint_ui_run() {
             let idx = index as usize;
             if idx < state.schedules.len() {
                 state.selected_index = Some(idx);
+                state.history_graph_id = None;
                 let schedule = state.schedules[idx].clone();
                 ui.set_selected_schedule_name(schedule.name.clone().into());
                 ui.set_selected_steps_count(schedule_steps_count(&schedule));
@@ -1971,6 +2218,7 @@ pub extern "C" fn slint_ui_run() {
             if idx < state.schedules.len() {
                 state.editing_index = Some(idx);
                 state.graph_index = None;
+                state.history_graph_id = None;
                 let schedule = state.schedules[idx].clone();
                 state.editor_steps = to_editor_steps(&schedule, state.temp_unit);
                 ui.set_selected_schedule_name(schedule.name.clone().into());
@@ -2052,6 +2300,7 @@ pub extern "C" fn slint_ui_run() {
             let name = make_unique_schedule_name(&state.schedules, base_name);
             let id = make_safe_id(&name);
             state.graph_index = None;
+            state.history_graph_id = None;
             state.schedules.push(ScheduleFile {
                 id,
                 name: name.clone(),
@@ -2204,7 +2453,12 @@ pub extern "C" fn slint_ui_run() {
                 }
                 ui.set_kb_step_index(step_index);
                 ui.set_kb_field(field.clone().into());
-                ui.set_kb_value(value.clone().into());
+                let sanitized = if field == "clock_time" || field == "clock_date" {
+                    value.chars().filter(|c| c.is_ascii_digit()).collect::<String>()
+                } else {
+                    value.clone()
+                };
+                ui.set_kb_value(sanitized.into());
                 if field == "name" || field == "wifi_pass" {
                     ui.set_kb_mode("alpha".into());
                     ui.set_kb_caps(false);
@@ -2305,6 +2559,8 @@ pub extern "C" fn slint_ui_run() {
                 "run_rate" => (run_rate_min, run_rate_max, rate_len),
                 "run_temp" => (run_temp_min, run_temp_max, 4usize),
                 "run_time" => (-300, 300, 4usize),
+                "clock_time" => (0, 2359, 4usize),
+                "clock_date" => (0, 99999999, 8usize),
                 _ => (0, 9999, 5usize),
             };
 
@@ -2341,6 +2597,49 @@ pub extern "C" fn slint_ui_run() {
                             }
                         }
                         refresh_editor_model(&ui, &state);
+                    } else if field == "clock_time" {
+                        let digits: String = value.chars().filter(|c| c.is_ascii_digit()).collect();
+                        if digits.len() == 4 {
+                            let hour = digits.get(0..2).and_then(|v| v.parse::<u8>().ok()).unwrap_or(255);
+                            let minute = digits.get(2..4).and_then(|v| v.parse::<u8>().ok()).unwrap_or(255);
+                            if hour < 24 && minute < 60 {
+                                let ok = unsafe { slint_bridge_set_time_hm(hour, minute) };
+                                if ok {
+                                    let mut buf = vec![0u8; 16];
+                                    let _ = unsafe { slint_bridge_get_time_str(buf.as_mut_ptr() as *mut c_char, buf.len() as i32) };
+                                    let label = c_buf_to_string(&buf);
+                                    if !label.is_empty() {
+                                        ui.set_current_time(label.into());
+                                    }
+                                }
+                            }
+                        }
+                    } else if field == "clock_date" {
+                        let digits: String = value.chars().filter(|c| c.is_ascii_digit()).collect();
+                        if digits.len() == 8 {
+                            let fmt = ui.get_date_format().to_string();
+                            let (year_s, month_s, day_s) = if fmt == "YMD" {
+                                (digits.get(0..4), digits.get(4..6), digits.get(6..8))
+                            } else if fmt == "MDY" {
+                                (digits.get(4..8), digits.get(0..2), digits.get(2..4))
+                            } else {
+                                (digits.get(4..8), digits.get(2..4), digits.get(0..2))
+                            };
+                            let year = year_s.and_then(|v| v.parse::<u16>().ok()).unwrap_or(0);
+                            let month = month_s.and_then(|v| v.parse::<u8>().ok()).unwrap_or(0);
+                            let day = day_s.and_then(|v| v.parse::<u8>().ok()).unwrap_or(0);
+                            if year >= 2020 && year <= 2099 && (1..=12).contains(&month) && (1..=31).contains(&day) {
+                                let ok = unsafe { slint_bridge_set_date_ymd(year, month, day) };
+                                if ok {
+                                    let mut buf = vec![0u8; 16];
+                                    let _ = unsafe { slint_bridge_get_date_str(buf.as_mut_ptr() as *mut c_char, buf.len() as i32) };
+                                    let label = c_buf_to_string(&buf);
+                                    if !label.is_empty() {
+                                        ui.set_current_date(label.into());
+                                    }
+                                }
+                            }
+                        }
                     } else if field == "fan" {
                         let parsed = parse_int_with_clamp(&value, min, max, ui.get_fan_power());
                         ui.set_fan_power(parsed);

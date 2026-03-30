@@ -1,78 +1,52 @@
 dependencies:
   atanisoft/esp_lcd_touch_xpt2046:
-    component_hash: 7e6381b67b6e487379118368b8e91624dc87036ef5734818de1db9eb35697998
-    dependencies:
-    - name: espressif/esp_lcd_touch
-      registry_url: https://components.espressif.com
-      require: private
-      version: '>=1.0.4'
-    - name: idf
-      require: private
-      version: '>=4.4'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: managed_components\atanisoft__esp_lcd_touch_xpt2046
+      type: local
     version: 1.0.6
   espressif/cjson:
-    component_hash: 002c6d1872ee4c97d333938ebe107a29841cc847f9de89e676714bd2844057ea
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.0'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: managed_components\espressif__cjson
+      type: local
     version: 1.7.19~1
   espressif/esp_lcd_touch:
-    component_hash: 3f85a7d95af876f1a6ecca8eb90a81614890d0f03a038390804e5a77e2caf862
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=4.4.2'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com
-      type: service
+      path: managed_components\espressif__esp_lcd_touch
+      type: local
     version: 1.2.1
   espressif/mdns:
-    component_hash: 1ebe3bd675bb9d1c58f52bc0b609b32f74e572b01c328f9e61282040c775495c
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.0'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: managed_components\espressif__mdns
+      type: local
     version: 1.11.0
   espressif/mqtt:
-    component_hash: ffdad5659706b4dc14bc63f8eb73ef765efa015bf7e9adf71c813d52a2dc9342
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.3'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: managed_components\espressif__mqtt
+      type: local
     version: 1.0.0
   idf:
     source:
       type: idf
-    version: 6.1.0
+    version: 6.0.0
   joltwallet/littlefs:
-    component_hash: dcea25bcef2de023f089f5f01e8d8c46ad1b8ffef75861ad5ffb4098555839df
-    dependencies:
-    - name: idf
-      require: private
-      version: '>=5.0'
+    dependencies: []
     source:
-      registry_url: https://components.espressif.com/
-      type: service
+      path: managed_components\joltwallet__littlefs
+      type: local
     version: 1.20.4
 direct_dependencies:
 - atanisoft/esp_lcd_touch_xpt2046
 - espressif/cjson
+- espressif/esp_lcd_touch
 - espressif/mdns
 - espressif/mqtt
+- idf
 - joltwallet/littlefs
-manifest_hash: 2d968a9f396ea59a299b409cc05ba2994f8beee36ce610387d44af24a5ed4e3e
+manifest_hash: e142ab49494604dc5b46b02fb9df2aac2c7eab8bd3ab500c5010d740d349ef24
 target: esp32s3
 version: 3.0.0

@@ -18,6 +18,10 @@ typedef struct {
     char error_msg[96];
     bool fault_active;
     char fault_reason[96];
+    float pzem_voltage;
+    float pzem_current;
+    float pzem_power;
+    bool pzem_ok;
 } slint_kiln_state_t;
 
 typedef struct {
@@ -63,6 +67,8 @@ void slint_bridge_ui_heartbeat(void);
 uint64_t slint_bridge_get_ui_heartbeat_ms(void);
 bool slint_bridge_get_time_str(char *out, int32_t out_len);
 bool slint_bridge_get_date_str(char *out, int32_t out_len);
+bool slint_bridge_set_time_hm(uint8_t hour, uint8_t minute);
+bool slint_bridge_set_date_ymd(uint16_t year, uint8_t month, uint8_t day);
 bool slint_bridge_get_language_is_ua(void);
 void slint_bridge_set_language_is_ua(bool is_ua);
 uint8_t slint_bridge_get_temp_unit(void);

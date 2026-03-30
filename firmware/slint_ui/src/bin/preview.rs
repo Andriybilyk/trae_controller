@@ -23,11 +23,11 @@ fn make_editor_step(rate: i32, target: i32, hold: i32) -> EditorStepRow {
 }
 
 fn make_graph_rect(x: i32, y: i32, width: i32, height: i32) -> ScheduleGraphRect {
-    ScheduleGraphRect { x, y, width, height }
+    ScheduleGraphRect { x, y, width, height, color: slint::Color::from_rgb_u8(52, 223, 172) }
 }
 
 fn make_graph_marker(x: i32, y: i32, label: &str) -> ScheduleGraphMarker {
-    ScheduleGraphMarker { x, y, label: label.into() }
+    ScheduleGraphMarker { x, y, label: label.into(), color: slint::Color::from_rgb_u8(255, 255, 255) }
 }
 
 fn parse_int(text: &str, min: i32, max: i32, fallback: i32) -> i32 {
@@ -45,6 +45,8 @@ fn main() {
     let ui = AppWindow::new().expect("Failed to create UI");
     ui.window().set_size(slint::LogicalSize::new(480.0, 320.0));
 
+    ui.set_boot_splash_visible(false);
+    ui.set_standby_visible(false);
     ui.set_temp(24.5);
     ui.set_temp_label("24.5".into());
     ui.set_target(0);
