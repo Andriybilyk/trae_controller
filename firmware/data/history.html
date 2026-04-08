@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>History</title>
+    <link rel="stylesheet" href="/assets/index-2e86c01a.css" />
+    <style>
+      body{margin:0;background:var(--history-bg,#0D1B2A);color:var(--history-text,#fff);font-family:var(--history-font,"PT Sans","Segoe UI",sans-serif)}
+      .history-panel{background:var(--history-surface,#1B263B);border:1px solid var(--history-border,#24344F);border-radius:12px;box-shadow:0 10px 24px rgba(0,0,0,.18)}
+      .history-card{background:var(--history-card,#111827);border:1px solid var(--history-border,#24344F);border-radius:12px}
+      .history-list-card{background:var(--history-card,#111827);border:1px solid var(--history-border,#24344F);border-radius:12px}
+      .history-list-card--active{border-color:var(--history-accent,#34DFAC);box-shadow:0 0 0 1px rgba(52,223,172,.18) inset}
+      .history-button{background:var(--history-surface-alt,#142033);border:1px solid var(--history-border,#24344F);border-radius:8px;color:var(--history-muted,#9FB1C7);font-weight:700;transition:all .15s ease}
+      .history-button:hover{background:#22304a;color:var(--history-text,#fff)}
+      .history-button-danger{background:rgba(220,38,38,.15);border-color:rgba(220,38,38,.35);color:#fecaca}
+      .history-button-danger:hover{background:rgba(220,38,38,.22);color:#fff}
+      .history-label{color:var(--history-subtle,#7D8CA6);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+      .history-value{color:var(--history-text,#fff);font-size:24px;font-weight:700;line-height:1.1}
+      .history-muted{color:var(--history-muted,#9FB1C7)}
+    </style>
+  </head>
+  <body>
+    <div class="min-h-screen" id="history-root">
+      <header class="flex items-center justify-between px-6 py-4 history-panel !rounded-none !shadow-none border-x-0 border-t-0">
+        <h1 class="m-0 text-lg font-bold truncate">
+          <span id="page-title">History</span><span class="history-muted ml-2 text-xs font-bold" id="page-ver">v3</span>
+        </h1>
+        <button id="back-btn" class="history-button px-3 py-1.5 text-sm">Back</button>
+      </header>
+
+      <main class="p-6 flex gap-6 h-[calc(100vh-72px)] box-border">
+        <section class="history-panel w-[360px] min-w-[320px] p-4 flex flex-col min-h-0">
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-white font-bold text-lg" id="library-title"></div>
+          </div>
+          <div class="min-h-0 overflow-auto" id="list"></div>
+        </section>
+
+        <section class="flex-1 min-w-0 flex flex-col gap-6 min-h-0">
+          <div class="history-panel p-4 flex flex-col">
+            <div class="h-[260px] md:h-[320px] flex-1 min-h-0 relative history-card overflow-hidden" id="chart-wrap">
+              <canvas id="chart" class="absolute inset-0 w-full h-full block"></canvas>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div class="text-3xl font-bold truncate" id="detail-title"></div>
+          </div>
+
+          <div class="history-panel p-4 min-h-0 overflow-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div class="history-card p-3">
+                <div id="k-program" class="history-label"></div>
+                <div id="v-program" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-start" class="history-label"></div>
+                <div id="v-start" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-end" class="history-label"></div>
+                <div id="v-end" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-status" class="history-label"></div>
+                <div id="v-status" class="history-value text-base lg:text-lg">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-status-verbose" class="history-label"></div>
+                <div id="v-status-verbose" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-duration" class="history-label"></div>
+                <div id="v-duration" class="history-value text-base lg:text-lg">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-steps" class="history-label"></div>
+                <div id="v-steps" class="history-value text-base lg:text-lg">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-energy" class="history-label"></div>
+                <div id="v-energy" class="history-value text-base lg:text-lg">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-cost" class="history-label"></div>
+                <div id="v-cost" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-max-load" class="history-label"></div>
+                <div id="v-max-load" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-peak-temp" class="history-label"></div>
+                <div id="v-peak-temp" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+              <div class="history-card p-3">
+                <div id="k-voltage-stability" class="history-label"></div>
+                <div id="v-voltage-stability" class="history-muted mt-1 text-sm break-words">--</div>
+              </div>
+            </div>
+            <div class="history-card p-3 mt-3">
+              <div id="k-step-plan-actual" class="history-label"></div>
+              <div id="v-step-plan-actual" class="history-muted mt-2 text-xs whitespace-pre-wrap max-h-56 overflow-auto">--</div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script>
+      const THEME_FALLBACK = {
+        bg: "#0D1B2A",
+        surface: "#1B263B",
+        surfaceAlt: "#142033",
+        card: "#111827",
+        border: "#24344F",
+        text: "#FFFFFF",
+        muted: "#9FB1C7",
+        subtle: "#7D8CA6",
+        accent: "#34DFAC",
+        planned: "#60A5FA",
+        actual: "#34DFAC",
+        grid: "rgba(159,177,199,0.18)",
+        fill: "rgba(52,223,172,0.14)",
+        font: `"PT Sans","Segoe UI",sans-serif`
+      };
+      const resolveTheme = () => {
+        const host = document.body || document.documentElement;
+        const wrap = document.createElement("div");
+        wrap.style.position = "fixed";
+        wrap.style.left = "-9999px";
+        wrap.style.top = "-9999px";
+        wrap.style.opacity = "0";
+        const makeProbe = (className, text = "A") => {
+          const el = document.createElement("div");
+          el.className = className;
+          el.textContent = text;
+          wrap.appendChild(el);
+          return el;
+        };
+        const bgProbe = makeProbe("min-h-screen bg-black text-white");
+        const panelProbe = makeProbe("bg-kiln-card border border-kiln-border text-white");
+        const cardProbe = makeProbe("bg-zinc-800 border border-kiln-border text-white");
+        const mutedProbe = makeProbe("text-zinc-500");
+        const subtleProbe = makeProbe("text-zinc-400");
+        const accentProbe = makeProbe("bg-kiln-accent text-black");
+        host.appendChild(wrap);
+        const bodyStyle = getComputedStyle(document.body || document.documentElement);
+        const bgStyle = getComputedStyle(bgProbe);
+        const panelStyle = getComputedStyle(panelProbe);
+        const cardStyle = getComputedStyle(cardProbe);
+        const mutedStyle = getComputedStyle(mutedProbe);
+        const subtleStyle = getComputedStyle(subtleProbe);
+        const accentStyle = getComputedStyle(accentProbe);
+        const bodyBg =
+          bodyStyle.backgroundColor && bodyStyle.backgroundColor !== "rgba(0, 0, 0, 0)" && bodyStyle.backgroundColor !== "transparent"
+            ? bodyStyle.backgroundColor
+            : "";
+        const theme = {
+          bg: bodyBg || bgStyle.backgroundColor || THEME_FALLBACK.bg,
+          surface: panelStyle.backgroundColor || THEME_FALLBACK.surface,
+          surfaceAlt: cardStyle.backgroundColor || THEME_FALLBACK.surfaceAlt,
+          card: cardStyle.backgroundColor || THEME_FALLBACK.card,
+          border: panelStyle.borderTopColor || THEME_FALLBACK.border,
+          text: panelStyle.color || THEME_FALLBACK.text,
+          muted: mutedStyle.color || THEME_FALLBACK.muted,
+          subtle: subtleStyle.color || THEME_FALLBACK.subtle,
+          accent: accentStyle.backgroundColor || THEME_FALLBACK.accent,
+          planned: THEME_FALLBACK.planned,
+          actual: accentStyle.backgroundColor || THEME_FALLBACK.actual,
+          grid: THEME_FALLBACK.grid,
+          fill: THEME_FALLBACK.fill,
+          font: bodyStyle.fontFamily || THEME_FALLBACK.font
+        };
+        wrap.remove();
+        return theme;
+      };
+      const THEME = resolveTheme();
+      document.documentElement.style.setProperty("--history-bg", THEME.bg);
+      document.documentElement.style.setProperty("--history-surface", THEME.surface);
+      document.documentElement.style.setProperty("--history-surface-alt", THEME.surfaceAlt);
+      document.documentElement.style.setProperty("--history-card", THEME.card);
+      document.documentElement.style.setProperty("--history-border", THEME.border);
+      document.documentElement.style.setProperty("--history-text", THEME.text);
+      document.documentElement.style.setProperty("--history-muted", THEME.muted);
+      document.documentElement.style.setProperty("--history-subtle", THEME.subtle);
+      document.documentElement.style.setProperty("--history-accent", THEME.accent);
+      document.documentElement.style.setProperty("--history-planned", THEME.planned);
+      document.documentElement.style.setProperty("--history-actual", THEME.actual);
+      document.documentElement.style.setProperty("--history-font", THEME.font);
+
+      const detectIsUa = () => {
+        const lang = String(
+          localStorage.getItem("lang") ||
+          localStorage.getItem("language") ||
+          document.documentElement.lang ||
+          navigator.language ||
+          ""
+        ).toLowerCase();
+        if (lang.startsWith("uk") || lang.startsWith("ua")) return true;
+        if (lang.startsWith("en")) return false;
+        return true;
+      };
+      const isUa = detectIsUa();
+      const t = (ua,en)=>isUa?ua:en;
+      document.getElementById("page-title").textContent = t("Історія","History");
+      document.getElementById("back-btn").textContent = t("Назад","Back");
+      document.getElementById("back-btn").onclick = () => location.href = "/";
+      document.getElementById("library-title").textContent = t("Історія","History");
+      document.getElementById("k-program").textContent = t("Програма","Program");
+      document.getElementById("k-start").textContent = t("Початок","Start");
+      document.getElementById("k-end").textContent = t("Завершення","End");
+      document.getElementById("k-status").textContent = t("Статус","Status");
+      document.getElementById("k-status-verbose").textContent = t("Розширений статус","Verbose status");
+      document.getElementById("k-duration").textContent = t("Тривалість","Duration");
+      document.getElementById("k-steps").textContent = t("Кроки","Steps");
+      document.getElementById("k-energy").textContent = t("Енергія","Energy");
+      document.getElementById("k-cost").textContent = t("Вартість","Cost");
+      document.getElementById("k-max-load").textContent = t("Макс. навантаження","Max load");
+      document.getElementById("k-peak-temp").textContent = t("Пікова температура","Peak temperature");
+      document.getElementById("k-voltage-stability").textContent = t("Стабільність напруги","Voltage stability");
+      document.getElementById("k-step-plan-actual").textContent = t("Кроки: план / факт","Steps: plan / actual");
+
+      const listEl = document.getElementById("list");
+      const chart = document.getElementById("chart");
+      const chartWrap = document.getElementById("chart-wrap");
+      const ctx = chart.getContext("2d");
+      let currentPlanned = [];
+      let currentActual = [];
+
+      const fmtMinutes = (m) => {
+        const mm = Math.max(0, Math.round(Number(m || 0)));
+        const h = Math.floor(mm / 60);
+        const r = mm % 60;
+        return h > 0 ? (isUa ? `${h} год ${r} хв` : `${h}h ${r}m`) : (isUa ? `${mm} хв` : `${mm} min`);
+      };
+
+      const detectTimestampSecondsDivisor = (rows) => {
+        if (!Array.isArray(rows) || rows.length < 2) return 1;
+        let minPositiveDelta = Infinity;
+        for (let i = 1; i < rows.length; i++) {
+          const t0 = Number(rows[i - 1]?.timestamp ?? 0);
+          const t1 = Number(rows[i]?.timestamp ?? 0);
+          const dt = t1 - t0;
+          if (Number.isFinite(dt) && dt > 0) minPositiveDelta = Math.min(minPositiveDelta, dt);
+        }
+        if (!Number.isFinite(minPositiveDelta)) return 1;
+        return minPositiveDelta > 100 ? 1000 : 1;
+      };
+
+      const formatMinutesLabel = (minutes) => {
+        const m = Math.max(0, Math.round(Number(minutes || 0)));
+        const h = Math.floor(m / 60);
+        const r = m % 60;
+        if (h > 0) return isUa ? `${h} год ${r} хв` : `${h}h ${r}m`;
+        return isUa ? `${m} хв` : `${m} min`;
+      };
+
+      const translateFaultReason = (reason) => {
+        const raw = String(reason || "").trim();
+        if (!raw) return isUa ? "невідома причина" : "unknown reason";
+        const key = raw.toLowerCase();
+        const mapUa = {
+          emergency_stop: "аварійна зупинка",
+          overheat: "перегрів",
+          sensor_error: "помилка датчика",
+          no_power: "відсутнє живлення",
+          voltage_fault: "проблема напруги",
+          relay_fault: "несправність реле"
+        };
+        const mapEn = {
+          emergency_stop: "emergency stop",
+          overheat: "overheat",
+          sensor_error: "sensor error",
+          no_power: "no power",
+          voltage_fault: "voltage fault",
+          relay_fault: "relay fault"
+        };
+        if (isUa && mapUa[key]) return mapUa[key];
+        if (!isUa && mapEn[key]) return mapEn[key];
+        return raw;
+      };
+
+      const buildStatusVerbose = (summary) => {
+        const code = String(summary?.statusCode || summary?.status || "").toUpperCase();
+        if (code.includes("COMPLETE") || code === "OK") return isUa ? "Успішно" : "Completed";
+        if (code.includes("STOP")) return isUa ? "Перервано користувачем" : "Stopped by user";
+        if (code.includes("ERROR") || code.includes("FAULT")) {
+          const reason = translateFaultReason(summary?.faultReason);
+          return isUa ? `Помилка (${reason})` : `Error (${reason})`;
+        }
+        if (!String(summary?.status || "").trim()) return isUa ? "Невідомо" : "Unknown";
+        return String(summary.status);
+      };
+
+      const buildStatusShort = (summary) => {
+        const raw = String(summary?.statusCode || summary?.status || "").toUpperCase();
+        if (!raw) return isUa ? "НЕВІДОМО" : "UNKNOWN";
+        if (raw.includes("COMPLETE") || raw === "OK") return isUa ? "ГОТОВО" : "COMPLETE";
+        if (raw.includes("STOP")) return isUa ? "ЗУПИНЕНО" : "STOPPED";
+        if (raw.includes("ERROR") || raw.includes("FAULT")) return isUa ? "ПОМИЛКА" : "ERROR";
+        if (raw.includes("COOL")) return isUa ? "ОХОЛОДЖ." : "COOL";
+        return raw;
+      };
+
+      const estimateEnergy = (detail) => {
+        const direct =
+          Number(detail?.summary?.energyKwh || 0) ||
+          Number(detail?.summary?.energy_kwh || 0);
+        if (direct > 0) return direct;
+        const energyWh =
+          Number(detail?.summary?.energyWh || 0) ||
+          Number(detail?.summary?.energy_wh || 0);
+        if (energyWh > 0) return energyWh / 1000;
+        const rows = Array.isArray(detail?.data) ? detail.data : [];
+        if (rows.length < 2) return 0;
+        const tsDiv = detectTimestampSecondsDivisor(rows);
+        let wh = 0;
+        for (let i = 1; i < rows.length; i++) {
+          const p0 = Number(rows[i - 1]?.power ?? rows[i - 1]?.pzem_power ?? rows[i - 1]?.watts ?? 0);
+          const p1 = Number(rows[i]?.power ?? rows[i]?.pzem_power ?? rows[i]?.watts ?? 0);
+          const t0 = Number(rows[i - 1]?.timestamp ?? 0);
+          const t1 = Number(rows[i]?.timestamp ?? 0);
+          const dt_h = Math.max(0, ((t1 - t0) / tsDiv) / 3600);
+          wh += ((Math.max(0, p0) + Math.max(0, p1)) * 0.5) * dt_h;
+        }
+        return wh / 1000;
+      };
+
+      const buildStepDetails = (planned) => {
+        if (!Array.isArray(planned) || planned.length < 2) return "--";
+        const out = [];
+        let prevTemp = Number(planned[0].temp || 0);
+        for (let i = 1; i < planned.length; i++) {
+          const p = planned[i];
+          const temp = Number(p.temp || 0);
+          const time = Number(p.t || 0);
+          if (Math.abs(temp - prevTemp) < 0.5) continue;
+          const start = Number(planned[i - 1].t || 0);
+          const rampMin = Math.max(0, time - start);
+          let holdEnd = time;
+          let j = i + 1;
+          while (j < planned.length && Math.abs(Number(planned[j].temp || 0) - temp) < 0.5) {
+            holdEnd = Number(planned[j].t || holdEnd);
+            j++;
+          }
+          const holdMin = Math.max(0, holdEnd - time);
+          const rate = rampMin > 0 ? Math.round((Math.abs(temp - prevTemp) * 60) / rampMin) : 0;
+          out.push(
+            `${isUa ? "Крок" : "Step"} ${out.length + 1}: ` +
+            `${isUa ? "швидк." : "rate"} ${rate}, ` +
+            `${isUa ? "ціль" : "target"} ${Math.round(temp)}°, ` +
+            `${isUa ? "витр." : "hold"} ${Math.round(holdMin)}`
+          );
+          prevTemp = temp;
+          i = Math.max(i, j - 1);
+        }
+        return out.length ? out.join("\n") : "--";
+      };
+
+      const buildSeriesFromRows = (rows) => {
+        if (!Array.isArray(rows) || !rows.length) return { planned: [], actual: [] };
+        const firstTs = Number(rows[0]?.timestamp ?? 0);
+        const tsDiv = detectTimestampSecondsDivisor(rows);
+        const planned = [];
+        const actual = [];
+        rows.forEach((row, index) => {
+          const ts = Number(row?.timestamp ?? firstTs);
+          const t = index === 0 ? 0 : Math.max(0, ((ts - firstTs) / tsDiv) / 60);
+          const target = Number(row?.target ?? row?.setpoint ?? row?.planned ?? NaN);
+          const temp = Number(row?.temp ?? row?.temperature ?? row?.actual ?? NaN);
+          if (Number.isFinite(target)) planned.push({ t, temp: target });
+          if (Number.isFinite(temp)) actual.push({ t, temp });
+        });
+        return { planned, actual };
+      };
+
+      const normalizeSeriesPoints = (series) => {
+        if (!Array.isArray(series)) return [];
+        const out = [];
+        for (const p of series) {
+          if (!p || typeof p !== "object") continue;
+          const tRaw = Number(p.t ?? p.time ?? p.ts ?? p.timestamp ?? p.x ?? p.minute ?? p.min ?? p.elapsedMin ?? 0);
+          const tempRaw = Number(p.temp ?? p.temperature ?? p.actual ?? p.target ?? p.value ?? p.y ?? 0);
+          if (!Number.isFinite(tRaw) || !Number.isFinite(tempRaw)) continue;
+          out.push({ t: Math.max(0, tRaw), temp: tempRaw });
+        }
+        out.sort((a, b) => a.t - b.t);
+        return out;
+      };
+
+      const computeVoltageStability = (detail) => {
+        const rows = Array.isArray(detail?.data) ? detail.data : [];
+        let minV = Infinity;
+        let maxV = 0;
+        rows.forEach((s) => {
+          const v = Number(s?.voltage ?? 0);
+          if (v > 1) {
+            minV = Math.min(minV, v);
+            maxV = Math.max(maxV, v);
+          }
+        });
+        if (!Number.isFinite(minV) || maxV <= 0) return isUa ? "Н/Д" : "N/A";
+        const span = Math.max(0, maxV - minV);
+        return isUa
+          ? `${Math.round(minV)}-${Math.round(maxV)} В (±${(span * 0.5).toFixed(1)}В)`
+          : `${Math.round(minV)}-${Math.round(maxV)} V (+/-${(span * 0.5).toFixed(1)}V)`;
+      };
+
+      const computePeakTemp = (detail) => {
+        const dataPeak = (Array.isArray(detail?.data) ? detail.data : []).reduce(
+          (acc, row) => Math.max(acc, Number(row?.temp ?? 0)),
+          0
+        );
+        const summaryPeak = Number(detail?.summary?.peakTemp ?? detail?.summary?.peak_temp ?? 0);
+        return Math.max(0, dataPeak, summaryPeak);
+      };
+
+      const computeMaxLoad = (detail) => {
+        const rows = Array.isArray(detail?.data) ? detail.data : [];
+        const peakPower = rows.reduce(
+          (acc, row) => Math.max(acc, Number(row?.power ?? row?.pzem_power ?? row?.watts ?? 0)),
+          Number(detail?.summary?.peakPower ?? detail?.summary?.peak_power ?? 0)
+        );
+        const peakCurrent = rows.reduce(
+          (acc, row) => Math.max(acc, Number(row?.current ?? 0)),
+          Number(detail?.summary?.peakCurrent ?? detail?.summary?.peak_current ?? 0)
+        );
+        if (peakPower <= 0 && peakCurrent <= 0) return isUa ? "Н/Д" : "N/A";
+        return isUa
+          ? `${peakPower.toFixed(0)} Вт / ${peakCurrent.toFixed(1)} A`
+          : `${peakPower.toFixed(0)} W / ${peakCurrent.toFixed(1)} A`;
+      };
+
+      const buildStepPlanActualText = (detail) => {
+        const rows = Array.isArray(detail?.data) ? detail.data : [];
+        if (rows.length < 2) return isUa ? "Н/Д" : "N/A";
+        const tsDiv = detectTimestampSecondsDivisor(rows);
+        const boundaries = [0];
+        for (let i = 1; i < rows.length; i++) {
+          const prev = Number(rows[i - 1]?.target ?? 0);
+          const curr = Number(rows[i]?.target ?? 0);
+          if (Math.abs(curr - prev) >= 0.5) boundaries.push(i);
+        }
+        if (boundaries[boundaries.length - 1] !== rows.length - 1) boundaries.push(rows.length - 1);
+        const lines = [];
+        for (let i = 0; i < boundaries.length - 1; i++) {
+          const a = boundaries[i];
+          const b = boundaries[i + 1];
+          const target = Math.round(Number(rows[a]?.target ?? 0));
+          const dtMin = Math.max(0, Math.round(((Number(rows[b]?.timestamp ?? 0) - Number(rows[a]?.timestamp ?? 0)) / tsDiv) / 60));
+          const lbl = formatMinutesLabel(dtMin);
+          lines.push(
+            isUa
+              ? `Крок ${i + 1}: ціль ${target}°, план ${lbl}, факт ${lbl}`
+              : `Step ${i + 1}: target ${target}°, plan ${lbl}, actual ${lbl}`
+          );
+        }
+        return lines.length ? lines.join("\n") : (isUa ? "Н/Д" : "N/A");
+      };
+
+      const buildChangeDiffText = (detail) => {
+        const changes = Array.isArray(detail?.changes) ? detail.changes : [];
+        if (!changes.length) return isUa ? "Н/Д" : "N/A";
+        const lines = [];
+        for (let i = 0; i < changes.length; i++) {
+          if (i >= 14) {
+            lines.push(isUa ? `... ще ${changes.length - i} змін` : `... ${changes.length - i} more changes`);
+            break;
+          }
+          const ch = changes[i] || {};
+          const actionKey = String(ch.action || "").trim();
+          const action =
+            actionKey === "add_temp" ? (isUa ? "Додано температуру" : "Added temperature") :
+            actionKey === "add_time" ? (isUa ? "Додано час витримки" : "Added hold time") :
+            actionKey === "set_rate" ? (isUa ? "Змінено швидкість" : "Changed rate") :
+            actionKey === "skip_step" ? (isUa ? "Пропуск кроку" : "Skipped step") :
+            (isUa ? "Зміна" : "Change");
+          const field = String(ch.field || (isUa ? "параметр" : "field"));
+          const before = Number(ch.before ?? 0);
+          const after = Number(ch.after ?? 0);
+          const delta = Number(ch.delta ?? (after - before));
+          const step = Math.max(0, Number(ch.step || 0));
+          lines.push(
+            `${action}: ${field}, ${isUa ? "крок" : "step"} ${step}, ` +
+            `${before.toFixed(1)} -> ${after.toFixed(1)} (Δ${delta >= 0 ? "+" : ""}${delta.toFixed(1)})`
+          );
+        }
+        return lines.length ? lines.join("\n") : (isUa ? "Н/Д" : "N/A");
+      };
+
+      const P = { left: 44, right: 18, top: 16, bottom: 34 };
+
+      const resizeCanvasToWrap = () => {
+        const w = Math.max(320, Math.floor(chartWrap.clientWidth));
+        const h = Math.max(220, Math.floor(chartWrap.clientHeight));
+        const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+        const nextW = w * dpr;
+        const nextH = h * dpr;
+        if (chart.width !== nextW) chart.width = nextW;
+        if (chart.height !== nextH) chart.height = nextH;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+
+      const drawSeries = (data, color, maxT, maxY, plotW, plotH) => {
+        if (!data.length) return;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        data.forEach((p, i) => {
+          const x = P.left + (p.t / maxT) * plotW;
+          const y = P.top + plotH - (p.temp / maxY) * plotH;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        data.forEach((p) => {
+          const x = P.left + (p.t / maxT) * plotW;
+          const y = P.top + plotH - (p.temp / maxY) * plotH;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      };
+
+      const renderChart = (planned, actual) => {
+        planned = normalizeSeriesPoints(planned);
+        actual = normalizeSeriesPoints(actual);
+        resizeCanvasToWrap();
+        const w = chartWrap.clientWidth;
+        const h = chartWrap.clientHeight;
+        ctx.clearRect(0,0,w,h);
+        ctx.fillStyle = THEME.surface;
+        ctx.fillRect(0,0,w,h);
+        const all = planned.concat(actual);
+        const maxT = Math.max(60, ...all.map(p=>p.t||0), 0);
+        const maxY = Math.max(100, ...all.map(p=>p.temp||0), 0);
+        const plotW = Math.max(1, w - P.left - P.right);
+        const plotH = Math.max(1, h - P.top - P.bottom);
+        ctx.strokeStyle = THEME.grid;
+        ctx.lineWidth = 1;
+        for (let i=1;i<=4;i++){const y=P.top+i*(plotH)/5;ctx.beginPath();ctx.moveTo(P.left,y);ctx.lineTo(P.left+plotW,y);ctx.stroke();}
+        for (let i=1;i<=5;i++){const x=P.left+i*(plotW)/6;ctx.beginPath();ctx.moveTo(x,P.top);ctx.lineTo(x,P.top+plotH);ctx.stroke();}
+        if (!all.length) {
+          ctx.fillStyle = THEME.subtle;
+          ctx.font = `12px ${THEME.font}`;
+          ctx.fillText(t("Немає даних для графіка","No chart data"), P.left + 8, P.top + 24);
+          return;
+        }
+        if (actual.length > 0) {
+          drawSeries(planned, THEME.planned, maxT, maxY, plotW, plotH);
+          drawSeries(actual, THEME.actual, maxT, maxY, plotW, plotH);
+        } else {
+          drawSeries(planned, THEME.actual, maxT, maxY, plotW, plotH);
+        }
+      };
+
+      const setDetail = (detail) => {
+        document.getElementById("detail-title").textContent = detail.summary?.scheduleName || detail.summary?.name || "";
+        document.getElementById("v-program").textContent = detail.summary?.scheduleName || detail.summary?.name || "—";
+        document.getElementById("v-start").textContent = detail.summary?.startTime || (isUa ? "Н/Д" : "N/A");
+        document.getElementById("v-end").textContent = detail.summary?.endTime || (isUa ? "Н/Д" : "N/A");
+        document.getElementById("v-status").textContent = buildStatusShort(detail.summary);
+        document.getElementById("v-status-verbose").textContent = buildStatusVerbose(detail.summary);
+        document.getElementById("v-duration").textContent = detail.summary?.duration ? fmtMinutes(detail.summary.duration) : "--";
+        document.getElementById("v-steps").textContent = detail.summary?.totalSteps ?? "--";
+        const ekwh = estimateEnergy(detail);
+        document.getElementById("v-energy").textContent = ekwh > 0 ? (isUa ? `${ekwh.toFixed(2)} кВт·год` : `${ekwh.toFixed(2)} kWh`) : "--";
+        const costRaw = Number(detail.summary?.cost ?? 0);
+        document.getElementById("v-cost").textContent = costRaw > 0 ? (isUa ? `${costRaw.toFixed(2)} грн` : `${costRaw.toFixed(2)} UAH`) : (isUa ? "Н/Д (тариф не задано)" : "N/A (tariff not set)");
+        document.getElementById("v-max-load").textContent = computeMaxLoad(detail);
+        const peakTemp = computePeakTemp(detail);
+        document.getElementById("v-peak-temp").textContent = peakTemp > 0 ? `${peakTemp.toFixed(1)}°C` : (isUa ? "Н/Д" : "N/A");
+        document.getElementById("v-voltage-stability").textContent = computeVoltageStability(detail);
+        const fallbackSeries = buildSeriesFromRows(detail?.data);
+        const planned = normalizeSeriesPoints((Array.isArray(detail.planned) && detail.planned.length ? detail.planned : fallbackSeries.planned) || []);
+        const stepPlanActual = buildStepPlanActualText(detail);
+        const changeDiff = buildChangeDiffText(detail);
+        document.getElementById("v-step-plan-actual").textContent =
+          changeDiff !== (isUa ? "Н/Д" : "N/A")
+            ? `${stepPlanActual !== (isUa ? "Н/Д" : "N/A") ? stepPlanActual : buildStepDetails(planned)}\n\n${isUa ? "Зміни під час випалу:" : "Changes during firing:"}\n${changeDiff}`
+            : (stepPlanActual !== (isUa ? "Н/Д" : "N/A") ? stepPlanActual : buildStepDetails(planned));
+        currentPlanned = planned;
+        currentActual = normalizeSeriesPoints((Array.isArray(detail.actual) && detail.actual.length ? detail.actual : fallbackSeries.actual) || []);
+        renderChart(currentPlanned, currentActual);
+      };
+
+      let historyItems = [];
+      const loadDetail = async (id) => {
+        const res = await fetch(`/api/history/${id}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const detail = await res.json();
+        activeId = id;
+        updateSelection();
+        setDetail(detail);
+      };
+
+      let activeId = "";
+      const updateSelection = () => {
+        Array.from(listEl.querySelectorAll("[data-id]")).forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          el.classList.toggle("history-list-card--active", el.dataset.id === activeId);
+        });
+      };
+
+      const renderList = async (items) => {
+        const total = Array.isArray(items) ? items.length : 0;
+        const capped = Array.isArray(items) ? items.slice(0, 200) : [];
+        listEl.innerHTML = "";
+        if (total > capped.length) {
+          const info = document.createElement("div");
+          info.className = "history-muted text-xs mb-2";
+          info.textContent = isUa ? `Показано ${capped.length} з ${total}` : `Showing ${capped.length} of ${total}`;
+          listEl.appendChild(info);
+        }
+
+        const makeCard = (item) => {
+          const card = document.createElement("div");
+          card.dataset.id = item.id || "";
+          card.className = "history-list-card p-4 mb-3 cursor-pointer " + ((item.id || "") === activeId ? "history-list-card--active" : "");
+          const title = document.createElement("div");
+          title.className = "text-white font-bold text-sm";
+          title.textContent = item.title || item.name || "—";
+          const subtitle = document.createElement("div");
+          subtitle.className = "history-muted text-xs mt-1";
+          subtitle.textContent = isUa ? (item.subtitle_ua || item.subtitle || "") : (item.subtitle_en || item.subtitle || "");
+          const row = document.createElement("div");
+          row.className = "flex items-center justify-between gap-2 mt-3";
+          const status = document.createElement("span");
+          const sc = String(item.statusCode || "");
+          const ok = sc.includes("COMPLETE") || sc.includes("OK");
+          status.className = "px-2 py-0.5 rounded-lg text-xs font-bold";
+          status.style.background = ok ? THEME.accent : THEME.surfaceAlt;
+          status.style.color = ok ? "#071018" : THEME.text;
+          status.textContent = buildStatusShort({ statusCode: item.statusCode, status: item.status });
+          const detailBtn = document.createElement("button");
+          detailBtn.className = "history-button px-3 py-1 text-xs";
+          detailBtn.textContent = t("Деталі","Details");
+          detailBtn.onclick = (ev) => { ev.stopPropagation(); item.id && loadDetail(item.id); };
+          card.onclick = () => item.id && loadDetail(item.id);
+          row.append(status, detailBtn);
+          card.append(title, subtitle, row);
+          return card;
+        };
+
+        const batchSize = 25;
+        for (let i = 0; i < capped.length; i += batchSize) {
+          const frag = document.createDocumentFragment();
+          for (let j = i; j < Math.min(capped.length, i + batchSize); j++) {
+            frag.appendChild(makeCard(capped[j]));
+          }
+          listEl.appendChild(frag);
+          await new Promise((r) => requestAnimationFrame(r));
+        }
+      };
+
+      const loadList = async () => {
+        const res = await fetch("/api/history", { cache: "no-store" });
+        if (!res.ok) return;
+        historyItems = await res.json();
+        await renderList(historyItems);
+        if (historyItems.length && historyItems[0].id) {
+          loadDetail(historyItems[0].id);
+        } else {
+          setDetail({ summary: {}, data: [], planned: [], actual: [] });
+        }
+      };
+
+      loadList();
+      new ResizeObserver(() => renderChart(currentPlanned, currentActual)).observe(chartWrap);
+    </script>
+  </body>
+</html>

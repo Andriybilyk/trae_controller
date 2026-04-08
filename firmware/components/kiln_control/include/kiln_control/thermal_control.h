@@ -150,12 +150,22 @@ private:
         float temp;
         float target;
     };
+    struct HistoryChange {
+        uint64_t ts_ms;
+        int step;
+        std::string action;
+        std::string field;
+        float before_value;
+        float after_value;
+        float delta;
+    };
     bool historyActive;
     std::string historyId;
     uint64_t historyStartMs;
     float historyPeakTemp;
     uint64_t lastHistorySampleMs;
     std::vector<HistoryPoint> historyPoints;
+    std::vector<HistoryChange> historyChanges;
 
     // Safety / diagnostics
     float lastTemp;
@@ -227,6 +237,7 @@ private:
     void historyStartLocked(uint64_t now_ms);
     void historySampleLocked(uint64_t now_ms);
     void historyFinalizeLocked(uint64_t now_ms, const char *status);
+    void historyRecordChangeLocked(const char *action, const char *field, float before_value, float after_value);
     
     // Safety
     uint64_t lastUpdate;

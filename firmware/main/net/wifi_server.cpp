@@ -38,6 +38,7 @@ static constexpr size_t AUDIT_LOG_MAX_BYTES = 128 * 1024;
 
 static const char *result_code_to_str(device_commands::ResultCode code);
 static const char *result_message(device_commands::ResultCode code);
+static std::string normalize_schedule_storage_name(const char *name);
 static void copy_text_field(char *dst, size_t dst_len, const char *src) {
     if (!dst || dst_len == 0) return;
     dst[0] = '\0';
@@ -192,6 +193,8 @@ static const char *get_string_or_null(const cJSON *obj, const char *key) {
     return nullptr;
 }
 
+static std::string humanize_schedule_name(const char *name);
+
 static void normalize_schedule_steps(cJSON *schedule) {
     if (!schedule || !cJSON_IsObject(schedule)) return;
 
@@ -205,20 +208,174 @@ static void normalize_schedule_steps(cJSON *schedule) {
     cJSON_AddItemToObject(schedule, "steps", segments);
 }
 
+static void ensure_schedule_segments(cJSON *schedule) {
+    if (!schedule || !cJSON_IsObject(schedule)) return;
+    const cJSON *segments = cJSON_GetObjectItem(schedule, "segments");
+    if (cJSON_IsArray(segments)) return;
+    const cJSON *steps = cJSON_GetObjectItem(schedule, "steps");
+    if (!cJSON_IsArray(steps)) return;
+    cJSON_AddItemToObject(schedule, "segments", cJSON_Duplicate(steps, 1));
+}
+
+static int json_int_or(const cJSON *obj, const char *key, int fallback) {
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
+    if (!v) return fallback;
+    if (cJSON_IsNumber(v)) return v->valueint;
+    return fallback;
+}
+
+static bool has_number(const cJSON *obj, const char *key) {
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(obj, key);
+    return cJSON_IsNumber(v);
+}
+
+static int extract_hold_minutes(const cJSON *step) {
+    if (!step || !cJSON_IsObject(step)) return 0;
+    if (has_number(step, "holdTime")) return json_int_or(step, "holdTime", 0);
+    if (has_number(step, "hold")) return json_int_or(step, "hold", 0);
+    if (has_number(step, "holdMinutes")) return json_int_or(step, "holdMinutes", 0);
+    if (has_number(step, "duration")) return json_int_or(step, "duration", 0);
+    if (has_number(step, "time")) return json_int_or(step, "time", 0);
+    return 0;
+}
+
+static void coalesce_web_two_part_steps(cJSON *schedule) {
+    if (!schedule || !cJSON_IsObject(schedule)) return;
+    cJSON *steps = cJSON_GetObjectItem(schedule, "steps");
+    if (!cJSON_IsArray(steps)) return;
+
+    cJSON *merged = cJSON_CreateArray();
+    const int n = cJSON_GetArraySize(steps);
+    for (int i = 0; i < n; ++i) {
+        cJSON *cur = cJSON_GetArrayItem(steps, i);
+        if (!cJSON_IsObject(cur)) continue;
+        cJSON *cur_dup = cJSON_Duplicate(cur, 1);
+        if (!cJSON_IsObject(cur_dup)) continue;
+
+        const int cur_rate = json_int_or(cur_dup, "rate", 0);
+        const int cur_target = json_int_or(cur_dup, "target", 0);
+        int cur_hold = extract_hold_minutes(cur_dup);
+
+        if (i + 1 < n) {
+            cJSON *next = cJSON_GetArrayItem(steps, i + 1);
+            if (cJSON_IsObject(next)) {
+                const int next_rate = json_int_or(next, "rate", 0);
+                const int next_target = json_int_or(next, "target", cur_target);
+                int next_hold = extract_hold_minutes(next);
+
+                const bool is_ramp = (cur_rate > 0 && cur_target > 0);
+                const bool next_is_hold_part = (next_hold > 0 && next_rate == 0 && next_target == cur_target);
+                if (is_ramp && next_is_hold_part) {
+                    cJSON_DeleteItemFromObject(cur_dup, "holdTime");
+                    cJSON_DeleteItemFromObject(cur_dup, "hold");
+                    cJSON_AddNumberToObject(cur_dup, "holdTime", std::max(0, cur_hold + next_hold));
+                    ++i;
+                }
+            }
+        }
+
+        cJSON_AddItemToArray(merged, cur_dup);
+    }
+
+    cJSON_DeleteItemFromObject(schedule, "steps");
+    cJSON_AddItemToObject(schedule, "steps", merged);
+}
+
+static void normalize_step_field_aliases(cJSON *schedule) {
+    if (!schedule || !cJSON_IsObject(schedule)) return;
+    cJSON *steps = cJSON_GetObjectItem(schedule, "steps");
+    if (!cJSON_IsArray(steps)) return;
+
+    const int n = cJSON_GetArraySize(steps);
+    for (int i = 0; i < n; ++i) {
+        cJSON *step = cJSON_GetArrayItem(steps, i);
+        if (!cJSON_IsObject(step)) continue;
+
+        const int hold_minutes = extract_hold_minutes(step);
+        cJSON_DeleteItemFromObject(step, "holdTime");
+        cJSON_DeleteItemFromObject(step, "hold");
+        cJSON_DeleteItemFromObject(step, "holdMinutes");
+        cJSON_DeleteItemFromObject(step, "duration");
+        cJSON_DeleteItemFromObject(step, "time");
+        cJSON_AddNumberToObject(step, "holdTime", hold_minutes);
+        cJSON_AddNumberToObject(step, "hold", hold_minutes);
+        cJSON_AddNumberToObject(step, "holdMinutes", hold_minutes);
+        cJSON_AddNumberToObject(step, "duration", hold_minutes);
+        cJSON_AddNumberToObject(step, "time", hold_minutes);
+    }
+}
+
+static void expand_hold_for_web_response(cJSON *schedule) {
+    if (!schedule || !cJSON_IsObject(schedule)) return;
+    cJSON *steps = cJSON_GetObjectItem(schedule, "steps");
+    if (!cJSON_IsArray(steps)) return;
+
+    cJSON *expanded = cJSON_CreateArray();
+    const int n = cJSON_GetArraySize(steps);
+    for (int i = 0; i < n; ++i) {
+        cJSON *step = cJSON_GetArrayItem(steps, i);
+        if (!cJSON_IsObject(step)) continue;
+        cJSON *ramp = cJSON_Duplicate(step, 1);
+        if (!cJSON_IsObject(ramp)) continue;
+
+        const int hold = extract_hold_minutes(step);
+        const int target = json_int_or(step, "target", 0);
+        const int rate = json_int_or(step, "rate", 0);
+        const bool has_hold = hold > 0;
+        const bool is_hold_only = (rate == 0 && target > 0 && has_hold);
+
+        if (!is_hold_only) {
+            cJSON_DeleteItemFromObject(ramp, "holdTime");
+            cJSON_DeleteItemFromObject(ramp, "hold");
+            cJSON_DeleteItemFromObject(ramp, "holdMinutes");
+            cJSON_DeleteItemFromObject(ramp, "duration");
+            cJSON_DeleteItemFromObject(ramp, "time");
+            cJSON_AddNumberToObject(ramp, "holdTime", 0);
+            cJSON_AddStringToObject(ramp, "type", "ramp");
+            cJSON_AddItemToArray(expanded, ramp);
+
+            if (has_hold) {
+                cJSON *hold_step = cJSON_CreateObject();
+                cJSON_AddStringToObject(hold_step, "type", "hold");
+                cJSON_AddNumberToObject(hold_step, "rate", 0);
+                cJSON_AddNumberToObject(hold_step, "target", target);
+                cJSON_AddNumberToObject(hold_step, "holdTime", hold);
+                cJSON_AddNumberToObject(hold_step, "hold", hold);
+                cJSON_AddItemToArray(expanded, hold_step);
+            }
+        } else {
+            cJSON_AddItemToArray(expanded, ramp);
+        }
+    }
+
+    cJSON_DeleteItemFromObject(schedule, "steps");
+    cJSON_AddItemToObject(schedule, "steps", expanded);
+    ensure_schedule_segments(schedule);
+}
+
 static std::string ensure_schedule_name(cJSON *schedule) {
     if (!schedule || !cJSON_IsObject(schedule)) return {};
 
     const char *existingName = get_string_or_null(schedule, "name");
-    const char *fallback = existingName;
-    if (!fallback) fallback = get_string_or_null(schedule, "title");
-    if (!fallback) fallback = get_string_or_null(schedule, "id");
+    const char *title = get_string_or_null(schedule, "title");
+    const char *id = get_string_or_null(schedule, "id");
 
-    if (fallback) {
-        if (!existingName || strcmp(existingName, fallback) != 0) {
+    std::string chosen;
+    if (existingName) {
+        chosen = existingName;
+    } else if (title) {
+        chosen = title;
+    } else if (id) {
+        chosen = id;
+    }
+    chosen = normalize_schedule_storage_name(chosen.c_str());
+
+    if (!chosen.empty()) {
+        if (!existingName || strcmp(existingName, chosen.c_str()) != 0) {
             cJSON_DeleteItemFromObject(schedule, "name");
-            cJSON_AddStringToObject(schedule, "name", fallback);
+            cJSON_AddStringToObject(schedule, "name", chosen.c_str());
         }
-        return fallback;
+        return chosen;
     }
 
     char generated[64];
@@ -238,8 +395,92 @@ static void ensure_schedule_id(cJSON *schedule) {
     const cJSON *idItem = cJSON_GetObjectItem(schedule, "id");
     if (cJSON_IsString(idItem) && idItem->valuestring && idItem->valuestring[0]) return;
 
+    std::string id(name);
+    for (char &ch : id) {
+        if (ch == ' ') ch = '_';
+    }
     cJSON_DeleteItemFromObject(schedule, "id");
-    cJSON_AddStringToObject(schedule, "id", name);
+    cJSON_AddStringToObject(schedule, "id", id.c_str());
+}
+
+static std::string humanize_schedule_name(const char *name) {
+    if (!name) return {};
+    std::string out(name);
+    for (char &c : out) {
+        if (c == '_') c = ' ';
+    }
+    return out;
+}
+
+static std::string normalize_schedule_storage_name(const char *name) {
+    if (!name) return {};
+    std::string out;
+    out.reserve(strlen(name));
+    bool prev_underscore = false;
+    for (char c : std::string(name)) {
+        const bool is_ws = (c == ' ' || c == '\t' || c == '\r' || c == '\n');
+        if (is_ws) {
+            if (!prev_underscore) {
+                out.push_back('_');
+                prev_underscore = true;
+            }
+            continue;
+        }
+        out.push_back(c);
+        prev_underscore = (c == '_');
+    }
+    while (!out.empty() && out.front() == '_') out.erase(out.begin());
+    while (!out.empty() && out.back() == '_') out.pop_back();
+    return out;
+}
+
+static std::string normalize_schedule_name_key(const char *name) {
+    if (!name) return {};
+    std::string out;
+    out.reserve(strlen(name));
+    for (char c : std::string(name)) {
+        if (c == '_' || c == ' ') continue;
+        out.push_back((char)std::tolower((unsigned char)c));
+    }
+    return out;
+}
+
+static cJSON *build_normalized_schedule_copy(cJSON *source) {
+    if (!cJSON_IsObject(source)) return nullptr;
+
+    cJSON *schedule_source = source;
+    cJSON *wrapped = cJSON_GetObjectItem(source, "schedule");
+    if (cJSON_IsObject(wrapped)) {
+        schedule_source = wrapped;
+    }
+
+    cJSON *normalized = cJSON_Duplicate(schedule_source, 1);
+    if (!cJSON_IsObject(normalized)) {
+        if (normalized) cJSON_Delete(normalized);
+        return nullptr;
+    }
+
+    cJSON *steps_top = cJSON_GetObjectItem(source, "steps");
+    if (!cJSON_IsArray(steps_top)) steps_top = cJSON_GetObjectItem(source, "segments");
+    if (cJSON_IsArray(steps_top)) {
+        cJSON_DeleteItemFromObject(normalized, "steps");
+        cJSON_AddItemToObject(normalized, "steps", cJSON_Duplicate(steps_top, 1));
+        cJSON_DeleteItemFromObject(normalized, "segments");
+    } else {
+        cJSON *segments = cJSON_GetObjectItem(normalized, "segments");
+        cJSON *steps = cJSON_GetObjectItem(normalized, "steps");
+        if (cJSON_IsArray(segments) && cJSON_IsArray(steps)) {
+            cJSON_DeleteItemFromObject(normalized, "segments");
+        }
+    }
+
+    normalize_schedule_steps(normalized);
+    coalesce_web_two_part_steps(normalized);
+    normalize_step_field_aliases(normalized);
+    ensure_schedule_segments(normalized);
+    ensure_schedule_name(normalized);
+    ensure_schedule_id(normalized);
+    return normalized;
 }
 
 esp_err_t static_asset_handler(httpd_req_t *req);
@@ -1123,13 +1364,29 @@ esp_err_t WiFiServerManager::api_schedules_handler(httpd_req_t *req) {
     }
 
     if (!name.empty()) {
+        const std::string wanted_key = normalize_schedule_name_key(name.c_str());
         cJSON *match = nullptr;
         cJSON *it = nullptr;
         cJSON_ArrayForEach(it, root) {
             const cJSON *n = cJSON_GetObjectItem(it, "name");
+            const cJSON *idv = cJSON_GetObjectItem(it, "id");
             if (cJSON_IsString(n) && n->valuestring && strcmp(n->valuestring, name.c_str()) == 0) {
                 match = it;
                 break;
+            }
+            if (cJSON_IsString(idv) && idv->valuestring && strcmp(idv->valuestring, name.c_str()) == 0) {
+                match = it;
+                break;
+            }
+            if (!wanted_key.empty()) {
+                const bool name_match = cJSON_IsString(n) && n->valuestring &&
+                    normalize_schedule_name_key(n->valuestring) == wanted_key;
+                const bool id_match = cJSON_IsString(idv) && idv->valuestring &&
+                    normalize_schedule_name_key(idv->valuestring) == wanted_key;
+                if (name_match || id_match) {
+                    match = it;
+                    break;
+                }
             }
         }
 
@@ -1142,7 +1399,15 @@ esp_err_t WiFiServerManager::api_schedules_handler(httpd_req_t *req) {
         }
 
         normalize_schedule_steps(match);
+        normalize_step_field_aliases(match);
+        expand_hold_for_web_response(match);
+        ensure_schedule_segments(match);
         ensure_schedule_id(match);
+        if (const cJSON *n = cJSON_GetObjectItem(match, "name"); cJSON_IsString(n) && n->valuestring) {
+            cJSON_DeleteItemFromObject(match, "title");
+            const std::string title = humanize_schedule_name(n->valuestring);
+            cJSON_AddStringToObject(match, "title", title.c_str());
+        }
         const cJSON *steps = cJSON_GetObjectItem(match, "steps");
         const int stepsCount = cJSON_IsArray(steps) ? cJSON_GetArraySize(steps) : 0;
         cJSON_DeleteItemFromObject(match, "stepsCount");
@@ -1170,6 +1435,9 @@ esp_err_t WiFiServerManager::api_schedules_handler(httpd_req_t *req) {
             }
 
             normalize_schedule_steps(it);
+            normalize_step_field_aliases(it);
+            expand_hold_for_web_response(it);
+            ensure_schedule_segments(it);
 
             const cJSON *steps = cJSON_GetObjectItem(it, "steps");
             const int stepsCount = cJSON_IsArray(steps) ? cJSON_GetArraySize(steps) : 0;
@@ -1182,6 +1450,12 @@ esp_err_t WiFiServerManager::api_schedules_handler(httpd_req_t *req) {
                 snprintf(fallback, sizeof(fallback), "Unnamed_%d", idx);
                 cJSON_DeleteItemFromObject(it, "name");
                 cJSON_AddStringToObject(it, "name", fallback);
+                cJSON_DeleteItemFromObject(it, "title");
+                cJSON_AddStringToObject(it, "title", humanize_schedule_name(fallback).c_str());
+            } else {
+                cJSON_DeleteItemFromObject(it, "title");
+                const std::string title = humanize_schedule_name(n->valuestring);
+                cJSON_AddStringToObject(it, "title", title.c_str());
             }
             ensure_schedule_id(it);
             idx++;
@@ -1227,24 +1501,23 @@ esp_err_t WiFiServerManager::api_schedules_save_handler(httpd_req_t *req) {
     cJSON *arr = nullptr;
     std::string respName;
     if (cJSON_IsArray(incoming)) {
+        for (int i = 0; i < cJSON_GetArraySize(incoming); ++i) {
+            cJSON *item = cJSON_GetArrayItem(incoming, i);
+            cJSON *normalized = build_normalized_schedule_copy(item);
+            if (!normalized) continue;
+            cJSON_ReplaceItemInArray(incoming, i, normalized);
+        }
         arr = incoming; // overwrite
         incoming = nullptr;
     } else if (cJSON_IsObject(incoming)) {
-        cJSON *scheduleObj = incoming;
-        cJSON *wrapped = cJSON_GetObjectItem(incoming, "schedule");
-        if (cJSON_IsObject(wrapped)) {
-            scheduleObj = wrapped;
-
-            cJSON *stepsTop = cJSON_GetObjectItem(incoming, "steps");
-            if (!cJSON_IsArray(stepsTop)) stepsTop = cJSON_GetObjectItem(incoming, "segments");
-            if (cJSON_IsArray(stepsTop) && !cJSON_IsArray(cJSON_GetObjectItem(scheduleObj, "steps")) && !cJSON_IsArray(cJSON_GetObjectItem(scheduleObj, "segments"))) {
-                cJSON_AddItemToObject(scheduleObj, "steps", cJSON_Duplicate(stepsTop, 1));
-            }
+        cJSON *scheduleObj = build_normalized_schedule_copy(incoming);
+        if (!scheduleObj) {
+            cJSON_Delete(incoming);
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_sendstr(req, "{\"error\":\"invalid_schedule\"}");
+            return ESP_OK;
         }
-
-        normalize_schedule_steps(scheduleObj);
         respName = ensure_schedule_name(scheduleObj);
-        ensure_schedule_id(scheduleObj);
 
         const std::string existingFile = kiln_fs_read_text("/littlefs/schedules.json");
         cJSON *root = existingFile.empty() ? cJSON_CreateArray() : cJSON_Parse(existingFile.c_str());
@@ -1254,11 +1527,23 @@ esp_err_t WiFiServerManager::api_schedules_save_handler(httpd_req_t *req) {
         }
 
         const char *name = respName.c_str();
+        const char *incoming_id = get_string_or_null(scheduleObj, "id");
+        const std::string incoming_name_key = normalize_schedule_name_key(name);
         bool replaced = false;
         for (int i = 0; i < cJSON_GetArraySize(root); i++) {
             cJSON *it = cJSON_GetArrayItem(root, i);
             const cJSON *n = cJSON_GetObjectItem(it, "name");
-            if (cJSON_IsString(n) && n->valuestring && strcmp(n->valuestring, name) == 0) {
+            const cJSON *id = cJSON_GetObjectItem(it, "id");
+            const bool id_match = incoming_id && cJSON_IsString(id) && id->valuestring && strcmp(id->valuestring, incoming_id) == 0;
+            const bool name_match = cJSON_IsString(n) && n->valuestring && strcmp(n->valuestring, name) == 0;
+            const bool id_missing = !(cJSON_IsString(id) && id->valuestring && id->valuestring[0]);
+            const bool legacy_key_match =
+                id_missing &&
+                !incoming_name_key.empty() &&
+                cJSON_IsString(n) &&
+                n->valuestring &&
+                normalize_schedule_name_key(n->valuestring) == incoming_name_key;
+            if (id_match || name_match || legacy_key_match) {
                 cJSON_ReplaceItemInArray(root, i, cJSON_Duplicate(scheduleObj, 1));
                 replaced = true;
                 break;
@@ -1266,6 +1551,7 @@ esp_err_t WiFiServerManager::api_schedules_save_handler(httpd_req_t *req) {
         }
         if (!replaced) cJSON_AddItemToArray(root, cJSON_Duplicate(scheduleObj, 1));
 
+        cJSON_Delete(scheduleObj);
         cJSON_Delete(incoming);
         arr = root;
     } else {

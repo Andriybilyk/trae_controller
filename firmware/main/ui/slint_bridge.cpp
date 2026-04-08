@@ -4,18 +4,23 @@
 #include "drivers/display_driver.h"
 #include "drivers/pzem004t_driver.h"
 #include "kiln_control/thermal_control.h"
+#include "kiln_config/config_store.h"
 #include "drivers/rtc_ds3231.h"
 #include "net/wifi_connection.h"
 #include "net/wifi_server.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "esp_system.h"
+#include "esp_mac.h"
+#include "esp_app_desc.h"
 #include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "cJSON.h"
 
 #include <atomic>
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -38,6 +43,14 @@ static constexpr uint8_t DATE_FMT_MDY = 1;
 static constexpr uint8_t DATE_FMT_YMD = 2;
 static std::atomic<bool> s_fault_clear_inflight{false};
 static std::atomic<uint64_t> s_last_fault_clear_ms{0};
+
+static bool copy_cstr_out(char *out, int32_t out_len, const char *src) {
+    if (!out || out_len <= 0 || !src) return false;
+    const size_t n = strnlen(src, static_cast<size_t>(out_len - 1));
+    memcpy(out, src, n);
+    out[n] = '\0';
+    return true;
+}
 
 static uint8_t ui_pref_get_u8(const char *key, uint8_t fallback) {
     nvs_handle_t h = 0;
@@ -127,6 +140,41 @@ static bool notify_slint_command(const char *action,
                                  const char *ok_message) {
     wifiServer.notifyCommandResult(action, res, ok_message, "slint");
     return res.ok();
+}
+
+static cJSON *load_settings_root() {
+    cJSON *root = nullptr;
+    const std::string existing = kiln_config_load_json_config();
+    if (!existing.empty()) {
+        root = cJSON_Parse(existing.c_str());
+    }
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
+        root = cJSON_CreateObject();
+    }
+    return root;
+}
+
+static bool save_settings_root(cJSON *root) {
+    if (!root) return false;
+    char *rendered = cJSON_PrintUnformatted(root);
+    const std::string out = rendered ? rendered : "{}";
+    if (rendered) free(rendered);
+    const bool ok = kiln_config_save_json_config(out);
+    if (ok) {
+        wifiServer.notifySettingsChanged("save");
+    }
+    return ok;
+}
+
+static double read_settings_number(const char *key, double fallback) {
+    if (!key) return fallback;
+    cJSON *root = load_settings_root();
+    if (!root) return fallback;
+    const cJSON *item = cJSON_GetObjectItem(root, key);
+    const double out = cJSON_IsNumber(item) ? item->valuedouble : fallback;
+    cJSON_Delete(root);
+    return out;
 }
 
 extern "C" void slint_bridge_display_init(void) {
@@ -220,6 +268,59 @@ extern "C" void slint_bridge_stop_autotune(void) {
 
 extern "C" float slint_bridge_get_user_max_temp_c(void) {
     return thermalCtrl.getUserMaxTemperatureC();
+}
+
+extern "C" bool slint_bridge_set_user_max_temp_c(float max_c) {
+    if (!std::isfinite(max_c)) return false;
+    const float clamped = std::clamp(max_c, 100.0f, 1300.0f);
+    if (!thermalCtrl.setUserMaxTemperatureC(clamped)) {
+        return false;
+    }
+    cJSON *root = load_settings_root();
+    if (!root) return false;
+    cJSON_DeleteItemFromObject(root, "maxC");
+    cJSON_AddNumberToObject(root, "maxC", (double)clamped);
+    const bool ok = save_settings_root(root);
+    cJSON_Delete(root);
+    return ok;
+}
+
+extern "C" float slint_bridge_get_temperature_offset_c(void) {
+    return thermalCtrl.getTemperatureOffset();
+}
+
+extern "C" bool slint_bridge_set_temperature_offset_c(float offset_c) {
+    if (!std::isfinite(offset_c)) return false;
+    const float clamped = std::clamp(offset_c, -100.0f, 100.0f);
+    if (!thermalCtrl.setTemperatureOffset(clamped)) {
+        return false;
+    }
+    cJSON *root = load_settings_root();
+    if (!root) return false;
+    cJSON_DeleteItemFromObject(root, "temp_offset_c");
+    cJSON_AddNumberToObject(root, "temp_offset_c", (double)clamped);
+    cJSON_DeleteItemFromObject(root, "offset");
+    cJSON_AddNumberToObject(root, "offset", (double)clamped);
+    const bool ok = save_settings_root(root);
+    cJSON_Delete(root);
+    return ok;
+}
+
+extern "C" int32_t slint_bridge_get_kiln_wattage(void) {
+    const double watts = read_settings_number("wattage", 0.0);
+    if (!std::isfinite(watts)) return 0;
+    return (int32_t)std::lround(watts);
+}
+
+extern "C" bool slint_bridge_set_kiln_wattage(int32_t watts) {
+    const int32_t clamped = std::clamp<int32_t>(watts, 100, 50000);
+    cJSON *root = load_settings_root();
+    if (!root) return false;
+    cJSON_DeleteItemFromObject(root, "wattage");
+    cJSON_AddNumberToObject(root, "wattage", (double)clamped);
+    const bool ok = save_settings_root(root);
+    cJSON_Delete(root);
+    return ok;
 }
 
 extern "C" float slint_bridge_get_autotune_target_c(void) {
@@ -406,6 +507,30 @@ extern "C" bool slint_bridge_get_date_str(char *out, int32_t out_len) {
         std::snprintf(out, out_len, "%02d.%02d.%04d", local_tm.tm_mday, local_tm.tm_mon + 1, year);
     }
     return true;
+}
+
+extern "C" bool slint_bridge_get_firmware_version_copy(char *out, int32_t out_len) {
+    const esp_app_desc_t *desc = esp_app_get_description();
+    if (!desc || !desc->version[0]) return copy_cstr_out(out, out_len, "unknown");
+    return copy_cstr_out(out, out_len, desc->version);
+}
+
+extern "C" bool slint_bridge_get_device_id_copy(char *out, int32_t out_len) {
+    uint8_t mac[6] = {0};
+    if (esp_efuse_mac_get_default(mac) != ESP_OK) {
+        return copy_cstr_out(out, out_len, "--");
+    }
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    return copy_cstr_out(out, out_len, buf);
+}
+
+extern "C" uint64_t slint_bridge_get_uptime_seconds(void) {
+    return static_cast<uint64_t>(esp_timer_get_time() / 1000000ULL);
+}
+
+extern "C" uint32_t slint_bridge_get_free_heap_bytes(void) {
+    return static_cast<uint32_t>(esp_get_free_heap_size());
 }
 
 static bool load_current_tm(struct tm *out_tm) {

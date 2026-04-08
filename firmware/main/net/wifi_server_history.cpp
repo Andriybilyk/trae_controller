@@ -37,6 +37,95 @@ static void replace_item(cJSON *obj, const char *key, cJSON *item) {
     cJSON_AddItemToObject(obj, key, item);
 }
 
+static int get_step_int(const cJSON *step, const char *key, int fallback = 0) {
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(step, key);
+    return cJSON_IsNumber(v) ? v->valueint : fallback;
+}
+
+static int get_step_hold_minutes(const cJSON *step) {
+    const cJSON *v = cJSON_GetObjectItemCaseSensitive(step, "holdTime");
+    if (cJSON_IsNumber(v)) return v->valueint;
+    v = cJSON_GetObjectItemCaseSensitive(step, "hold");
+    if (cJSON_IsNumber(v)) return v->valueint;
+    v = cJSON_GetObjectItemCaseSensitive(step, "time");
+    if (cJSON_IsNumber(v)) return v->valueint;
+    v = cJSON_GetObjectItemCaseSensitive(step, "duration");
+    if (cJSON_IsNumber(v)) return v->valueint;
+    return 0;
+}
+
+static cJSON *build_planned_from_schedule_name(const std::string &schedule_name, double start_temp) {
+    if (schedule_name.empty()) return nullptr;
+    const std::string schedules_raw = kiln_fs_read_text("/littlefs/schedules.json");
+    if (schedules_raw.empty()) return nullptr;
+    cJSON *root = cJSON_Parse(schedules_raw.c_str());
+    if (!cJSON_IsArray(root)) {
+        if (root) cJSON_Delete(root);
+        return nullptr;
+    }
+
+    cJSON *match = nullptr;
+    const int n = cJSON_GetArraySize(root);
+    for (int i = 0; i < n; ++i) {
+        cJSON *item = cJSON_GetArrayItem(root, i);
+        const cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
+        if (cJSON_IsString(name) && name->valuestring && schedule_name == name->valuestring) {
+            match = item;
+            break;
+        }
+    }
+    if (!match) {
+        cJSON_Delete(root);
+        return nullptr;
+    }
+
+    cJSON *steps = cJSON_GetObjectItemCaseSensitive(match, "steps");
+    if (!cJSON_IsArray(steps)) steps = cJSON_GetObjectItemCaseSensitive(match, "segments");
+    if (!cJSON_IsArray(steps)) {
+        cJSON_Delete(root);
+        return nullptr;
+    }
+
+    cJSON *planned = cJSON_CreateArray();
+    double t = 0.0;
+    double current = start_temp;
+    cJSON *p0 = cJSON_CreateObject();
+    cJSON_AddNumberToObject(p0, "t", t);
+    cJSON_AddNumberToObject(p0, "temp", current);
+    cJSON_AddItemToArray(planned, p0);
+
+    const int steps_n = cJSON_GetArraySize(steps);
+    for (int i = 0; i < steps_n; ++i) {
+        const cJSON *step = cJSON_GetArrayItem(steps, i);
+        if (!cJSON_IsObject(step)) continue;
+        const int rate = std::max(0, get_step_int(step, "rate", 0));
+        const int target = get_step_int(step, "target", static_cast<int>(current));
+        const int hold_min = std::max(0, get_step_hold_minutes(step));
+
+        if (rate > 0) {
+            const double delta = std::abs(static_cast<double>(target) - current);
+            const double ramp_min = (delta / static_cast<double>(rate)) * 60.0;
+            t += ramp_min;
+        }
+        current = static_cast<double>(target);
+        cJSON *p1 = cJSON_CreateObject();
+        cJSON_AddNumberToObject(p1, "t", t);
+        cJSON_AddNumberToObject(p1, "temp", current);
+        cJSON_AddItemToArray(planned, p1);
+
+        if (hold_min > 0) {
+            t += hold_min;
+            cJSON *p2 = cJSON_CreateObject();
+            cJSON_AddNumberToObject(p2, "t", t);
+            cJSON_AddNumberToObject(p2, "temp", current);
+            cJSON_AddItemToArray(planned, p2);
+        }
+    }
+
+    cJSON_Delete(root);
+    return planned;
+}
+
 static std::string build_history_list_enriched(const std::string &raw) {
     cJSON *root = cJSON_Parse(raw.c_str());
     if (!cJSON_IsArray(root)) {
@@ -245,6 +334,20 @@ esp_err_t WiFiServerManager::api_history_detail_handler(httpd_req_t *req) {
             }
             if (!cJSON_GetObjectItemCaseSensitive(summary, "duration")) {
                 cJSON_AddNumberToObject(summary, "duration", last_min);
+            }
+        } else {
+            cJSON *summary = cJSON_GetObjectItemCaseSensitive(root, "summary");
+            const cJSON *sn = summary ? cJSON_GetObjectItemCaseSensitive(summary, "scheduleName") : nullptr;
+            const cJSON *st = summary ? cJSON_GetObjectItemCaseSensitive(summary, "startTemp") : nullptr;
+            const std::string schedule_name = (cJSON_IsString(sn) && sn->valuestring) ? sn->valuestring : "";
+            const double start_temp = cJSON_IsNumber(st) ? st->valuedouble : 20.0;
+            if (!cJSON_GetObjectItemCaseSensitive(root, "planned")) {
+                if (cJSON *planned = build_planned_from_schedule_name(schedule_name, start_temp)) {
+                    replace_item(root, "planned", planned);
+                }
+            }
+            if (!cJSON_GetObjectItemCaseSensitive(root, "actual")) {
+                replace_item(root, "actual", cJSON_CreateArray());
             }
         }
         char *rendered = cJSON_PrintUnformatted(root);

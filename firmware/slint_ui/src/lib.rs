@@ -100,6 +100,11 @@ extern "C" {
     fn slint_bridge_start_autotune(target_c: f32) -> bool;
     fn slint_bridge_stop_autotune();
     fn slint_bridge_get_user_max_temp_c() -> f32;
+    fn slint_bridge_set_user_max_temp_c(max_c: f32) -> bool;
+    fn slint_bridge_get_temperature_offset_c() -> f32;
+    fn slint_bridge_set_temperature_offset_c(offset_c: f32) -> bool;
+    fn slint_bridge_get_kiln_wattage() -> i32;
+    fn slint_bridge_set_kiln_wattage(watts: i32) -> bool;
     fn slint_bridge_get_autotune_target_c() -> f32;
     fn slint_bridge_set_autotune_target_c(target_c: f32) -> bool;
     fn slint_bridge_clear_fault() -> bool;
@@ -120,6 +125,10 @@ extern "C" {
     fn slint_bridge_ui_heartbeat();
     fn slint_bridge_get_time_str(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_get_date_str(out: *mut c_char, out_len: i32) -> bool;
+    fn slint_bridge_get_firmware_version_copy(out: *mut c_char, out_len: i32) -> bool;
+    fn slint_bridge_get_device_id_copy(out: *mut c_char, out_len: i32) -> bool;
+    fn slint_bridge_get_uptime_seconds() -> u64;
+    fn slint_bridge_get_free_heap_bytes() -> u32;
     fn slint_bridge_get_language_is_ua() -> bool;
     fn slint_bridge_set_language_is_ua(is_ua: bool);
     fn slint_bridge_get_temp_unit() -> u8;
@@ -190,10 +199,16 @@ struct WifiScanAp {
 struct HistorySample {
     #[serde(default)]
     timestamp: i64,
-    #[serde(default)]
+    #[serde(alias = "temperature", alias = "actual", default)]
     temp: f32,
-    #[serde(default)]
+    #[serde(alias = "setpoint", alias = "planned", default)]
     target: f32,
+    #[serde(default)]
+    voltage: f32,
+    #[serde(default)]
+    current: f32,
+    #[serde(default)]
+    power: f32,
 }
 
 #[allow(dead_code)]
@@ -207,8 +222,34 @@ struct HistorySummary {
     duration: i64,
     #[serde(default)]
     status: String,
+    #[serde(rename = "statusCode", default)]
+    status_code: String,
     #[serde(rename = "totalSteps", default)]
     total_steps: i64,
+    #[serde(rename = "completedSteps", default)]
+    completed_steps: i64,
+    #[serde(rename = "startTime", default)]
+    start_time: String,
+    #[serde(rename = "endTime", default)]
+    end_time: String,
+    #[serde(rename = "startTs", default)]
+    start_ts: i64,
+    #[serde(rename = "endTs", default)]
+    end_ts: i64,
+    #[serde(rename = "energyKwh", default)]
+    energy_kwh: f32,
+    #[serde(rename = "energyWh", default)]
+    energy_wh: f32,
+    #[serde(rename = "cost", default)]
+    cost: f32,
+    #[serde(rename = "peakPower", default)]
+    peak_power: f32,
+    #[serde(rename = "peakCurrent", default)]
+    peak_current: f32,
+    #[serde(rename = "peakTemp", default)]
+    peak_temp: f32,
+    #[serde(rename = "faultReason", default)]
+    fault_reason: String,
 }
 
 #[derive(Clone, serde::Deserialize, Default)]
@@ -217,6 +258,26 @@ struct HistoryDetail {
     summary: HistorySummary,
     #[serde(default)]
     data: Vec<HistorySample>,
+    #[serde(default)]
+    changes: Vec<HistoryChange>,
+}
+
+#[derive(Clone, serde::Deserialize, Default)]
+struct HistoryChange {
+    #[serde(rename = "ts_ms", alias = "timestamp", default)]
+    ts_ms: i64,
+    #[serde(default)]
+    step: i64,
+    #[serde(default)]
+    action: String,
+    #[serde(default)]
+    field: String,
+    #[serde(default)]
+    before: f32,
+    #[serde(default)]
+    after: f32,
+    #[serde(default)]
+    delta: f32,
 }
 
 struct AppState {
@@ -255,6 +316,20 @@ enum DateFormat {
 
 fn c_to_f(c: f32) -> f32 {
     c * 9.0 / 5.0 + 32.0
+}
+
+fn delta_temp_to_display_i32(delta_c: f32, unit: TempUnit) -> i32 {
+    match unit {
+        TempUnit::C => delta_c.round() as i32,
+        TempUnit::F => (delta_c * 9.0 / 5.0).round() as i32,
+    }
+}
+
+fn delta_temp_to_c_from_display(delta_display: i32, unit: TempUnit) -> f32 {
+    match unit {
+        TempUnit::C => delta_display as f32,
+        TempUnit::F => delta_display as f32 * 5.0 / 9.0,
+    }
 }
 
 fn f_to_c(f: f32) -> f32 {
@@ -324,6 +399,7 @@ fn apply_temp_unit_change(ui: &AppWindow, state: &mut AppState, new_unit: TempUn
     let autotune_c = temp_to_c_from_display(ui.get_autotune_target_c(), old_unit);
     let run_temp_c = temp_to_c_from_display(ui.get_running_edit_add_temp(), old_unit);
     let run_rate_c = rate_to_c_from_display(ui.get_running_edit_rate(), old_unit);
+    let offset_c = delta_temp_to_c_from_display(ui.get_thermocouple_offset(), old_unit);
 
     ui.set_temp(temp_to_display(temp_c, new_unit));
     ui.set_temp_label(format!("{:.1}", temp_to_display(temp_c, new_unit)).into());
@@ -333,6 +409,7 @@ fn apply_temp_unit_change(ui: &AppWindow, state: &mut AppState, new_unit: TempUn
     ui.set_autotune_target_c(temp_to_display_i32(autotune_c, new_unit));
     ui.set_running_edit_add_temp(temp_to_display_i32(run_temp_c, new_unit));
     ui.set_running_edit_rate(rate_to_display(run_rate_c, new_unit));
+    ui.set_thermocouple_offset(delta_temp_to_display_i32(offset_c, new_unit));
 
     state.temp_unit = new_unit;
     update_unit_labels(ui, new_unit);
@@ -632,10 +709,250 @@ fn load_history_item_id_by_preview_index(index: usize) -> Option<String> {
         .filter(|id| !id.is_empty())
 }
 
+fn history_summary_from_item(item: &serde_json::Value) -> HistorySummary {
+    let get_str = |keys: &[&str]| -> String {
+        keys.iter()
+            .find_map(|k| item.get(*k).and_then(|v| v.as_str()))
+            .unwrap_or("")
+            .to_string()
+    };
+    let get_i64 = |keys: &[&str]| -> i64 {
+        keys.iter()
+            .find_map(|k| item.get(*k).and_then(|v| v.as_i64()))
+            .unwrap_or(0)
+    };
+    let get_f32 = |keys: &[&str]| -> f32 {
+        keys.iter()
+            .find_map(|k| item.get(*k).and_then(|v| v.as_f64()))
+            .unwrap_or(0.0) as f32
+    };
+    let status = get_str(&["status", "result"]);
+    let status_code = if !get_str(&["statusCode"]).is_empty() {
+        get_str(&["statusCode"])
+    } else {
+        history_status_code(&status)
+    };
+    HistorySummary {
+        id: get_str(&["id", "runId", "historyId"]),
+        schedule_name: get_str(&["scheduleName", "name", "program", "title"]),
+        duration: get_i64(&["duration"]),
+        status,
+        status_code,
+        total_steps: get_i64(&["totalSteps", "stepsCount"]),
+        completed_steps: get_i64(&["completedSteps"]),
+        start_time: get_str(&["startTime"]),
+        end_time: get_str(&["endTime"]),
+        start_ts: get_i64(&["startTs", "startTimestamp"]),
+        end_ts: get_i64(&["endTs", "endTimestamp"]),
+        energy_kwh: get_f32(&["energyKwh", "energy_kwh"]),
+        energy_wh: get_f32(&["energyWh", "energy_wh"]),
+        cost: get_f32(&["cost"]),
+        peak_power: get_f32(&["peakPower", "maxPower"]),
+        peak_current: get_f32(&["peakCurrent", "maxCurrent"]),
+        peak_temp: get_f32(&["peakTemp", "maxTemp"]),
+        fault_reason: get_str(&["faultReason", "error", "reason"]),
+    }
+}
+
+fn load_history_summary_by_preview_index(index: usize) -> Option<HistorySummary> {
+    let data = std::fs::read_to_string("/littlefs/history.json").ok()?;
+    let value = serde_json::from_str::<serde_json::Value>(data.trim()).ok()?;
+    let items = value.as_array()?;
+    let rev_index = items.len().checked_sub(index + 1)?;
+    let item = items.get(rev_index)?;
+    Some(history_summary_from_item(item))
+}
+
 fn load_history_detail(id: &str) -> Option<HistoryDetail> {
     let path = format!("/littlefs/history_{}.json", id);
     let data = std::fs::read_to_string(path).ok()?;
     serde_json::from_str::<HistoryDetail>(data.trim()).ok()
+}
+
+fn history_status_verbose(summary: &HistorySummary, is_ua: bool) -> String {
+    let code = if !summary.status_code.is_empty() {
+        summary.status_code.to_ascii_uppercase()
+    } else {
+        summary.status.to_ascii_uppercase()
+    };
+    if code.contains("COMPLETE") || code == "OK" {
+        if is_ua { "Успішно".to_string() } else { "Completed".to_string() }
+    } else if code.contains("STOP") {
+        if is_ua { "Перервано користувачем".to_string() } else { "Stopped by user".to_string() }
+    } else if code.contains("ERROR") || code.contains("FAULT") {
+        let reason = if !summary.fault_reason.is_empty() {
+            translate_fault_reason(&summary.fault_reason, is_ua)
+        } else if is_ua {
+            "невідома причина".to_string()
+        } else {
+            "unknown reason".to_string()
+        };
+        if is_ua {
+            format!("Помилка ({})", reason)
+        } else {
+            format!("Error ({})", reason)
+        }
+    } else if summary.status.is_empty() {
+        if is_ua { "Невідомо".to_string() } else { "Unknown".to_string() }
+    } else {
+        summary.status.clone()
+    }
+}
+
+fn compute_energy_kwh(detail: &HistoryDetail) -> f32 {
+    if detail.summary.energy_kwh > 0.0 {
+        return detail.summary.energy_kwh;
+    }
+    if detail.summary.energy_wh > 0.0 {
+        return detail.summary.energy_wh / 1000.0;
+    }
+    if detail.data.len() < 2 {
+        return 0.0;
+    }
+    let ts_div = detect_timestamp_seconds_divisor(&detail.data) as f64;
+    let mut wh = 0.0_f64;
+    for i in 1..detail.data.len() {
+        let prev = &detail.data[i - 1];
+        let curr = &detail.data[i];
+        let dt_sec = ((curr.timestamp - prev.timestamp).max(0) as f64) / ts_div;
+        if dt_sec <= 0.0 {
+            continue;
+        }
+        let avg_w = ((prev.power.max(0.0) + curr.power.max(0.0)) as f64) * 0.5;
+        wh += avg_w * dt_sec / 3600.0;
+    }
+    (wh / 1000.0) as f32
+}
+
+fn compute_voltage_stability(detail: &HistoryDetail, is_ua: bool) -> String {
+    let mut min_v = f32::MAX;
+    let mut max_v = 0.0_f32;
+    for s in &detail.data {
+        if s.voltage > 1.0 {
+            min_v = min_v.min(s.voltage);
+            max_v = max_v.max(s.voltage);
+        }
+    }
+    if max_v <= 0.0 || min_v == f32::MAX {
+        return if is_ua { "Н/Д".to_string() } else { "N/A".to_string() };
+    }
+    let span = (max_v - min_v).max(0.0);
+    if is_ua {
+        format!("{:.0}-{:.0} В (±{:.1}В)", min_v, max_v, span * 0.5)
+    } else {
+        format!("{:.0}-{:.0} V (+/-{:.1}V)", min_v, max_v, span * 0.5)
+    }
+}
+
+fn build_step_plan_actual_text(detail: &HistoryDetail, is_ua: bool) -> String {
+    if detail.data.len() < 2 {
+        return if is_ua { "Н/Д".to_string() } else { "N/A".to_string() };
+    }
+    let ts_div = detect_timestamp_seconds_divisor(&detail.data) as f64;
+    let mut boundaries: Vec<usize> = vec![0];
+    for i in 1..detail.data.len() {
+        if (detail.data[i].target - detail.data[i - 1].target).abs() >= 0.5 {
+            boundaries.push(i);
+        }
+    }
+    if *boundaries.last().unwrap_or(&0) != detail.data.len() - 1 {
+        boundaries.push(detail.data.len() - 1);
+    }
+    let mut out = Vec::new();
+    for step_idx in 0..boundaries.len().saturating_sub(1) {
+        let a = boundaries[step_idx];
+        let b = boundaries[step_idx + 1];
+        let dt_min = (((detail.data[b].timestamp - detail.data[a].timestamp).max(0) as f64) / ts_div / 60.0).round() as i32;
+        let target = detail.data[a].target.round() as i32;
+        let plan_lbl = format_minutes_label(dt_min.max(0), is_ua);
+        let act_lbl = format_minutes_label(dt_min.max(0), is_ua);
+        out.push(if is_ua {
+            format!("Крок {}: ціль {}°, план {}, факт {}", step_idx + 1, target, plan_lbl, act_lbl)
+        } else {
+            format!("Step {}: target {}°, plan {}, actual {}", step_idx + 1, target, plan_lbl, act_lbl)
+        });
+    }
+    if out.is_empty() {
+        if is_ua { "Н/Д".to_string() } else { "N/A".to_string() }
+    } else {
+        out.join("\n")
+    }
+}
+
+fn build_change_diff_text(detail: &HistoryDetail, is_ua: bool) -> String {
+    if detail.changes.is_empty() {
+        return if is_ua { "Н/Д".to_string() } else { "N/A".to_string() };
+    }
+    let mut lines = Vec::new();
+    for (idx, ch) in detail.changes.iter().enumerate() {
+        if idx >= 14 {
+            lines.push(if is_ua {
+                format!("... ще {} змін", detail.changes.len() - idx)
+            } else {
+                format!("... {} more changes", detail.changes.len() - idx)
+            });
+            break;
+        }
+        let action = match ch.action.as_str() {
+            "add_temp" => if is_ua { "Додано температуру" } else { "Added temperature" },
+            "add_time" => if is_ua { "Додано час витримки" } else { "Added hold time" },
+            "set_rate" => if is_ua { "Змінено швидкість" } else { "Changed rate" },
+            "skip_step" => if is_ua { "Пропуск кроку" } else { "Skipped step" },
+            _ => if is_ua { "Зміна" } else { "Change" },
+        };
+        let field = if ch.field.is_empty() {
+            if is_ua { "параметр" } else { "field" }
+        } else {
+            ch.field.as_str()
+        };
+        lines.push(if is_ua {
+            format!(
+                "#{} [{}] крок {}: {}: {:.1} -> {:.1} (Δ{:+.1})",
+                idx + 1,
+                uptime_label(ch.ts_ms.max(0) as u64),
+                ch.step.max(0),
+                field,
+                ch.before,
+                ch.after,
+                ch.delta
+            )
+        } else {
+            format!(
+                "#{} [{}] step {}: {}: {:.1} -> {:.1} (Δ{:+.1})",
+                idx + 1,
+                uptime_label(ch.ts_ms.max(0) as u64),
+                ch.step.max(0),
+                field,
+                ch.before,
+                ch.after,
+                ch.delta
+            )
+        });
+        if lines.last().is_some() {
+            let last = lines.pop().unwrap_or_default();
+            lines.push(format!("{} | {}", action, last));
+        }
+    }
+    lines.join("\n")
+}
+
+fn build_step_and_change_text(detail: &HistoryDetail, is_ua: bool) -> String {
+    let base = build_step_plan_actual_text(detail, is_ua);
+    let changes = build_change_diff_text(detail, is_ua);
+    if changes == "N/A" || changes == "Н/Д" {
+        return base;
+    }
+    if base == "N/A" || base == "Н/Д" {
+        if is_ua {
+            return format!("Зміни під час випалу:\n{}", changes);
+        }
+        return format!("Changes during firing:\n{}", changes);
+    }
+    if is_ua {
+        format!("{}\n\nЗміни під час випалу:\n{}", base, changes)
+    } else {
+        format!("{}\n\nChanges during firing:\n{}", base, changes)
+    }
 }
 
 fn fault_status_label(ok: bool, is_ua: bool) -> String {
@@ -659,6 +976,7 @@ fn uptime_label(ms: u64) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn prettify_token(token: &str) -> String {
     token
         .split('_')
@@ -672,6 +990,142 @@ fn prettify_token(token: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn fault_title_from_fields(code: &str, message: &str, action: &str, is_ua: bool) -> String {
+    let mut candidate = String::new();
+    if !code.is_empty() && code != "ok" {
+        candidate = translate_command_message(code, is_ua);
+    } else if !message.is_empty() && message != "ok" && message != "settings_changed" {
+        candidate = if message.contains("fault")
+            || message.contains("Sensor")
+            || message.contains("sensor")
+            || message.contains("Temperature")
+        {
+            translate_fault_reason(message, is_ua)
+        } else {
+            translate_command_message(message, is_ua)
+        };
+    } else if !action.is_empty() {
+        candidate = translate_command_message(action, is_ua);
+    }
+
+    let trimmed = candidate.trim();
+    if trimmed.is_empty() {
+        if is_ua {
+            "Невідома помилка".to_string()
+        } else {
+            "Unknown fault".to_string()
+        }
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn format_uptime_label(seconds: u64, is_ua: bool) -> String {
+    let days = seconds / 86_400;
+    let hours = (seconds % 86_400) / 3_600;
+    let mins = (seconds % 3_600) / 60;
+    if is_ua {
+        format!("{}д {}г {}хв", days, hours, mins)
+    } else {
+        format!("{}d {}h {}m", days, hours, mins)
+    }
+}
+
+fn format_heap_label(bytes: u32, is_ua: bool) -> String {
+    let kb = bytes as f32 / 1024.0;
+    if is_ua {
+        format!("{:.0} КБ вільно", kb)
+    } else {
+        format!("{:.0} KB free", kb)
+    }
+}
+
+fn parse_history_total_heating_minutes() -> i64 {
+    let path = "/littlefs/history.json";
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return 0;
+    };
+    let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(&content) else {
+        return 0;
+    };
+    items.iter().fold(0_i64, |acc, item| {
+        let add = item
+            .get("summary")
+            .and_then(|s| s.get("duration"))
+            .and_then(|d| d.as_i64())
+            .unwrap_or(0)
+            .max(0);
+        acc + add
+    })
+}
+
+fn format_storage_label(schedule_count: usize, schedules_bytes: u64, is_ua: bool) -> String {
+    const LITTLEFS_TOTAL_BYTES: u64 = 0x350000;
+    let used_est = schedules_bytes.max(4096);
+    let avg_per_program = if schedule_count > 0 {
+        (used_est / schedule_count as u64).max(4096)
+    } else {
+        8192
+    };
+    let free_bytes = LITTLEFS_TOTAL_BYTES.saturating_sub(used_est);
+    let free_programs = (free_bytes / avg_per_program) as i64;
+    if is_ua {
+        format!("{} програм • ще ~{}", schedule_count, free_programs.max(0))
+    } else {
+        format!("{} programs • ~{} more", schedule_count, free_programs.max(0))
+    }
+}
+
+fn update_controller_info_ui(ui: &AppWindow, state: &SlintKilnState, is_ua: bool) {
+    let mut buf = vec![0u8; 96];
+    let fw = if unsafe { slint_bridge_get_firmware_version_copy(buf.as_mut_ptr() as *mut c_char, buf.len() as i32) } {
+        c_buf_to_string(&buf)
+    } else {
+        String::from("--")
+    };
+    let mut mac_buf = vec![0u8; 64];
+    let device_id = if unsafe { slint_bridge_get_device_id_copy(mac_buf.as_mut_ptr() as *mut c_char, mac_buf.len() as i32) } {
+        c_buf_to_string(&mac_buf)
+    } else {
+        String::from("--")
+    };
+    let heap = unsafe { slint_bridge_get_free_heap_bytes() };
+    let uptime_s = unsafe { slint_bridge_get_uptime_seconds() };
+
+    let schedules = load_schedules();
+    let schedules_bytes = std::fs::metadata("/littlefs/schedules.json").map(|m| m.len()).unwrap_or(0);
+    let storage = format_storage_label(schedules.len(), schedules_bytes, is_ua);
+
+    let total_heating_minutes = parse_history_total_heating_minutes().max(0);
+    let heating_label = if is_ua {
+        format!("{:.1} год", total_heating_minutes as f32 / 60.0)
+    } else {
+        format!("{:.1} h", total_heating_minutes as f32 / 60.0)
+    };
+
+    let chip_temp = if is_ua { "Н/Д" } else { "N/A" };
+    let pzem = if state.pzem_ok {
+        if is_ua {
+            format!("OK • {:.0} В", state.pzem_voltage.max(0.0))
+        } else {
+            format!("OK • {:.0} V", state.pzem_voltage.max(0.0))
+        }
+    } else if is_ua {
+        "Немає зв'язку".to_string()
+    } else {
+        "No link".to_string()
+    };
+
+    ui.set_controller_info_fw(fw.into());
+    ui.set_controller_info_heap(format_heap_label(heap, is_ua).into());
+    ui.set_controller_info_storage(storage.into());
+    ui.set_controller_info_device_id(device_id.into());
+    ui.set_controller_info_uptime(format_uptime_label(uptime_s, is_ua).into());
+    ui.set_controller_info_heating_hours(heating_label.into());
+    ui.set_controller_info_chip_temp(chip_temp.into());
+    ui.set_controller_info_pzem(pzem.into());
 }
 
 fn load_fault_log_items(is_ua: bool) -> Vec<FaultLogPreviewCard> {
@@ -694,7 +1148,7 @@ fn load_fault_log_items(is_ua: bool) -> Vec<FaultLogPreviewCard> {
         }];
     }
     let mut cards = Vec::new();
-    for line in combined.lines().rev().filter(|line| !line.trim().is_empty()).take(3) {
+    for line in combined.lines().rev().filter(|line| !line.trim().is_empty()) {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
             let ok = value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
             let action = value.get("action").and_then(|v| v.as_str()).unwrap_or("");
@@ -702,26 +1156,34 @@ fn load_fault_log_items(is_ua: bool) -> Vec<FaultLogPreviewCard> {
             let code = value.get("code").and_then(|v| v.as_str()).unwrap_or("");
             let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("");
             let ts_ms = value.get("ts_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+            let kind = value.get("kind").and_then(|v| v.as_str()).unwrap_or("");
 
-            let title = if !message.is_empty() && message != "settings_changed" {
-                prettify_token(message)
-            } else if !action.is_empty() {
-                prettify_token(action)
-            } else if is_ua {
-                "Подія без назви".to_string()
-            } else {
-                "Unnamed event".to_string()
-            };
+            let fault_like = !ok
+                || action.contains("fault")
+                || code.contains("fault")
+                || code.contains("sensor")
+                || message.contains("fault")
+                || message.contains("Sensor")
+                || message.contains("sensor")
+                || kind == "autotune";
+            if !fault_like {
+                continue;
+            }
+
+            let title = fault_title_from_fields(code, message, action, is_ua);
 
             let mut subtitle_parts = Vec::new();
             if !action.is_empty() {
-                subtitle_parts.push(prettify_token(action));
+                subtitle_parts.push(translate_command_message(action, is_ua));
             }
             if !source.is_empty() {
                 subtitle_parts.push(source.to_uppercase());
             }
             if !code.is_empty() && code != "ok" {
-                subtitle_parts.push(prettify_token(code));
+                subtitle_parts.push(translate_command_message(code, is_ua));
+            }
+            if !message.is_empty() && message != "ok" && message != "settings_changed" {
+                subtitle_parts.push(translate_fault_reason(message, is_ua));
             }
             if ts_ms > 0 {
                 subtitle_parts.push(uptime_label(ts_ms));
@@ -732,12 +1194,18 @@ fn load_fault_log_items(is_ua: bool) -> Vec<FaultLogPreviewCard> {
                 status: fault_status_label(ok, is_ua).into(),
                 subtitle: truncate_preview(subtitle_parts.join(" • "), 76).into(),
             });
+            if cards.len() >= 3 {
+                break;
+            }
         } else {
             cards.push(FaultLogPreviewCard {
                 title: truncate_preview(line.trim().to_string(), 44).into(),
                 status: if is_ua { "ЗБІЙ".into() } else { "FAULT".into() },
                 subtitle: "".into(),
             });
+            if cards.len() >= 3 {
+                break;
+            }
         }
     }
 
@@ -881,16 +1349,40 @@ fn make_safe_id(name: &str) -> String {
     out
 }
 
+fn normalize_schedule_name(input: &str) -> String {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let mut out = String::with_capacity(trimmed.len());
+    let mut prev_underscore = false;
+    for ch in trimmed.chars() {
+        if ch.is_whitespace() {
+            if !prev_underscore {
+                out.push('_');
+                prev_underscore = true;
+            }
+        } else {
+            out.push(ch);
+            prev_underscore = ch == '_';
+        }
+    }
+    out.trim_matches('_').to_string()
+}
+
 fn make_unique_schedule_name(schedules: &[ScheduleFile], base_name: &str) -> String {
-    let base = base_name.trim();
+    let base = normalize_schedule_name(base_name);
     let mut max_index: u32 = 0;
 
     for s in schedules {
-        let name = s.name.trim();
+        let name = normalize_schedule_name(&s.name);
         if name == base {
             continue;
         }
-        if let Some(suffix) = name.strip_prefix(base).and_then(|rest| rest.strip_prefix(' ')) {
+        if let Some(suffix) = name
+            .strip_prefix(&base)
+            .and_then(|rest| rest.strip_prefix('_').or_else(|| rest.strip_prefix(' ')))
+        {
             if let Ok(n) = suffix.trim().parse::<u32>() {
                 if n > max_index {
                     max_index = n;
@@ -996,6 +1488,36 @@ fn format_minutes_label(total_minutes: i32, is_ua: bool) -> String {
     }
 }
 
+#[allow(dead_code)]
+fn format_graph_hhmm(total_minutes: i32) -> String {
+    let mins = total_minutes.max(0);
+    let h = mins / 60;
+    let m = mins % 60;
+    format!("{:02}:{:02}", h, m)
+}
+
+fn detect_timestamp_seconds_divisor(data: &[HistorySample]) -> f32 {
+    if data.len() < 2 {
+        return 1.0;
+    }
+    let mut min_positive_delta: i64 = i64::MAX;
+    for window in data.windows(2) {
+        let dt = window[1].timestamp - window[0].timestamp;
+        if dt > 0 && dt < min_positive_delta {
+            min_positive_delta = dt;
+        }
+    }
+    if min_positive_delta == i64::MAX {
+        return 1.0;
+    }
+    // Millisecond logs usually have per-sample deltas >> 100.
+    if min_positive_delta > 100 {
+        1000.0
+    } else {
+        1.0
+    }
+}
+
 fn sample_graph_line(rects: &mut Vec<ScheduleGraphRect>, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
     let steps = (x1 - x0).abs().max((y1 - y0).abs()).clamp(1, 64);
     for i in 0..=steps {
@@ -1040,6 +1562,8 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
         ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(Vec::<ScheduleGraphRect>::new())));
         ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(Vec::<ScheduleGraphMarker>::new())));
         ui.set_schedule_graph_peak_temp(0);
+        ui.set_schedule_graph_mid_temp(0);
+        ui.set_schedule_graph_half_label("0 min".into());
         ui.set_schedule_graph_total_label("0 min".into());
     };
 
@@ -1048,7 +1572,8 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
                        points: &[(f32, f32)],
                        map_x: &dyn Fn(f32) -> i32,
                        map_y: &dyn Fn(f32) -> i32,
-                       color: Color| {
+                       color: Color,
+                       add_point_markers: bool| {
         for window in points.windows(2) {
             let (start_h, start_temp_c) = window[0];
             let (end_h, end_temp_c) = window[1];
@@ -1070,15 +1595,17 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
             }
         }
 
-        let marker_step = (points.len() / 10).max(1);
-        for (idx, (hour, temp_c)) in points.iter().enumerate() {
-            if idx % marker_step == 0 || idx + 1 == points.len() {
-                markers.push(ScheduleGraphMarker {
-                    x: map_x(*hour).clamp(0, GRAPH_W - 1),
-                    y: map_y(*temp_c).clamp(0, GRAPH_H - 1),
-                    label: "".into(),
-                    color: color.into(),
-                });
+        if add_point_markers {
+            let marker_step = (points.len() / 10).max(1);
+            for (idx, (hour, temp_c)) in points.iter().enumerate() {
+                if idx % marker_step == 0 || idx + 1 == points.len() {
+                    markers.push(ScheduleGraphMarker {
+                        x: map_x(*hour).clamp(0, GRAPH_W - 1),
+                        y: map_y(*temp_c).clamp(0, GRAPH_H - 1),
+                        label: "".into(),
+                        color: color.into(),
+                    });
+                }
             }
         }
     };
@@ -1094,18 +1621,38 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
         }
 
         let first_ts = detail.data.first().map(|p| p.timestamp).unwrap_or(0);
-        let mut planned_points: Vec<(f32, f32)> = detail
+        let ts_divisor = detect_timestamp_seconds_divisor(&detail.data);
+        let raw_planned_points: Vec<(f32, f32)> = detail
             .data
             .iter()
-            .map(|p| (((p.timestamp - first_ts).max(0) as f32) / 3600.0, p.target.max(0.0)))
+            .map(|p| ((((p.timestamp - first_ts).max(0) as f32) / ts_divisor) / 3600.0, p.target.max(0.0)))
             .collect();
-        let mut actual_points: Vec<(f32, f32)> = detail
+        let raw_actual_points: Vec<(f32, f32)> = detail
             .data
             .iter()
-            .map(|p| (((p.timestamp - first_ts).max(0) as f32) / 3600.0, p.temp.max(0.0)))
+            .map(|p| ((((p.timestamp - first_ts).max(0) as f32) / ts_divisor) / 3600.0, p.temp.max(0.0)))
             .collect();
-        planned_points = downsample_graph_points(&planned_points, 120);
-        actual_points = downsample_graph_points(&actual_points, 120);
+        let mut raw_actual_points = raw_actual_points;
+        if detail.summary.duration > 0 {
+            let max_actual_h = (detail.summary.duration as f32 / 60.0).max(0.0) + 1.0 / 60.0;
+            raw_actual_points.retain(|(h, _)| *h <= max_actual_h);
+        }
+        let mut step_end_points: Vec<(f32, f32)> = Vec::new();
+        if !raw_planned_points.is_empty() {
+            for i in 1..raw_planned_points.len() {
+                let prev_target = raw_planned_points[i - 1].1;
+                let target = raw_planned_points[i].1;
+                if (target - prev_target).abs() >= 0.5 {
+                    step_end_points.push(raw_planned_points[i - 1]);
+                }
+            }
+            if let Some(last) = raw_planned_points.last().copied() {
+                step_end_points.push(last);
+            }
+        }
+
+        let planned_points = downsample_graph_points(&raw_planned_points, 120);
+        let actual_points = downsample_graph_points(&raw_actual_points, 120);
 
         let last_hour = planned_points
             .last()
@@ -1125,19 +1672,84 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
         let peak_display = temp_to_display_i32(peak_temp_c.max(MIN_PEAK_TEMP_C) as i32, state.temp_unit);
         let peak_scale_c = peak_temp_c.max(MIN_PEAK_TEMP_C);
 
-        let x_scale = if last_hour <= 0.0 { 0.0 } else { (GRAPH_W - 1) as f32 / last_hour };
-        let y_scale = if peak_scale_c <= 0.0 { 0.0 } else { (GRAPH_H - 1) as f32 / peak_scale_c };
-        let map_x = |hour: f32| -> i32 { (hour * x_scale).round() as i32 };
-        let map_y = |temp_c: f32| -> i32 { GRAPH_H - 1 - (temp_c * y_scale).round() as i32 };
+        // Keep labels outside the plotted area: reserve paddings like in web chart.
+        let plot_left = 19i32;
+        let plot_right = (GRAPH_W - 6).max(plot_left + 1);
+        let plot_top = 8i32;
+        let plot_bottom = (GRAPH_H - 18).max(plot_top + 1);
+        let plot_w = (plot_right - plot_left).max(1) as f32;
+        let plot_h = (plot_bottom - plot_top).max(1) as f32;
+        let x_scale = if last_hour <= 0.0 { 0.0 } else { plot_w / last_hour };
+        let y_scale = if peak_scale_c <= 0.0 { 0.0 } else { plot_h / peak_scale_c };
+        let map_x = |hour: f32| -> i32 { plot_left + (hour * x_scale).round() as i32 };
+        let map_y = |temp_c: f32| -> i32 { plot_bottom - (temp_c * y_scale).round() as i32 };
 
         let mut rects: Vec<ScheduleGraphRect> = Vec::new();
         let mut markers: Vec<ScheduleGraphMarker> = Vec::new();
-        draw_series(&mut rects, &mut markers, &planned_points, &map_x, &map_y, PLAN_COLOR);
-        draw_series(&mut rects, &mut markers, &actual_points, &map_x, &map_y, ACTUAL_COLOR);
+        draw_series(&mut rects, &mut markers, &planned_points, &map_x, &map_y, PLAN_COLOR, false);
+        draw_series(&mut rects, &mut markers, &actual_points, &map_x, &map_y, ACTUAL_COLOR, false);
+
+        // Add labels only for key "step end" points to avoid overlaps.
+        let unit_label = match state.temp_unit {
+            TempUnit::C => "°C",
+            TempUnit::F => "°F",
+        };
+        if !step_end_points.is_empty() {
+            let max_labels = 4usize;
+            let stride = (step_end_points.len() / max_labels).max(1);
+            let mut selected_indices: Vec<usize> = Vec::new();
+            let mut last_labeled_x: Option<i32> = None;
+            let mut i = 0usize;
+            while i < step_end_points.len() {
+                selected_indices.push(i);
+                let (hour, temp_c) = step_end_points[i];
+                let x = map_x(hour).clamp(0, GRAPH_W - 1);
+                let y = map_y(temp_c).clamp(0, GRAPH_H - 1);
+                let can_label = last_labeled_x.map(|px| (x - px).abs() >= 42).unwrap_or(true);
+                let temp_label = format!(
+                    "{}{}",
+                    temp_to_display_i32(temp_c.round() as i32, state.temp_unit),
+                    unit_label
+                );
+                if can_label {
+                    markers.push(ScheduleGraphMarker {
+                        x,
+                        y,
+                        label: temp_label.into(),
+                        color: PLAN_COLOR.into(),
+                    });
+                    last_labeled_x = Some(x);
+                }
+                i += stride;
+            }
+            if let Some(last_idx) = step_end_points.len().checked_sub(1) {
+                if !selected_indices.contains(&last_idx) {
+                    let (hour, temp_c) = step_end_points[last_idx];
+                    let x = map_x(hour).clamp(0, GRAPH_W - 1);
+                    let y = map_y(temp_c).clamp(0, GRAPH_H - 1);
+                    let can_label = last_labeled_x.map(|px| (x - px).abs() >= 36).unwrap_or(true);
+                    if can_label {
+                        markers.push(ScheduleGraphMarker {
+                            x,
+                            y,
+                            label: format!(
+                                "{}{}",
+                                temp_to_display_i32(temp_c.round() as i32, state.temp_unit),
+                                unit_label
+                            )
+                            .into(),
+                            color: PLAN_COLOR.into(),
+                        });
+                    }
+                }
+            }
+        }
 
         ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
         ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(markers)));
         ui.set_schedule_graph_peak_temp(peak_display);
+        ui.set_schedule_graph_mid_temp(temp_to_display_i32((peak_scale_c * 0.5).round() as i32, state.temp_unit));
+        ui.set_schedule_graph_half_label(format_minutes_label((total_minutes / 2).max(0), ui.get_is_ua()).into());
         ui.set_schedule_graph_total_label(format_minutes_label(total_minutes, ui.get_is_ua()).into());
         return;
     }
@@ -1195,7 +1807,7 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
 
     let mut rects: Vec<ScheduleGraphRect> = Vec::new();
     let mut marker_rows: Vec<ScheduleGraphMarker> = Vec::new();
-    draw_series(&mut rects, &mut marker_rows, &points, &map_x, &map_y, PLAN_COLOR);
+    draw_series(&mut rects, &mut marker_rows, &points, &map_x, &map_y, PLAN_COLOR, true);
 
     let unit_label = match state.temp_unit {
         TempUnit::C => "°C",
@@ -1216,6 +1828,8 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
     ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
     ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(marker_rows)));
     ui.set_schedule_graph_peak_temp(peak_display);
+    ui.set_schedule_graph_mid_temp(temp_to_display_i32((peak_scale_c * 0.5).round() as i32, state.temp_unit));
+    ui.set_schedule_graph_half_label(format_minutes_label((total_minutes / 2).max(0), ui.get_is_ua()).into());
     ui.set_schedule_graph_total_label(format_minutes_label(total_minutes, ui.get_is_ua()).into());
 }
 
@@ -1315,6 +1929,14 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
     let initial_autotune_target_c = unsafe { slint_bridge_get_autotune_target_c() };
     if initial_autotune_target_c.is_finite() {
         ui.set_autotune_target_c(temp_to_display(initial_autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32);
+    }
+    let initial_offset_c = unsafe { slint_bridge_get_temperature_offset_c() };
+    if initial_offset_c.is_finite() {
+        ui.set_thermocouple_offset(delta_temp_to_display_i32(initial_offset_c, unit));
+    }
+    let initial_wattage = unsafe { slint_bridge_get_kiln_wattage() };
+    if initial_wattage > 0 {
+        ui.set_kiln_wattage(initial_wattage);
     }
 
     let pzem_ok = state.pzem_ok && state.pzem_voltage.is_finite() && state.pzem_current.is_finite() && state.pzem_power.is_finite();
@@ -1874,10 +2496,16 @@ pub extern "C" fn slint_ui_run() {
         ui.on_open_history_detail(move |index| {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let idx = index as usize;
-            let Some(id) = load_history_item_id_by_preview_index(idx) else { return; };
-            let detail = load_history_detail(&id);
+            let summary_fallback = load_history_summary_by_preview_index(idx);
+            let id = load_history_item_id_by_preview_index(idx).or_else(|| {
+                summary_fallback
+                    .as_ref()
+                    .map(|s| s.id.clone())
+                    .filter(|s| !s.is_empty())
+            });
+            let detail = id.as_ref().and_then(|detail_id| load_history_detail(detail_id));
             let mut state = app_state.borrow_mut();
-            state.history_detail_id = Some(id.clone());
+            state.history_detail_id = id;
             if let Some(detail) = detail {
                 let title = if detail.summary.schedule_name.is_empty() {
                     if ui.get_is_ua() { "Випал" } else { "Firing" }
@@ -1885,11 +2513,22 @@ pub extern "C" fn slint_ui_run() {
                     detail.summary.schedule_name.as_str()
                 };
                 ui.set_history_detail_title(title.into());
-                ui.set_history_detail_status(detail.summary.status.clone().into());
+                ui.set_history_detail_status(history_status_label(&detail.summary.status, ui.get_is_ua()).into());
                 let duration_label = format_minutes_label(detail.summary.duration.max(0) as i32, ui.get_is_ua());
                 ui.set_history_detail_duration(duration_label.into());
                 ui.set_history_detail_steps(detail.summary.total_steps.max(0).to_string().into());
-                let energy_label = if ui.get_is_ua() { "-- кВт·год" } else { "-- kWh" };
+                let energy_kwh = compute_energy_kwh(&detail);
+                let energy_label = if energy_kwh > 0.0 {
+                    if ui.get_is_ua() {
+                        format!("{:.2} кВт·год", energy_kwh)
+                    } else {
+                        format!("{:.2} kWh", energy_kwh)
+                    }
+                } else if ui.get_is_ua() {
+                    "-- кВт·год".to_string()
+                } else {
+                    "-- kWh".to_string()
+                };
                 ui.set_history_detail_energy(energy_label.into());
                 let step_label = if detail.summary.total_steps > 0 && detail.summary.duration > 0 {
                     let avg = (detail.summary.duration as f32 / detail.summary.total_steps as f32).round() as i32;
@@ -1902,6 +2541,158 @@ pub extern "C" fn slint_ui_run() {
                     if ui.get_is_ua() { "-- хв/крок" } else { "-- min/step" }.to_string()
                 };
                 ui.set_history_detail_step_durations(step_label.into());
+
+                ui.set_history_detail_program_name(title.into());
+                ui.set_history_detail_start_time(
+                    if !detail.summary.start_time.is_empty() {
+                        detail.summary.start_time.clone()
+                    } else if ui.get_is_ua() {
+                        "Н/Д".to_string()
+                    } else {
+                        "N/A".to_string()
+                    }
+                    .into(),
+                );
+                ui.set_history_detail_end_time(
+                    if !detail.summary.end_time.is_empty() {
+                        detail.summary.end_time.clone()
+                    } else if ui.get_is_ua() {
+                        "Н/Д".to_string()
+                    } else {
+                        "N/A".to_string()
+                    }
+                    .into(),
+                );
+                ui.set_history_detail_status_verbose(history_status_verbose(&detail.summary, ui.get_is_ua()).into());
+                let cost_label = if detail.summary.cost > 0.0 {
+                    if ui.get_is_ua() {
+                        format!("{:.2} грн", detail.summary.cost)
+                    } else {
+                        format!("{:.2} UAH", detail.summary.cost)
+                    }
+                } else if ui.get_is_ua() {
+                    "Н/Д (тариф не задано)".to_string()
+                } else {
+                    "N/A (tariff not set)".to_string()
+                };
+                ui.set_history_detail_energy_cost(cost_label.into());
+                let peak_power = detail
+                    .data
+                    .iter()
+                    .map(|s| s.power.max(0.0))
+                    .fold(detail.summary.peak_power.max(0.0), f32::max);
+                let peak_current = detail
+                    .data
+                    .iter()
+                    .map(|s| s.current.max(0.0))
+                    .fold(detail.summary.peak_current.max(0.0), f32::max);
+                let max_load = if peak_power > 0.0 || peak_current > 0.0 {
+                    if ui.get_is_ua() {
+                        format!("{:.0} Вт / {:.1} A", peak_power, peak_current)
+                    } else {
+                        format!("{:.0} W / {:.1} A", peak_power, peak_current)
+                    }
+                } else if ui.get_is_ua() {
+                    "Н/Д".to_string()
+                } else {
+                    "N/A".to_string()
+                };
+                ui.set_history_detail_max_load(max_load.into());
+                let peak_temp = detail
+                    .data
+                    .iter()
+                    .map(|s| s.temp.max(0.0))
+                    .fold(detail.summary.peak_temp.max(0.0), f32::max);
+                let peak_temp_label = if peak_temp > 0.0 {
+                    format!("{:.1}{}", peak_temp, ui.get_temp_unit_label())
+                } else if ui.get_is_ua() {
+                    "Н/Д".to_string()
+                } else {
+                    "N/A".to_string()
+                };
+                ui.set_history_detail_peak_temp(peak_temp_label.into());
+                ui.set_history_detail_voltage_stability(compute_voltage_stability(&detail, ui.get_is_ua()).into());
+                ui.set_history_detail_step_plan_actual(build_step_and_change_text(&detail, ui.get_is_ua()).into());
+            } else if let Some(summary) = summary_fallback {
+                let title = if summary.schedule_name.is_empty() {
+                    if ui.get_is_ua() { "Випал" } else { "Firing" }
+                } else {
+                    summary.schedule_name.as_str()
+                };
+                ui.set_history_detail_title(title.into());
+                ui.set_history_detail_status(history_status_label(&summary.status, ui.get_is_ua()).into());
+                ui.set_history_detail_duration(format_minutes_label(summary.duration.max(0) as i32, ui.get_is_ua()).into());
+                ui.set_history_detail_steps(summary.total_steps.max(0).to_string().into());
+                let energy_kwh = if summary.energy_kwh > 0.0 {
+                    summary.energy_kwh
+                } else if summary.energy_wh > 0.0 {
+                    summary.energy_wh / 1000.0
+                } else {
+                    0.0
+                };
+                let energy_label = if energy_kwh > 0.0 {
+                    if ui.get_is_ua() {
+                        format!("{:.2} кВт·год", energy_kwh)
+                    } else {
+                        format!("{:.2} kWh", energy_kwh)
+                    }
+                } else if ui.get_is_ua() {
+                    "Н/Д".to_string()
+                } else {
+                    "N/A".to_string()
+                };
+                ui.set_history_detail_energy(energy_label.into());
+                let step_label = if summary.total_steps > 0 && summary.duration > 0 {
+                    let avg = (summary.duration as f32 / summary.total_steps as f32).round() as i32;
+                    if ui.get_is_ua() {
+                        format!("≈{} хв/крок", avg)
+                    } else {
+                        format!("≈{} min/step", avg)
+                    }
+                } else if ui.get_is_ua() {
+                    "Н/Д".to_string()
+                } else {
+                    "N/A".to_string()
+                };
+                ui.set_history_detail_step_durations(step_label.into());
+                ui.set_history_detail_program_name(title.into());
+                ui.set_history_detail_start_time(if !summary.start_time.is_empty() { summary.start_time.clone() } else if ui.get_is_ua() { "Н/Д".to_string() } else { "N/A".to_string() }.into());
+                ui.set_history_detail_end_time(if !summary.end_time.is_empty() { summary.end_time.clone() } else if ui.get_is_ua() { "Н/Д".to_string() } else { "N/A".to_string() }.into());
+                ui.set_history_detail_status_verbose(history_status_verbose(&summary, ui.get_is_ua()).into());
+                ui.set_history_detail_energy_cost(
+                    if summary.cost > 0.0 {
+                        if ui.get_is_ua() { format!("{:.2} грн", summary.cost) } else { format!("{:.2} UAH", summary.cost) }
+                    } else if ui.get_is_ua() {
+                        "Н/Д (тариф не задано)".to_string()
+                    } else {
+                        "N/A (tariff not set)".to_string()
+                    }
+                    .into(),
+                );
+                let max_load = if summary.peak_power > 0.0 || summary.peak_current > 0.0 {
+                    if ui.get_is_ua() {
+                        format!("{:.0} Вт / {:.1} A", summary.peak_power.max(0.0), summary.peak_current.max(0.0))
+                    } else {
+                        format!("{:.0} W / {:.1} A", summary.peak_power.max(0.0), summary.peak_current.max(0.0))
+                    }
+                } else if ui.get_is_ua() {
+                    "Н/Д".to_string()
+                } else {
+                    "N/A".to_string()
+                };
+                ui.set_history_detail_max_load(max_load.into());
+                ui.set_history_detail_peak_temp(
+                    if summary.peak_temp > 0.0 {
+                        format!("{:.1}{}", summary.peak_temp, ui.get_temp_unit_label())
+                    } else if ui.get_is_ua() {
+                        "Н/Д".to_string()
+                    } else {
+                        "N/A".to_string()
+                    }
+                    .into(),
+                );
+                ui.set_history_detail_voltage_stability((if ui.get_is_ua() { "Н/Д" } else { "N/A" }).into());
+                ui.set_history_detail_step_plan_actual((if ui.get_is_ua() { "Н/Д" } else { "N/A" }).into());
             } else {
                 ui.set_history_detail_title((if ui.get_is_ua() { "Випал" } else { "Firing" }).into());
                 ui.set_history_detail_status("--".into());
@@ -1909,6 +2700,15 @@ pub extern "C" fn slint_ui_run() {
                 ui.set_history_detail_steps("--".into());
                 ui.set_history_detail_energy(if ui.get_is_ua() { "-- кВт·год" } else { "-- kWh" }.into());
                 ui.set_history_detail_step_durations(if ui.get_is_ua() { "-- хв/крок" } else { "-- min/step" }.into());
+                ui.set_history_detail_program_name("--".into());
+                ui.set_history_detail_start_time("--".into());
+                ui.set_history_detail_end_time("--".into());
+                ui.set_history_detail_status_verbose("--".into());
+                ui.set_history_detail_energy_cost("--".into());
+                ui.set_history_detail_max_load("--".into());
+                ui.set_history_detail_peak_temp("--".into());
+                ui.set_history_detail_voltage_stability("--".into());
+                ui.set_history_detail_step_plan_actual("--".into());
             }
             ui.set_view(View::HistoryDetail);
         });
@@ -2360,7 +3160,7 @@ pub extern "C" fn slint_ui_run() {
         ui.on_new_schedule(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let mut state = app_state.borrow_mut();
-            let base_name = if ui.get_is_ua() { "Нова програма" } else { "New Program" };
+            let base_name = if ui.get_is_ua() { "Нова_програма" } else { "New_Program" };
             let name = make_unique_schedule_name(&state.schedules, base_name);
             let id = make_safe_id(&name);
             state.graph_index = None;
@@ -2406,19 +3206,18 @@ pub extern "C" fn slint_ui_run() {
                 let current_step = ui.get_step_index().max(0) as usize;
                 let selected_for_run = state.selected_index;
                 let old_steps = state.schedules.get(idx).map(|s| s.steps.clone()).unwrap_or_default();
-                let name = ui.get_selected_schedule_name().to_string();
+                let name = normalize_schedule_name(&ui.get_selected_schedule_name().to_string());
                 let steps = to_schedule_steps(&state.schedules[idx].steps, &state.editor_steps, state.temp_unit);
                 if let Some(schedule) = state.schedules.get_mut(idx) {
-                    schedule.name = name;
+                    schedule.name = name.clone();
                     schedule.steps = steps;
                     schedule.steps_count = Some(schedule.steps.len() as i32);
-                    if schedule.id.is_empty() {
-                        schedule.id = make_safe_id(&schedule.name);
-                    }
+                    schedule.id = make_safe_id(&schedule.name);
                     if schedule.schedule_type.is_empty() {
                         schedule.schedule_type = "Custom".to_string();
                     }
                 }
+                ui.set_selected_schedule_name(name.into());
                 let _ = save_schedules(&state.schedules);
                 if was_firing && selected_for_run == Some(idx) {
                     if let Some(updated) = state.schedules.get(idx) {
@@ -2574,9 +3373,9 @@ pub extern "C" fn slint_ui_run() {
                     "OK" => {
                         let candidate = ui.get_kb_value().to_string();
                         if field == "name" {
-                            let trimmed = candidate.trim();
-                            if !trimmed.is_empty() {
-                                ui.set_selected_schedule_name(trimmed.into());
+                            let normalized = normalize_schedule_name(&candidate);
+                            if !normalized.is_empty() {
+                                ui.set_selected_schedule_name(normalized.into());
                             }
                         } else if field == "wifi_pass" {
                             ui.set_wifi_password(candidate.clone().into());
@@ -2609,6 +3408,10 @@ pub extern "C" fn slint_ui_run() {
             let schedule_target_max = ui.get_schedule_target_max_c().clamp(100, 3000);
             let autotune_min = temp_to_display_i32(100, unit);
             let autotune_max = temp_to_display_i32(1200, unit);
+            let max_temp_min = temp_to_display_i32(100, unit);
+            let max_temp_max = temp_to_display_i32(1300, unit);
+            let offset_min = delta_temp_to_display_i32(-100.0, unit);
+            let offset_max = delta_temp_to_display_i32(100.0, unit);
             let run_temp_min = temp_to_display_i32(-300, unit);
             let run_temp_max = temp_to_display_i32(300, unit);
             let run_rate_min = rate_to_display(1, unit);
@@ -2620,6 +3423,9 @@ pub extern "C" fn slint_ui_run() {
                 "hold" => (0, 999, 3usize),
                 "fan" => (0, 100, 3usize),
                 "autotune" => (autotune_min, autotune_max, 4usize),
+                "max_temp" => (max_temp_min, max_temp_max, 4usize),
+                "thermocouple_offset" => (offset_min, offset_max, 4usize),
+                "kiln_wattage" => (100, 50000, 5usize),
                 "run_rate" => (run_rate_min, run_rate_max, rate_len),
                 "run_temp" => (run_temp_min, run_temp_max, 4usize),
                 "run_time" => (-300, 300, 4usize),
@@ -2715,6 +3521,26 @@ pub extern "C" fn slint_ui_run() {
                             let parsed_c = temp_to_c_from_display(parsed, unit);
                             let _ = slint_bridge_set_autotune_target_c(parsed_c as f32);
                         }
+                    } else if field == "max_temp" {
+                        let parsed = parse_int_with_clamp(&value, min, max, ui.get_schedule_target_max_c());
+                        ui.set_schedule_target_max_c(parsed);
+                        unsafe {
+                            let parsed_c = temp_to_c_from_display(parsed, unit);
+                            let _ = slint_bridge_set_user_max_temp_c(parsed_c as f32);
+                        }
+                    } else if field == "thermocouple_offset" {
+                        let parsed = parse_int_with_clamp(&value, min, max, ui.get_thermocouple_offset());
+                        ui.set_thermocouple_offset(parsed);
+                        unsafe {
+                            let parsed_c = delta_temp_to_c_from_display(parsed, unit);
+                            let _ = slint_bridge_set_temperature_offset_c(parsed_c);
+                        }
+                    } else if field == "kiln_wattage" {
+                        let parsed = parse_int_with_clamp(&value, min, max, ui.get_kiln_wattage());
+                        ui.set_kiln_wattage(parsed);
+                        unsafe {
+                            let _ = slint_bridge_set_kiln_wattage(parsed);
+                        }
                     } else if field == "run_rate" {
                         let parsed = parse_int_with_clamp(&value, min, max, ui.get_running_edit_rate());
                         ui.set_running_edit_rate(parsed);
@@ -2730,7 +3556,7 @@ pub extern "C" fn slint_ui_run() {
                 digit if digit.len() == 1 && (digit.chars().all(|c| c.is_ascii_digit()) || digit == "-") => {
                     let mut v = ui.get_kb_value().to_string();
                     if digit == "-" {
-                        if !matches!(field.as_str(), "run_temp" | "run_time") {
+                        if !matches!(field.as_str(), "run_temp" | "run_time" | "thermocouple_offset") {
                             return;
                         }
                         if v.starts_with('-') {
@@ -2793,6 +3619,8 @@ pub extern "C" fn slint_ui_run() {
     let mut last_state_update = Instant::now();
     let mut last_ui_heartbeat = Instant::now();
     let mut last_clock_update = Instant::now();
+    let mut last_controller_info_update = Instant::now() - Duration::from_secs(10);
+    let mut last_settings_sync = Instant::now() - Duration::from_secs(10);
     let mut last_schedules_revision = unsafe { slint_bridge_get_schedules_revision() };
     let mut last_command_result_revision = unsafe { slint_bridge_get_command_result_revision() };
     let mut command_feedback_until = Instant::now();
@@ -2821,6 +3649,20 @@ pub extern "C" fn slint_ui_run() {
                 if !date_label.is_empty() {
                     ui.set_current_date(date_label.into());
                 }
+            }
+        }
+
+        if let Some(ui) = ui_weak.upgrade() {
+            let need_info_refresh = ui.get_settings_page() == "controller_info";
+            let period = if need_info_refresh {
+                Duration::from_millis(1000)
+            } else {
+                Duration::from_millis(5000)
+            };
+            if last_controller_info_update.elapsed() >= period {
+                last_controller_info_update = Instant::now();
+                let st = state_poll();
+                update_controller_info_ui(&ui, &st, ui.get_is_ua());
             }
         }
 
@@ -3059,6 +3901,22 @@ pub extern "C" fn slint_ui_run() {
                 let unit = app_state.borrow().temp_unit;
                 ui.set_autotune_target_c(temp_to_display(autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32);
             }
+            if ui.get_settings_page() == "autotune" && last_settings_sync.elapsed() >= Duration::from_secs(3) {
+                last_settings_sync = Instant::now();
+                let unit = app_state.borrow().temp_unit;
+                let offset_c = unsafe { slint_bridge_get_temperature_offset_c() };
+                if offset_c.is_finite() {
+                    ui.set_thermocouple_offset(delta_temp_to_display_i32(offset_c, unit));
+                }
+                let watts = unsafe { slint_bridge_get_kiln_wattage() };
+                if watts > 0 {
+                    ui.set_kiln_wattage(watts);
+                }
+                let max_temp = unsafe { slint_bridge_get_user_max_temp_c() };
+                if max_temp.is_finite() {
+                    ui.set_schedule_target_max_c(temp_to_display(max_temp.clamp(100.0, 1300.0), unit).round() as i32);
+                }
+            }
             let wifi_ok = ui.get_wifi_ok();
             let url = ui.get_wifi_server_url().to_string();
             let qr_payload = wifi_qr_payload(wifi_ok, &url);
@@ -3090,6 +3948,11 @@ pub extern "C" fn slint_ui_run() {
                     if ui.get_view() != View::Editor {
                         let mut state = app_state.borrow_mut();
                         let previous_name = ui.get_selected_schedule_name().to_string();
+                        let previous_id = state
+                            .selected_index
+                            .and_then(|idx| state.schedules.get(idx))
+                            .map(|s| s.id.clone())
+                            .unwrap_or_default();
                         state.schedules = load_schedules();
                         state.editing_index = None;
                         state.editor_steps.clear();
@@ -3102,7 +3965,8 @@ pub extern "C" fn slint_ui_run() {
                             let selected_idx = state
                                 .schedules
                                 .iter()
-                                .position(|s| s.name == previous_name)
+                                .position(|s| !previous_id.is_empty() && s.id == previous_id)
+                                .or_else(|| state.schedules.iter().position(|s| s.name == previous_name))
                                 .unwrap_or(0);
                             state.selected_index = Some(selected_idx);
                             let selected = state.schedules[selected_idx].clone();

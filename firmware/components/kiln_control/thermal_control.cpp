@@ -101,6 +101,7 @@ ThermalController::ThermalController() {
     historyPeakTemp = 0.0f;
     lastHistorySampleMs = 0;
     historyPoints.clear();
+    historyChanges.clear();
     
     state.status = KILN_IDLE;
     state.isFiring = false;
@@ -162,6 +163,7 @@ void ThermalController::begin() {
     historyPeakTemp = 0.0f;
     lastHistorySampleMs = 0;
     historyPoints.clear();
+    historyChanges.clear();
 
     heater_hal_init();
     heater_hal_all_off();
@@ -1129,6 +1131,7 @@ void ThermalController::historyStartLocked(uint64_t now_ms) {
     historyPeakTemp = state.currentTemp;
     lastHistorySampleMs = 0;
     historyPoints.clear();
+    historyChanges.clear();
 
     char idbuf[24];
     snprintf(idbuf, sizeof(idbuf), "%llu", (unsigned long long)now_ms);
@@ -1136,6 +1139,26 @@ void ThermalController::historyStartLocked(uint64_t now_ms) {
 
     // First point
     historySampleLocked(now_ms);
+}
+
+void ThermalController::historyRecordChangeLocked(const char *action, const char *field, float before_value, float after_value) {
+    if (!historyActive || !state.isFiring) return;
+    const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    if (!std::isfinite(before_value) || !std::isfinite(after_value)) return;
+
+    if (historyChanges.size() >= 128) {
+        historyChanges.erase(historyChanges.begin(), historyChanges.begin() + 16);
+    }
+
+    HistoryChange change{};
+    change.ts_ms = now_ms;
+    change.step = std::max(0, state.currentStep + 1);
+    change.action = (action && action[0]) ? action : "change";
+    change.field = (field && field[0]) ? field : "value";
+    change.before_value = before_value;
+    change.after_value = after_value;
+    change.delta = after_value - before_value;
+    historyChanges.push_back(change);
 }
 
 void ThermalController::historySampleLocked(uint64_t now_ms) {
@@ -1214,6 +1237,7 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     else cJSON_AddNullToObject(summary, "peakTemp");
     cJSON_AddNumberToObject(summary, "totalSteps", (double)totalSteps);
     cJSON_AddNumberToObject(summary, "completedSteps", (double)completedSteps);
+    cJSON_AddNumberToObject(summary, "changesCount", (double)historyChanges.size());
     cJSON *kpi = cJSON_CreateObject();
     cJSON_AddNumberToObject(kpi, "tracking_error_rms", err_rms);
     cJSON_AddNumberToObject(kpi, "tracking_error_mae", err_mae);
@@ -1260,6 +1284,19 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
         cJSON_AddItemToArray(data, dp);
     }
     cJSON_AddItemToObject(detail, "data", data);
+    cJSON *changes = cJSON_CreateArray();
+    for (const HistoryChange &ch : historyChanges) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddNumberToObject(item, "ts_ms", (double)ch.ts_ms);
+        cJSON_AddNumberToObject(item, "step", (double)ch.step);
+        cJSON_AddStringToObject(item, "action", ch.action.c_str());
+        cJSON_AddStringToObject(item, "field", ch.field.c_str());
+        cJSON_AddNumberToObject(item, "before", (double)ch.before_value);
+        cJSON_AddNumberToObject(item, "after", (double)ch.after_value);
+        cJSON_AddNumberToObject(item, "delta", (double)ch.delta);
+        cJSON_AddItemToArray(changes, item);
+    }
+    cJSON_AddItemToObject(detail, "changes", changes);
 
     char *renderedDetail = cJSON_PrintUnformatted(detail);
     std::string outDetail = renderedDetail ? renderedDetail : "{}";
@@ -1272,6 +1309,7 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     (void)kiln_fs_write_text_atomic(path.c_str(), outDetail);
 
     historyActive = false;
+    historyChanges.clear();
 }
 
 void ThermalController::startSchedule(const std::string& scheduleJson) {
@@ -1517,8 +1555,11 @@ void ThermalController::skipCurrentStep() {
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     if (state.isFiring) {
+        const int prev_step = state.currentStep;
+        const float prev_target = state.targetTemp;
         ESP_LOGI(TAG, "Skipping current step. Current step: %d, Total steps: %d", state.currentStep + 1, state.totalSteps);
         state.currentStep++; // Move to next step
+        historyRecordChangeLocked("skip_step", "step", (float)(prev_step + 1), (float)(state.currentStep + 1));
 
         if (state.currentStep >= state.totalSteps) {
             stop("Schedule Complete (Skipped)");
@@ -1535,6 +1576,7 @@ void ThermalController::skipCurrentStep() {
                 state.targetTemp = state.currentTemp; // For HOLD, target is current temp
             }
             ESP_LOGI(TAG, "Moved to Step %d. New target temp: %.2f", state.currentStep + 1, state.targetTemp);
+            historyRecordChangeLocked("skip_step", "target", prev_target, state.targetTemp);
         }
     } else {
         ESP_LOGW(TAG, "Attempted to skip step but kiln is not firing.");
@@ -1549,7 +1591,9 @@ void ThermalController::addTimeToHold(float minutesToAdd) {
     if (state.isFiring && state.status == KILN_HOLD && state.currentStep < activeSchedule.size()) {
         ScheduleStep currentStep = activeSchedule[state.currentStep];
         if (currentStep.type == 1) { // Only add time if it's a HOLD step
+            const float before_hold = activeSchedule[state.currentStep].value;
             activeSchedule[state.currentStep].value += minutesToAdd;
+            historyRecordChangeLocked("add_time", "hold_min", before_hold, activeSchedule[state.currentStep].value);
             ESP_LOGI(TAG, "Added %.2f minutes to current HOLD step. New hold time: %.2f min", minutesToAdd, activeSchedule[state.currentStep].value);
         } else {
             ESP_LOGW(TAG, "Attempted to add time, but current step is not a HOLD step.");
@@ -1565,8 +1609,10 @@ void ThermalController::addTemperatureToTarget(float tempToAdd) {
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     if (state.isFiring) {
+        const float before_target = state.targetTemp;
         state.targetTemp += tempToAdd;
         setpoint = state.targetTemp; // Update PID setpoint immediately
+        historyRecordChangeLocked("add_temp", "target", before_target, state.targetTemp);
         ESP_LOGI(TAG, "Added %.2f C to target. New target temp: %.2f C", tempToAdd, state.targetTemp);
     } else {
         ESP_LOGW(TAG, "Attempted to add temperature but kiln is not firing.");
@@ -1579,7 +1625,9 @@ void ThermalController::setCurrentRampRate(float rateCPerMin) {
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     if (state.isFiring && state.currentStep < activeSchedule.size()) {
         if (activeSchedule[state.currentStep].type == 0 && std::isfinite(rateCPerMin) && rateCPerMin > 0.0f) {
+            const float before_rate = activeSchedule[state.currentStep].rate;
             activeSchedule[state.currentStep].rate = rateCPerMin;
+            historyRecordChangeLocked("set_rate", "rate_c_per_min", before_rate, activeSchedule[state.currentStep].rate);
             ESP_LOGI(TAG, "Updated current RAMP rate to %.2f C/min", (double)rateCPerMin);
         } else {
             ESP_LOGW(TAG, "Attempted to set ramp rate but current step is not RAMP or payload invalid.");
