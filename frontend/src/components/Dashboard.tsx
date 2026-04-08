@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import { Thermometer, Activity, Clock, Wind, DollarSign, Sliders, Play, Square, Timer, ChevronDown, Check, Plus, Trash2, Save } from 'lucide-react';
@@ -188,6 +188,10 @@ const Dashboard = () => {
   });
   
   const [history, setHistory] = useState<{x: number, y: number}[]>([]);
+  const [actualProfilePoints, setActualProfilePoints] = useState<{x: number, y: number}[]>([{ x: 0, y: 25 }]);
+  const wasFiringRef = useRef(false);
+  const runStartMsRef = useRef(0);
+  const historyAnchorXRef = useRef(0);
   const [fan, setFan] = useState<FanControl>({
       manual: false,
       auto: true,
@@ -237,9 +241,53 @@ const Dashboard = () => {
 
   // Unified Idle Logic
   const isIdle = status.status === 'IDLE' || status.status === 'COMPLETE' || status.status === 'ERROR' || status.status === 'FAULT';
+  const isFiringActive = !isIdle;
 
   // Derived active schedule
   const activeSchedule = schedules.find(s => s.id === selectedScheduleId);
+
+  useEffect(() => {
+      const liveTemp = Number.isFinite(Number(status.temp)) ? Number(status.temp) : 25;
+
+      if (!isFiringActive) {
+          wasFiringRef.current = false;
+          runStartMsRef.current = 0;
+          historyAnchorXRef.current = 0;
+          setActualProfilePoints([{ x: 0, y: liveTemp }]);
+          return;
+      }
+
+      if (!wasFiringRef.current) {
+          wasFiringRef.current = true;
+          runStartMsRef.current = Date.now();
+          const first = (Array.isArray(history) ? history : []).find(
+              (p) => p && Number.isFinite(Number(p.x))
+          );
+          historyAnchorXRef.current = first ? Number(first.x) : 0;
+      }
+
+      const normalized = (Array.isArray(history) ? history : [])
+          .filter((p) => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)))
+          .map((p) => ({
+              x: Math.max(0, Number(p.x) - historyAnchorXRef.current),
+              y: Number(p.y)
+          }))
+          .sort((a, b) => a.x - b.x);
+
+      let nextPoints = normalized;
+      if (nextPoints.length === 0) {
+          const elapsedHours = runStartMsRef.current > 0
+              ? Math.max(0, (Date.now() - runStartMsRef.current) / 3600000)
+              : 0;
+          nextPoints = elapsedHours > 0.0003
+              ? [{ x: 0, y: liveTemp }, { x: elapsedHours, y: liveTemp }]
+              : [{ x: 0, y: liveTemp }];
+      } else if (nextPoints[0].x > 0) {
+          nextPoints = [{ x: 0, y: nextPoints[0].y }, ...nextPoints];
+      }
+
+      setActualProfilePoints(nextPoints);
+  }, [history, isFiringActive, status.temp]);
 
   useEffect(() => {
       if (!schedules.length) return;
@@ -549,6 +597,10 @@ const Dashboard = () => {
       )
   ).sort((a, b) => a - b);
   const xMax = xTickValues.length > 0 ? xTickValues[xTickValues.length - 1] : 0;
+  const actualXMax = actualProfilePoints.length > 0
+      ? Number(actualProfilePoints[actualProfilePoints.length - 1].x) || 0
+      : 0;
+  const chartXMax = Math.max(xMax, actualXMax);
 
   useEffect(() => {
       const next: Record<number, { rate: string; target: string; hold: string }> = {};
@@ -690,7 +742,7 @@ const Dashboard = () => {
                   </div>
                   <div className="text-right">
                       <div className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">
-                          {t.dashboard.targetTemp || 'Target'}
+                          {t.dashboard.setpoint}
                       </div>
                       <div className="text-4xl font-bold text-emerald-300 leading-none tabular-nums">
                           {(status.target || 0).toFixed(0)}
@@ -699,7 +751,7 @@ const Dashboard = () => {
                   </div>
               </div>
               <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-zinc-500 font-semibold">{t.dashboard.status || 'Status'}:</span>
+                  <span className="text-xs text-zinc-500 font-semibold">{t.dashboard.status}:</span>
                   <span className={`px-2 py-1 rounded-md text-xs font-bold tracking-wide ${isIdle ? 'bg-zinc-800 text-zinc-300' : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'}`}>
                       {(t.status as Record<string, string>)[status.status] || status.status}
                   </span>
@@ -1109,7 +1161,7 @@ const Dashboard = () => {
                     x: {
                         type: 'linear',
                         min: 0,
-                        max: xMax,
+                        max: chartXMax,
                         grid: { color: '#27272a' },
                         ticks: {
                             color: '#71717a',
@@ -1141,7 +1193,7 @@ const Dashboard = () => {
                     },
                     {
                         label: 'Actual Temp',
-                        data: history,
+                        data: actualProfilePoints,
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         pointRadius: 0,
@@ -1298,6 +1350,7 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
 
 
 

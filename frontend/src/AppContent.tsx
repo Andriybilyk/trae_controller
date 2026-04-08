@@ -1,11 +1,10 @@
 import React from 'react';
 import { Routes, Route, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Flame, Settings as SettingsIcon, Globe, ShieldAlert, Activity, History as HistoryIcon, Monitor } from 'lucide-react';
+import { LayoutDashboard, Calendar, Flame, Settings as SettingsIcon, Globe, ShieldAlert, Activity, History as HistoryIcon } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import ScheduleEditor from './components/ScheduleEditor';
 import Settings from './components/Settings';
 import History from './components/History';
-import ControllerScreen from './components/ControllerScreen';
 import { useLanguage } from './contexts/LanguageContext';
 import toast from 'react-hot-toast';
 import { postCommand } from './api/commands';
@@ -76,9 +75,6 @@ const MainLayout = () => {
           <NavLink to="/settings" className={navLinkClass}>
             <SettingsIcon size={16} /> <span>{t.nav.settings}</span>
           </NavLink>
-          <NavLink to="/controller" className={navLinkClass}>
-            <Monitor size={16} /> <span>Controller</span>
-          </NavLink>
         </div>
 
         {/* Right Actions */}
@@ -122,9 +118,6 @@ const MainLayout = () => {
         <NavLink to="/settings" className={mobileNavLinkClass}>
             <SettingsIcon size={20} /> <span className="text-[10px]">{t.nav.settings}</span>
         </NavLink>
-        <NavLink to="/controller" className={mobileNavLinkClass}>
-            <Monitor size={20} /> <span className="text-[10px]">Controller</span>
-        </NavLink>
       </div>
     </div>
   );
@@ -138,7 +131,6 @@ function AppContent() {
         <Route path="/schedules" element={<ScheduleEditor />} />
         <Route path="/history" element={<History />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/controller" element={<ControllerScreen />} />
       </Route>
     </Routes>
   );

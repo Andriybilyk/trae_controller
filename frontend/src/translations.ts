@@ -1,4 +1,4 @@
-export type Language = 'en' | 'ua';
+﻿export type Language = 'en' | 'ua';
 
 export const translations = {
   en: {
@@ -79,16 +79,16 @@ export const translations = {
       addSegment: "Add Segment",
       saveSchedule: "Save Schedule",
       deleteSchedule: "Delete Schedule",
-      rateUnit: "(�C/h)",
-      tempUnit: "(�C)",
+      rateUnit: "(�C/h)",
+      tempUnit: "(�C)",
       timeUnit: "(min)",
       selectToEdit: "Select a program to edit",
       orCreate: "or create a new one from the library",
       segments: "segments",
       step: "Step",
       selectedProgram: "Selected Program",
-      rateLabel: "Rate (�C/h)",
-      targetLabel: "Target (�C)",
+      rateLabel: "Rate (�C/h)",
+      targetLabel: "Target (�C)",
       holdLabel: "Hold (min)",
       addStep: "+ Add Step",
       noSteps: "No steps added yet",
@@ -144,7 +144,7 @@ export const translations = {
       zoneMode: "Zone Control Mode",
       saveConfig: "Save Configuration",
       maintenance: "Maintenance & Diagnostics",
-      thermocoupleOffset: "Thermocouple Offset (�C)",
+      thermocoupleOffset: "Thermocouple Offset (�C)",
       offsetDesc: "Calibrate the thermocouple reading by adding or subtracting an offset value.",
       ssrCycles: "SSR Relay Cycles",
       ssrDesc: "Solid State Relays (SSR) have a limited lifespan. Monitor cycle count to predict failure.",
@@ -161,9 +161,9 @@ export const translations = {
       save: "Save",
       saved: "Settings saved!",
       serviceAutotune: "Service: PID Auto-Tune",
-      warningText: "Warning: Kiln will heat to 150�C and oscillate. Ensure empty kiln.",
+      warningText: "Warning: Kiln will heat to 150�C and oscillate. Ensure empty kiln.",
       initiateCalib: "Initiate Calibration",
-      confirmAutotune: "WARNING: This will start the calibration process. The kiln will heat to 150�C. Continue?",
+      confirmAutotune: "WARNING: This will start the calibration process. The kiln will heat to 150�C. Continue?",
       fault: "Fault",
       faultReason: "Reason",
       clearFault: "Clear Fault",
@@ -196,7 +196,7 @@ export const translations = {
       settings: "Налаштування"
     },
     dashboard: {
-      currentTemp: "Поточна Т-ра",
+      currentTemp: "Поточна температура",
       status: "Статус",
       timeRemaining: "Залишилось часу",
       currentCost: "Вартість",
@@ -265,16 +265,16 @@ export const translations = {
       addSegment: "Додати Сегмент",
       saveSchedule: "Зберегти Програму",
       deleteSchedule: "Видалити Програму",
-      rateUnit: "(�C/год)",
-      tempUnit: "(�C)",
+      rateUnit: "(�C/год)",
+      tempUnit: "(�C)",
       timeUnit: "(хв)",
       selectToEdit: "Оберіть програму для редагування",
       orCreate: "або створіть нову з бібліотеки",
       segments: "кроків",
       step: "Крок",
       selectedProgram: "Вибрана Програма",
-      rateLabel: "Швидкість (�C/год)",
-      targetLabel: "Температура (�C)",
+      rateLabel: "Швидкість (�C/год)",
+      targetLabel: "Температура (�C)",
       holdLabel: "Витримка (хв)",
       addStep: "+ Додати крок",
       noSteps: "Ще не додано жодного кроку",
@@ -332,7 +332,7 @@ export const translations = {
       zoneMode: "Режим контролю зон",
       saveConfig: "Зберегти конфігурацію",
       maintenance: "Обслуговування та діагностика",
-      thermocoupleOffset: "Зміщення термопари (�C)",
+      thermocoupleOffset: "Зміщення термопари (�C)",
       offsetDesc: "Калібрування показань термопари шляхом додавання або віднімання значення зміщення.",
       ssrCycles: "Цикли реле (SSR)",
       ssrDesc: "Твердотільні реле (SSR) мають обмежений термін служби. Слідкуйте за кількістю циклів.",
@@ -349,9 +349,9 @@ export const translations = {
       save: "Зберегти",
       saved: "Налаштування збережено!",
       serviceAutotune: "Сервіс: PID Автоналаштування",
-      warningText: "Увага: піч нагріється до 150�C. Переконайтеся, що піч порожня.",
+      warningText: "Увага: піч нагріється до 150�C. Переконайтеся, що піч порожня.",
       initiateCalib: "Розпочати калібрування",
-      confirmAutotune: "УВАГА: Це запустить процес калібрування. Піч нагріється до 150�C. Продовжити?",
+      confirmAutotune: "УВАГА: Це запустить процес калібрування. Піч нагріється до 150�C. Продовжити?",
       fault: "Fault",
       faultReason: "Reason",
       clearFault: "Clear Fault",
@@ -376,6 +376,7 @@ export const translations = {
     }
   }
 };
+
 
 
 

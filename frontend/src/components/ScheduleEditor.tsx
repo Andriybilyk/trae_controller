@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, Play } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSchedules, Schedule, Step } from '../contexts/SchedulesContext';
-import { useDeviceState } from '../contexts/DeviceStateContext';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import toast from 'react-hot-toast';
@@ -99,7 +98,6 @@ interface EditorStep {
 const ScheduleEditor = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const { state: deviceState } = useDeviceState();
   const fixDegree = (v: string) => v.replace(/\uFFFD/g, '°');
   const { schedules, isLoading, saveSchedule, deleteSchedule, getScheduleDetails } = useSchedules();
   
@@ -323,7 +321,7 @@ const ScheduleEditor = () => {
 
   // Chart Data from Editor Steps
   const getChartData = () => {
-      const baseTemp = Number.isFinite(Number(deviceState?.temp)) ? Number(deviceState?.temp) : 25;
+      const baseTemp = 0;
       const dataPoints = [{x: 0, y: baseTemp}];
       let currentTime = 0;
       let currentTemp = baseTemp;

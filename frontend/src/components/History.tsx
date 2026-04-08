@@ -1,5 +1,5 @@
 ﻿
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Clock, Thermometer, Hash, AlertTriangle, CheckCircle, XCircle, Loader, X, Trash2 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
@@ -9,6 +9,88 @@ import { deleteJson, getJson } from '../api/http';
 import { ConfirmModal } from './ConfirmModal';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+
+const formatHourMinuteLabel = (hoursValue: number, hourSuffix: string, minSuffix: string) => {
+    if (!Number.isFinite(hoursValue)) return '';
+    const totalMinutes = Math.max(0, Math.round(hoursValue * 60));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (minutes === 0) return `${hours}${hourSuffix}`;
+    return `${hours}${hourSuffix} ${minutes}${minSuffix}`;
+};
+
+const historyTargetBreakpointLabelsPlugin = {
+    id: 'historyTargetBreakpointLabels',
+    afterDraw: (chart: any, _args: any, pluginOptions: any) => {
+        const datasetIndex = Number(pluginOptions?.datasetIndex ?? 0);
+        const dataset = chart?.data?.datasets?.[datasetIndex];
+        const points = Array.isArray(dataset?.data) ? dataset.data : [];
+        const chartArea = chart?.chartArea;
+        const xScale = chart?.scales?.x;
+        const yScale = chart?.scales?.y;
+        if (!chartArea || !xScale || !yScale || !points.length) return;
+
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(113, 113, 122, 0.6)';
+        ctx.fillStyle = 'rgba(241, 245, 249, 1)';
+        ctx.font = '700 11px Inter, system-ui, sans-serif';
+
+        for (let i = 1; i < points.length; i += 1) {
+            const point = points[i];
+            if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') continue;
+            const x = xScale.getPixelForValue(point.x);
+            const y = yScale.getPixelForValue(point.y);
+            if (x < chartArea.left || x > chartArea.right || y < chartArea.top || y > chartArea.bottom) continue;
+
+            const tempLabel = `${Math.round(point.y)}°C`;
+            ctx.textBaseline = 'middle';
+            const labelY = Math.min(Math.max(y - 10, chartArea.top + 10), chartArea.bottom - 10);
+            const tempLabelWidth = ctx.measureText(tempLabel).width + 8;
+            const rightEdge = x - 8;
+            const leftEdge = Math.max(chartArea.left + 2, rightEdge - tempLabelWidth);
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
+            ctx.fillRect(leftEdge, labelY - 6, tempLabelWidth, 12);
+            ctx.fillStyle = 'rgba(241, 245, 249, 1)';
+            ctx.textAlign = 'right';
+            ctx.fillText(tempLabel, leftEdge + tempLabelWidth - 3, labelY);
+        }
+        ctx.restore();
+    }
+};
+
+const dynamicXAxisTicksPlugin = {
+    id: 'dynamicXAxisTicks',
+    afterBuildTicks: (_chart: any, args: any, pluginOptions: any) => {
+        const scale = args?.scale;
+        if (!scale || scale.id !== 'x') return;
+        const values = Array.isArray(pluginOptions?.values) ? pluginOptions.values : [];
+        const safe = values
+            .map((v: any) => Number(v))
+            .filter((v: number) => Number.isFinite(v) && v >= 0)
+            .sort((a: number, b: number) => a - b);
+        const unique = safe.length > 0 ? Array.from(new Set(safe)) : [0];
+        const min = Number(scale.min ?? 0);
+        const max = Number(scale.max ?? min);
+        const inView = unique.filter((v: number) => v >= min - 1e-6 && v <= max + 1e-6);
+        const base = inView.length > 0 ? inView : [min, max].filter((v, i, arr) => i === 0 || v !== arr[i - 1]);
+
+        const maxTicks = 8;
+        if (base.length <= maxTicks) {
+            scale.ticks = base.map((v: number) => ({ value: v }));
+            return;
+        }
+
+        const stride = Math.ceil(base.length / maxTicks);
+        const reduced: number[] = [];
+        for (let i = 0; i < base.length; i += stride) reduced.push(base[i]);
+        const last = base[base.length - 1];
+        if (reduced[reduced.length - 1] !== last) reduced.push(last);
+        scale.ticks = reduced.map((v: number) => ({ value: v }));
+    }
+};
 
 // --- Type Definitions ---
 interface FiringSummary {
@@ -34,6 +116,18 @@ interface FiringDetail {
     data: FiringDataPoint[];
 }
 
+interface ScheduleStepLike {
+    type?: string;
+    target?: number;
+    rate?: number;
+    holdTime?: number;
+}
+
+interface ScheduleLike {
+    name?: string;
+    steps?: ScheduleStepLike[];
+}
+
 const formatTemp = (t: number | null | undefined) => {
     if (t === null || t === undefined || isNaN(t)) return '--';
     return `${t.toFixed(1)}°C`;
@@ -44,40 +138,6 @@ const safePct = (num: number, den: number) => {
     return Math.max(0, Math.min(100, Math.round((num / den) * 100)));
 };
 
-// --- Chart Options ---
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  scales: {
-    x: {
-        type: 'linear' as const,
-        ticks: {
-            color: '#71717a',
-            callback: (value: any, index: number, values: any) => {
-                // Custom callback to format timestamp to relative time (e.g., 5m, 1h 15m)
-                const seconds = value / 1000;
-                const h = Math.floor(seconds / 3600);
-                const m = Math.floor((seconds % 3600) / 60);
-                if (h > 0) return `${h}h ${m}m`;
-                return `${m}m`;
-            }
-        },
-        grid: { color: '#27272a' },
-        title: { display: true, text: 'Time From Start', color: '#a1a1aa' }
-    },
-    y: { 
-        min: 0, 
-        grid: { color: '#27272a' }, 
-        ticks: { color: '#71717a' },
-        title: { display: true, text: 'Temperature (°C)', color: '#a1a1aa' }
-    }
-  },
-  plugins: {
-    legend: { position: 'top' as const, labels: { color: '#a1a1aa' } },
-    tooltip: { backgroundColor: '#18181b', titleColor: '#fff', bodyColor: '#a1a1aa' }
-  }
-};
-
 // --- Main Component ---
 const History = () => {
     const { t } = useLanguage();
@@ -86,6 +146,16 @@ const History = () => {
     const [error, setError] = useState<string | null>(null);
     
     const [selectedFiring, setSelectedFiring] = useState<FiringDetail | null>(null);
+    const [selectedPlan, setSelectedPlan] = useState<{ x: number; y: number }[] | null>(null);
+    const [zoomX, setZoomX] = useState(1);
+    const [panX, setPanX] = useState(0);
+    const [isDraggingPan, setIsDraggingPan] = useState(false);
+    const chartPanRef = useRef<HTMLDivElement | null>(null);
+    const dragRef = useRef<{ active: boolean; startClientX: number; startPan: number }>({
+        active: false,
+        startClientX: 0,
+        startPan: 0
+    });
     const [isDetailLoading, setIsDetailLoading] = useState(false);
     const [clearBusy, setClearBusy] = useState(false);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -130,6 +200,7 @@ const History = () => {
 
     const handleSelectFiring = async (id: string) => {
         setIsDetailLoading(true);
+        setSelectedPlan(null);
         try {
             const res = await getJson<FiringDetail>(`/history/${id}`);
             if (!res.ok || !res.data) throw new Error(res.message || 'Failed to load firing details.');
@@ -146,6 +217,10 @@ const History = () => {
                     throw new Error("Data invalid");
                 }
             } else {
+                setZoomX(1);
+                setPanX(0);
+                const plan = await fetchPlanForHistory(data);
+                setSelectedPlan(plan);
                 setSelectedFiring(data);
             }
         } catch (err) {
@@ -180,6 +255,126 @@ const History = () => {
         return { startTemp, endTemp, peakTemp, maxTarget, rise };
     };
 
+    const buildPlanFromSchedule = (detail: FiringDetail, schedule: ScheduleLike | null) => {
+        const steps = Array.isArray(schedule?.steps) ? schedule!.steps! : [];
+        const firstTemp = detail.data.find((p) => Number.isFinite(Number(p.temp)))?.temp;
+        const baseTemp = Number.isFinite(Number(firstTemp)) ? Number(firstTemp) : 25;
+        const points: { x: number; y: number }[] = [{ x: 0, y: baseTemp }];
+        let currentTemp = baseTemp;
+        let currentHours = 0;
+
+        for (const step of steps) {
+            const type = String(step?.type || '').toLowerCase();
+            const target = Number(step?.target);
+            const rate = Number(step?.rate);
+            const holdTime = Number(step?.holdTime);
+
+            const hasTarget = Number.isFinite(target);
+            const hasRate = Number.isFinite(rate) && rate > 0;
+            const hasHold = Number.isFinite(holdTime) && holdTime > 0;
+
+            if ((type === 'ramp' || type === '' || type === 'heat') && hasTarget) {
+                const diff = Math.abs(target - currentTemp);
+                const rampHours = diff / (hasRate ? rate : 100);
+                currentHours += rampHours;
+                currentTemp = target;
+                points.push({ x: currentHours, y: currentTemp });
+            }
+
+            if (type === 'hold' && hasTarget) {
+                currentTemp = target;
+            }
+
+            if (hasHold) {
+                currentHours += holdTime / 60;
+                points.push({ x: currentHours, y: currentTemp });
+            }
+        }
+
+        return points;
+    };
+
+    const fetchPlanForHistory = async (detail: FiringDetail) => {
+        const scheduleName = String(detail?.summary?.scheduleName || '').trim();
+        if (!scheduleName) return null;
+
+        const candidates = Array.from(new Set([
+            scheduleName,
+            scheduleName.replace(/\s+/g, '_'),
+            scheduleName.replace(/_/g, ' ')
+        ])).filter(Boolean);
+
+        for (const name of candidates) {
+            const res = await getJson<ScheduleLike>(`/schedules?name=${encodeURIComponent(name)}`);
+            if (!res.ok || !res.data) continue;
+            const points = buildPlanFromSchedule(detail, res.data);
+            if (points.length > 1) return points;
+        }
+
+        return null;
+    };
+
+    const toHoursFromStart = (ts: number | undefined, start: number | undefined) => {
+        if (!Number.isFinite(Number(ts)) || !Number.isFinite(Number(start))) return 0;
+        return Math.max(0, (Number(ts) - Number(start)) / 3600000);
+    };
+
+    const getHistoryChartModel = (detail: FiringDetail | null) => {
+        if (!detail || !detail.summary || !Array.isArray(detail.data)) {
+            return { target: [], actual: [], ticks: [0], xMax: 0 };
+        }
+
+        const start = Number(detail.summary.startTime);
+        const samples = detail.data
+            .filter((p) => p && Number.isFinite(Number(p.timestamp)))
+            .map((p) => ({
+                x: toHoursFromStart(Number(p.timestamp), start),
+                target: Number(p.target),
+                temp: Number(p.temp)
+            }))
+            .sort((a, b) => a.x - b.x);
+
+        const actual = samples
+            .filter((p) => Number.isFinite(p.temp))
+            .map((p) => ({ x: p.x, y: p.temp }));
+
+        const targetRaw = (selectedPlan && selectedPlan.length > 1)
+            ? selectedPlan.map((p) => ({ x: Number(p.x), y: Number(p.y) }))
+            : samples
+                .filter((p) => Number.isFinite(p.target))
+                .map((p) => ({ x: p.x, y: p.target }));
+
+        const target: { x: number; y: number }[] = [];
+        for (let i = 0; i < targetRaw.length; i += 1) {
+            const point = targetRaw[i];
+            if (i === 0) {
+                target.push(point);
+                continue;
+            }
+            const prev = targetRaw[i - 1];
+            if (Math.abs(point.y - prev.y) >= 0.1) {
+                target.push(point);
+            }
+        }
+        if (targetRaw.length > 0) {
+            const last = targetRaw[targetRaw.length - 1];
+            if (target.length === 0 || target[target.length - 1].x !== last.x) {
+                target.push(last);
+            }
+        }
+
+        const ticks = Array.from(new Set(target.map((p) => Number(p.x.toFixed(4))))).sort((a, b) => a - b);
+        const targetXMax = target.length > 0 ? target[target.length - 1].x : 0;
+        const actualXMax = actual.length > 0 ? actual[actual.length - 1].x : 0;
+        return {
+            target,
+            actual,
+            ticks: ticks.length > 0 ? ticks : [0],
+            xMax: Math.max(targetXMax, actualXMax),
+            planXMax: targetXMax
+        };
+    };
+
     const StatusBadge = ({ status }: { status: FiringSummary['status'] }) => {
         const statusMap = {
             COMPLETED: { icon: <CheckCircle size={14} />, text: t.history.completed, className: 'bg-green-500/10 text-green-400 border-green-500/20' },
@@ -195,6 +390,83 @@ const History = () => {
     };
 
     // --- Render Logic ---
+    const chartModel = getHistoryChartModel(selectedFiring);
+    const fullPlanXMax = Math.max(0, Number((chartModel as any).planXMax ?? chartModel.xMax ?? 0));
+    const baseXMax = fullPlanXMax > 0 ? fullPlanXMax : Math.max(0.1, chartModel.xMax);
+    const clampedZoom = Math.max(1, Math.min(20, zoomX));
+    const viewWidth = Math.max(baseXMax / clampedZoom, 0.02);
+    const maxPanStart = Math.max(0, baseXMax - viewWidth);
+    const viewMin = maxPanStart * Math.max(0, Math.min(1, panX));
+    const viewMax = Math.min(baseXMax, viewMin + viewWidth);
+    const historyChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index' as const, intersect: false },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: '#18181b',
+                titleColor: '#fff',
+                bodyColor: '#a1a1aa',
+                borderColor: '#27272a',
+                borderWidth: 1,
+                padding: 10,
+                displayColors: false,
+                callbacks: {
+                    label: (context: any) => `${context.dataset.label}: ${Number(context?.parsed?.y ?? context?.raw?.y ?? 0).toFixed(0)}°C`
+                }
+            },
+            historyTargetBreakpointLabels: {
+                datasetIndex: 0
+            },
+            dynamicXAxisTicks: {
+                values: chartModel.ticks
+            }
+        },
+        scales: {
+            x: {
+                type: 'linear' as const,
+                min: viewMin,
+                max: viewMax,
+                grid: { color: '#27272a' },
+                ticks: {
+                    color: '#71717a',
+                    autoSkip: true,
+                    maxTicksLimit: 8,
+                    maxRotation: 0,
+                    callback: (value: any) => formatHourMinuteLabel(Number(value), t.dashboard.hourSuffix || 'h', t.dashboard.minSuffix || 'm')
+                }
+            },
+            y: {
+                min: 0,
+                grid: { color: '#27272a' },
+                ticks: { color: '#71717a' }
+            }
+        }
+    };
+
+    const beginDragPan = (clientX: number) => {
+        if (clampedZoom <= 1.01) return;
+        dragRef.current = { active: true, startClientX: clientX, startPan: panX };
+        setIsDraggingPan(true);
+    };
+
+    const moveDragPan = (clientX: number) => {
+        const drag = dragRef.current;
+        if (!drag.active || !chartPanRef.current || maxPanStart <= 0) return;
+        const width = Math.max(1, chartPanRef.current.clientWidth);
+        const deltaPx = clientX - drag.startClientX;
+        const deltaHours = -(deltaPx / width) * viewWidth;
+        const startHours = drag.startPan * maxPanStart;
+        const nextStart = Math.max(0, Math.min(maxPanStart, startHours + deltaHours));
+        setPanX(nextStart / maxPanStart);
+    };
+
+    const endDragPan = () => {
+        dragRef.current.active = false;
+        setIsDraggingPan(false);
+    };
+
     if (loading) {
         return <div className="flex justify-center items-center h-64"><Loader className="animate-spin text-kiln-accent" size={48} /></div>;
     }
@@ -243,7 +515,7 @@ const History = () => {
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 items-center">
                                     <div className="col-span-2 md:col-span-2">
                                         <p className="font-bold text-white truncate">{item.scheduleName}</p>
-                                        <p className="text-xs text-zinc-400">{new Date(item.startTime).toLocaleString()}</p>
+                                        <p className="text-xs text-zinc-400">{item.startTime > 946684800000 ? new Date(item.startTime).toLocaleString() : 'No RTC timestamp'}</p>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-zinc-300"><Clock size={16} className="text-zinc-500" /><span>{formatDuration(item.duration)}</span></div>
                                     <div className="flex items-center gap-2 text-sm text-zinc-300"><Thermometer size={16} className="text-zinc-500" /><span>{typeof item.peakTemp === 'number' ? `${item.peakTemp.toFixed(0)}°C ${t.history.peakTemp}` : '--'}</span></div>
@@ -272,10 +544,10 @@ const History = () => {
                                 <div className="flex justify-between items-center p-4 border-b border-kiln-border shrink-0">
                                     <div>
                                         <h2 className="text-xl font-bold text-white">{selectedFiring.summary.scheduleName}</h2>
-                                        <p className="text-sm text-zinc-400">{new Date(selectedFiring.summary.startTime).toLocaleString()}</p>
+                                        <p className="text-sm text-zinc-400">{selectedFiring.summary.startTime > 946684800000 ? new Date(selectedFiring.summary.startTime).toLocaleString() : 'No RTC timestamp (uptime-based session)'}</p>
                                         <p className="text-xs text-zinc-500 mt-1">{t.history.steps}: {selectedFiring.summary.completedSteps} / {selectedFiring.summary.totalSteps}</p>
                                     </div>
-                                    <button onClick={() => setSelectedFiring(null)} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-800 hover:text-white"><X size={20} /></button>
+                                    <button onClick={() => { setSelectedFiring(null); setSelectedPlan(null); }} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-800 hover:text-white"><X size={20} /></button>
                                 </div>
                                 <div className="p-4 md:p-6 flex-1 overflow-hidden">
                                     {(() => {
@@ -314,19 +586,66 @@ const History = () => {
                                     })()}
 
                                     {selectedFiring.data && selectedFiring.data.length > 1 ? (
-                                        <Line options={chartOptions} data={{
+                                        <div className="h-[320px]">
+                                        <div className="mb-3 flex items-center gap-2">
+                                            <button
+                                                onClick={() => setZoomX((z) => Math.min(20, Number((z * 1.5).toFixed(3))))}
+                                                className="px-2 py-1 text-xs rounded border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                                            >
+                                                Zoom +
+                                            </button>
+                                            <button
+                                                onClick={() => setZoomX((z) => Math.max(1, Number((z / 1.5).toFixed(3))))}
+                                                className="px-2 py-1 text-xs rounded border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                                            >
+                                                Zoom -
+                                            </button>
+                                            <button
+                                                onClick={() => { setZoomX(1); setPanX(0); }}
+                                                className="px-2 py-1 text-xs rounded border border-zinc-700 text-zinc-200 hover:bg-zinc-800"
+                                            >
+                                                Reset
+                                            </button>
+                                            <div className="ml-2 text-xs text-zinc-500">
+                                                {`x${clampedZoom.toFixed(1)}`}
+                                            </div>
+                                            {clampedZoom > 1.01 && (
+                                                <div className="text-xs text-zinc-500">Drag chart to pan</div>
+                                            )}
+                                        </div>
+                                        <div
+                                            ref={chartPanRef}
+                                            className={`h-[275px] ${clampedZoom > 1.01 ? (isDraggingPan ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'}`}
+                                            style={{ touchAction: clampedZoom > 1.01 ? 'none' as const : 'auto' as const }}
+                                            onMouseDown={(e) => beginDragPan(e.clientX)}
+                                            onMouseMove={(e) => moveDragPan(e.clientX)}
+                                            onMouseUp={endDragPan}
+                                            onMouseLeave={endDragPan}
+                                            onTouchStart={(e) => beginDragPan(e.touches[0]?.clientX ?? 0)}
+                                            onTouchMove={(e) => {
+                                                moveDragPan(e.touches[0]?.clientX ?? 0);
+                                                if (clampedZoom > 1.01) e.preventDefault();
+                                            }}
+                                            onTouchEnd={endDragPan}
+                                        >
+                                        <Line options={historyChartOptions} plugins={[historyTargetBreakpointLabelsPlugin, dynamicXAxisTicksPlugin]} data={{
                                             datasets: [
                                                 {
                                                     label: t.history.targetTemp,
-                                                    data: selectedFiring.data.map(p => ({ x: p.timestamp - selectedFiring.summary.startTime, y: p.target })),
+                                                    data: chartModel.target,
                                                     borderColor: '#6366f1',
                                                     borderDash: [5, 5],
-                                                    pointRadius: 0,
-                                                    tension: 0.1
+                                                    pointRadius: 4,
+                                                    pointHoverRadius: 5,
+                                                    pointBorderWidth: 1,
+                                                    pointBackgroundColor: '#0f1115',
+                                                    pointBorderColor: '#818cf8',
+                                                    tension: 0,
+                                                    fill: false
                                                 },
                                                 {
                                                     label: t.history.currentTemp,
-                                                    data: selectedFiring.data.map(p => ({ x: p.timestamp - selectedFiring.summary.startTime, y: p.temp })),
+                                                    data: chartModel.actual,
                                                     borderColor: '#10b981',
                                                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                                                     fill: true,
@@ -335,6 +654,8 @@ const History = () => {
                                                 }
                                             ]
                                         }} />
+                                        </div>
+                                        </div>
                                     ) : (
                                         <div className="flex items-center justify-center h-full text-zinc-500 text-center">
                                             <p>{t.history.noData}</p>
@@ -345,7 +666,7 @@ const History = () => {
                         ) : (
                              <div className="p-8 text-center text-red-400">
                                  <p>{t.history.errorDetails}</p>
-                                 <button onClick={() => setSelectedFiring(null)} className="mt-4 px-4 py-2 bg-zinc-800 rounded-md text-white">{t.dashboard.done}</button>
+                                 <button onClick={() => { setSelectedFiring(null); setSelectedPlan(null); }} className="mt-4 px-4 py-2 bg-zinc-800 rounded-md text-white">{t.dashboard.done}</button>
                              </div>
                         )}
                     </div>
