@@ -2,10 +2,88 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Save, Play } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useSchedules, Schedule, Step } from '../contexts/SchedulesContext';
+import { useDeviceState } from '../contexts/DeviceStateContext';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+
+const formatHourMinuteLabel = (hoursValue: number, hourSuffix: string, minSuffix: string) => {
+  if (!Number.isFinite(hoursValue)) return '';
+  const totalMinutes = Math.max(0, Math.round(hoursValue * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) return `${hours}${hourSuffix}`;
+  return `${hours}${hourSuffix} ${minutes}${minSuffix}`;
+};
+
+const editorBreakpointLabelsPlugin = {
+  id: 'editorBreakpointLabels',
+  afterDraw: (chart: any, _args: any, pluginOptions: any) => {
+    const datasetIndex = Number(pluginOptions?.datasetIndex ?? 0);
+    const dataset = chart?.data?.datasets?.[datasetIndex];
+    const points = Array.isArray(dataset?.data) ? dataset.data : [];
+    const chartArea = chart?.chartArea;
+    const xScale = chart?.scales?.x;
+    const yScale = chart?.scales?.y;
+
+    if (!chartArea || !xScale || !yScale || !points.length) return;
+
+    const ctx = chart.ctx;
+
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.25;
+    ctx.strokeStyle = 'rgba(129, 140, 248, 0.75)';
+    ctx.fillStyle = 'rgba(226, 232, 240, 0.98)';
+    ctx.font = '700 12px Inter, system-ui, sans-serif';
+
+    for (let i = 1; i < points.length; i += 1) {
+      const point = points[i];
+      if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') continue;
+
+      const x = xScale.getPixelForValue(point.x);
+      const y = yScale.getPixelForValue(point.y);
+      if (x < chartArea.left || x > chartArea.right || y < chartArea.top || y > chartArea.bottom) continue;
+
+      const lineBottomY = chartArea.bottom - 14;
+      const lineTopY = Math.min(Math.max(y + 6, chartArea.top + 6), lineBottomY - 4);
+
+      ctx.beginPath();
+      ctx.moveTo(x, lineTopY);
+      ctx.lineTo(x, lineBottomY);
+      ctx.stroke();
+
+      const tempLabel = `${Math.round(point.y)}°C`;
+      const labelY = Math.min(Math.max(y - 10, chartArea.top + 10), chartArea.bottom - 18);
+      ctx.textBaseline = 'middle';
+      if (x - 10 < chartArea.left + 24) {
+        ctx.textAlign = 'left';
+        ctx.fillText(tempLabel, x + 10, labelY);
+      } else {
+        ctx.textAlign = 'right';
+        ctx.fillText(tempLabel, x - 10, labelY);
+      }
+    }
+
+    ctx.restore();
+  }
+};
+
+const dynamicXAxisTicksPlugin = {
+  id: 'dynamicXAxisTicks',
+  afterBuildTicks: (_chart: any, args: any, pluginOptions: any) => {
+    const scale = args?.scale;
+    if (!scale || scale.id !== 'x') return;
+    const values = Array.isArray(pluginOptions?.values) ? pluginOptions.values : [];
+    const safe = values
+      .map((v: any) => Number(v))
+      .filter((v: number) => Number.isFinite(v) && v >= 0)
+      .sort((a: number, b: number) => a - b);
+    const tickValues = safe.length > 0 ? Array.from(new Set(safe)) : [0];
+    scale.ticks = tickValues.map((v: number) => ({ value: v }));
+  }
+};
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
@@ -21,6 +99,7 @@ interface EditorStep {
 const ScheduleEditor = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { state: deviceState } = useDeviceState();
   const fixDegree = (v: string) => v.replace(/\uFFFD/g, '°');
   const { schedules, isLoading, saveSchedule, deleteSchedule, getScheduleDetails } = useSchedules();
   
@@ -244,25 +323,24 @@ const ScheduleEditor = () => {
 
   // Chart Data from Editor Steps
   const getChartData = () => {
-      const dataPoints = [{x: 0, y: 25}];
+      const baseTemp = Number.isFinite(Number(deviceState?.temp)) ? Number(deviceState?.temp) : 25;
+      const dataPoints = [{x: 0, y: baseTemp}];
       let currentTime = 0;
-      let currentTemp = 25;
+      let currentTemp = baseTemp;
 
       editorSteps.forEach(step => {
           const rate = step.rate === "" ? 0 : Number(step.rate);
           const target = step.target === "" ? 0 : Number(step.target);
-          const holdTime = step.holdTime === "" ? 0 : Number(step.holdTime);
+          const holdMinutes = step.holdTime === "" ? 0 : Number(step.holdTime);
 
-          // Ramp
           const diff = Math.abs(target - currentTemp);
-          const duration = diff / (rate || 100);
-          currentTime += duration;
+          const rampHours = diff / (rate || 100);
+          currentTime += rampHours;
           currentTemp = target;
           dataPoints.push({x: currentTime, y: currentTemp});
 
-          // Hold
-          if (holdTime > 0) {
-              currentTime += holdTime / 60;
+          if (holdMinutes > 0) {
+              currentTime += holdMinutes / 60;
               dataPoints.push({x: currentTime, y: currentTemp});
           }
       });
@@ -274,11 +352,25 @@ const ScheduleEditor = () => {
               borderColor: '#10b981',
               backgroundColor: 'rgba(16, 185, 129, 0.1)',
               fill: true,
-              pointRadius: 0,
+              pointRadius: 4,
+              pointHoverRadius: 5,
+              pointBorderWidth: 1,
+              pointBackgroundColor: '#0f1115',
+              pointBorderColor: '#818cf8',
               tension: 0.1
           }]
       };
   };
+  const chartData = getChartData();
+  const editorPoints = (chartData.datasets[0].data || []) as { x: number; y: number }[];
+  const editorTickValues = Array.from(
+      new Set(
+          editorPoints
+              .map((p) => Number((Number(p.x) || 0).toFixed(4)))
+              .filter((v) => Number.isFinite(v) && v >= 0)
+      )
+  ).sort((a, b) => a - b);
+  const editorXMax = editorTickValues.length > 0 ? editorTickValues[editorTickValues.length - 1] : 0;
 
   const chartOptions = {
     responsive: true,
@@ -286,15 +378,27 @@ const ScheduleEditor = () => {
     scales: {
         x: {
             type: 'linear' as const,
+            min: 0,
+            max: editorXMax,
             grid: { color: '#27272a' },
-            ticks: { color: '#71717a', callback: (v: any) => v.toFixed(1) + 'h' }
+            ticks: { color: '#71717a', autoSkip: false, maxRotation: 0, callback: (v: any) => formatHourMinuteLabel(Number(v), t.dashboard.hourSuffix, t.dashboard.minSuffix) }
         },
         y: {
             grid: { color: '#27272a' },
             ticks: { color: '#71717a' }
         }
     },
-    plugins: { legend: { display: false } }
+    plugins: {
+        legend: { display: false },
+        editorBreakpointLabels: {
+            datasetIndex: 0,
+            hourSuffix: t.dashboard.hourSuffix,
+            minSuffix: t.dashboard.minSuffix
+        },
+        dynamicXAxisTicks: {
+            values: editorTickValues
+        }
+    }
   };
 
   return (
@@ -407,13 +511,13 @@ const ScheduleEditor = () => {
 
                     {/* Mobile Chart */}
                     <div className="md:hidden mt-6 h-48 bg-kiln-card border border-kiln-border rounded-xl p-4 shrink-0">
-                        <Line data={getChartData()} options={chartOptions} />
+                        <Line data={chartData} options={chartOptions} plugins={[editorBreakpointLabelsPlugin, dynamicXAxisTicksPlugin]} />
                     </div>
                 </div>
 
                 {/* Desktop Chart */}
                 <div className="hidden md:block mb-6 h-48 bg-kiln-card border border-kiln-border rounded-xl p-4 shrink-0 md:order-first">
-                    <Line data={getChartData()} options={chartOptions} />
+                    <Line data={chartData} options={chartOptions} plugins={[editorBreakpointLabelsPlugin, dynamicXAxisTicksPlugin]} />
                 </div>
               </div>
           ) : (

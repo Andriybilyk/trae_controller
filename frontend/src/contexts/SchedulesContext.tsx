@@ -50,21 +50,10 @@ export const SchedulesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                         
                         const processed = data.map((s: any) => {
                             const existing = existingMap.get(s.name);
-                            
-                            // CRITICAL FIX: The list endpoint returns `stepsCount`.
-                            // If we have local steps, check if they match the count.
-                            // If the server says there are steps (stepsCount > 0), but we have none or wrong count,
-                            // we should probably trust the server's count and maybe clear our stale steps 
-                            // to force a re-fetch when clicked, OR keep existing if it looks valid.
-                            
-                            let steps = s.steps || [];
-                            
-                            if (existing && existing.steps && existing.steps.length > 0) {
-                                // If server list doesn't return steps (it usually doesn't), keep ours.
-                                if (steps.length === 0) {
-                                    steps = existing.steps;
-                                }
-                            }
+
+                            // List endpoint is summary-only: avoid keeping stale cached step bodies.
+                            // Full step data must come from getScheduleDetails().
+                            const steps = Array.isArray(s.steps) ? s.steps : [];
 
                             return {
                                 ...s,

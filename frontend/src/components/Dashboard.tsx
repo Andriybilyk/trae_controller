@@ -11,6 +11,76 @@ import { postCommand } from '../api/commands';
 import { getJson, postJson } from '../api/http';
 import { toastApiError } from '../api/notify';
 
+const formatHourMinuteLabel = (hoursValue: number, hourSuffix: string, minSuffix: string) => {
+  if (!Number.isFinite(hoursValue)) return '';
+  const totalMinutes = Math.max(0, Math.round(hoursValue * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) return `${hours}${hourSuffix}`;
+  return `${hours}${hourSuffix} ${minutes}${minSuffix}`;
+};
+
+const targetBreakpointLabelsPlugin = {
+  id: 'targetBreakpointLabels',
+  afterDraw: (chart: any, _args: any, pluginOptions: any) => {
+    const datasetIndex = Number(pluginOptions?.datasetIndex ?? 0);
+    const dataset = chart?.data?.datasets?.[datasetIndex];
+    const points = Array.isArray(dataset?.data) ? dataset.data : [];
+    const chartArea = chart?.chartArea;
+    const xScale = chart?.scales?.x;
+    const yScale = chart?.scales?.y;
+
+    if (!chartArea || !xScale || !yScale || !points.length) return;
+
+    const ctx = chart.ctx;
+
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(113, 113, 122, 0.6)';
+    ctx.fillStyle = 'rgba(241, 245, 249, 1)';
+    ctx.font = '700 11px Inter, system-ui, sans-serif';
+
+    for (let i = 1; i < points.length; i += 1) {
+      const point = points[i];
+      if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') continue;
+
+      const x = xScale.getPixelForValue(point.x);
+      const y = yScale.getPixelForValue(point.y);
+      if (x < chartArea.left || x > chartArea.right || y < chartArea.top || y > chartArea.bottom) continue;
+
+      const tempLabel = `${Math.round(point.y)}°C`;
+      ctx.textBaseline = 'middle';
+      const labelY = Math.min(Math.max(y - 10, chartArea.top + 10), chartArea.bottom - 10);
+      const tempLabelWidth = ctx.measureText(tempLabel).width + 8;
+      const rightEdge = x - 8;
+      const leftEdge = Math.max(chartArea.left + 2, rightEdge - tempLabelWidth);
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.92)';
+      ctx.fillRect(leftEdge, labelY - 6, tempLabelWidth, 12);
+      ctx.fillStyle = 'rgba(241, 245, 249, 1)';
+      ctx.textAlign = 'right';
+      ctx.fillText(tempLabel, leftEdge + tempLabelWidth - 3, labelY);
+    }
+
+    ctx.restore();
+  }
+};
+
+const dynamicXAxisTicksPlugin = {
+  id: 'dynamicXAxisTicks',
+  afterBuildTicks: (_chart: any, args: any, pluginOptions: any) => {
+    const scale = args?.scale;
+    if (!scale || scale.id !== 'x') return;
+    const values = Array.isArray(pluginOptions?.values) ? pluginOptions.values : [];
+    const safe = values
+      .map((v: any) => Number(v))
+      .filter((v: number) => Number.isFinite(v) && v >= 0)
+      .sort((a: number, b: number) => a - b);
+    const tickValues = safe.length > 0 ? Array.from(new Set(safe)) : [0];
+    scale.ticks = tickValues.map((v: number) => ({ value: v }));
+  }
+};
+
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const chartOptions = {
@@ -28,7 +98,7 @@ const chartOptions = {
         padding: 10,
         displayColors: false,
         callbacks: {
-            label: (context: any) => `${context.dataset.label}: ${context.raw}°C`
+            label: (context: any) => `${context.dataset.label}: ${Number(context?.parsed?.y ?? context?.raw?.y ?? 0).toFixed(0)}°C`
         }
     }
   },
@@ -188,38 +258,39 @@ const Dashboard = () => {
       localStorage.setItem('kiln:selectedScheduleId', selectedScheduleId);
   }, [selectedScheduleId]);
 
-  // Helper to calculate target profile points
-  const getTargetProfile = (schedule: Schedule | undefined) => {
-      if (!schedule || !schedule.steps) return [];
-      const points = [{x: 0, y: 25}];
+  const getTargetProfileFromRows = (rows: { rate: number; target: number; hold: number }[], startTempC: number) => {
+      const baseTemp = Number.isFinite(startTempC) ? startTempC : 25;
+      const points = [{ x: 0, y: baseTemp }];
       let currentTime = 0;
-      let currentTemp = 25;
+      let currentTemp = baseTemp;
 
-      schedule.steps.forEach(step => {
-          if (step.type === 'ramp') {
-              const diff = Math.abs(step.target - currentTemp);
-              const rate = step.rate || 100;
-              const duration = diff / rate;
-              currentTime += duration;
-              currentTemp = Number(step.target);
-              points.push({x: currentTime, y: currentTemp});
-          } else {
-              const duration = (step.holdTime || 0) / 60;
-              currentTime += duration;
-              points.push({x: currentTime, y: currentTemp});
+      rows.forEach((row) => {
+          const target = Number.isFinite(row.target) ? row.target : currentTemp;
+          const rate = Number.isFinite(row.rate) && row.rate > 0 ? row.rate : 100;
+          const holdMinutes = Number.isFinite(row.hold) && row.hold > 0 ? row.hold : 0;
+
+          const diff = Math.abs(target - currentTemp);
+          const rampHours = diff / rate;
+          currentTime += rampHours;
+          currentTemp = target;
+          points.push({ x: currentTime, y: currentTemp });
+
+          if (holdMinutes > 0) {
+              currentTime += holdMinutes / 60;
+              points.push({ x: currentTime, y: currentTemp });
           }
       });
+
       return points;
   };
+
   
-  // Load details when selected (if missing)
+  // Always refresh full schedule body on selection to avoid stale cached profile steps.
   useEffect(() => {
-      if (activeSchedule) {
-          if (!activeSchedule.steps || activeSchedule.steps.length === 0) {
-              getScheduleDetails(activeSchedule);
-          }
-      }
-  }, [selectedScheduleId, schedules]);
+      if (!activeSchedule) return;
+      getScheduleDetails(activeSchedule);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedScheduleId]);
 
   const loadFan = async () => {
     const res = await getJson<any>('/fan');
@@ -446,6 +517,38 @@ const Dashboard = () => {
   };
 
   const scheduleRows = getScheduleRows();
+  const targetProfileRows = (() => {
+      const keys = Object.keys(rowEdits)
+          .map(k => Number(k))
+          .filter(k => Number.isFinite(k))
+          .sort((a, b) => a - b);
+
+      if (keys.length > 0) {
+          return keys.map((k) => {
+              const edit = rowEdits[k];
+              return {
+                  rate: Number(edit?.rate ?? 0),
+                  target: Number(edit?.target ?? 25),
+                  hold: Number(edit?.hold ?? 0)
+              };
+          });
+      }
+
+      return scheduleRows.map((row) => ({
+          rate: row.rate,
+          target: row.target,
+          hold: row.hold
+      }));
+  })();
+  const targetProfilePoints = getTargetProfileFromRows(targetProfileRows, Number(status.temp));
+  const xTickValues = Array.from(
+      new Set(
+          targetProfilePoints
+              .map((p) => Number((Number(p.x) || 0).toFixed(4)))
+              .filter((v) => Number.isFinite(v) && v >= 0)
+      )
+  ).sort((a, b) => a - b);
+  const xMax = xTickValues.length > 0 ? xTickValues[xTickValues.length - 1] : 0;
 
   useEffect(() => {
       const next: Record<number, { rate: string; target: string; hold: string }> = {};
@@ -986,45 +1089,68 @@ const Dashboard = () => {
       {/* Main Chart Section */}
       <div className="bg-kiln-card border border-kiln-border rounded-xl shadow-lg shadow-black/20 flex flex-col overflow-hidden min-h-[320px]">
         {/* Chart */}
-        <div className="flex-1 p-6 relative">
-            <Line options={{
+        <div className="flex-1 p-6 pb-12 relative">
+            <Line
+            plugins={[targetBreakpointLabelsPlugin, dynamicXAxisTicksPlugin]}
+            options={{
                 ...chartOptions,
+                plugins: {
+                    ...chartOptions.plugins,
+                    targetBreakpointLabels: {
+                        datasetIndex: 0,
+                        hourSuffix: t.dashboard.hourSuffix,
+                        minSuffix: t.dashboard.minSuffix
+                    },
+                    dynamicXAxisTicks: {
+                        values: xTickValues
+                    }
+                },
                 scales: {
                     x: {
                         type: 'linear',
+                        min: 0,
+                        max: xMax,
                         grid: { color: '#27272a' },
-                        ticks: { color: '#71717a', callback: (v) => v + 'h' }
+                        ticks: {
+                            color: '#71717a',
+                            autoSkip: false,
+                            maxRotation: 0,
+                            callback: (value: any) => formatHourMinuteLabel(Number(value), t.dashboard.hourSuffix, t.dashboard.minSuffix)
+                        }
                     },
                     y: {
                         grid: { color: '#27272a' },
                         ticks: { color: '#71717a' }
                     }
                 }
-            }} data={{
+            }}
+            data={{
                 datasets: [
                     {
                         label: 'Target Profile',
-                        data: getTargetProfile(activeSchedule),
-                        borderColor: '#6366f1', // Indigo (Target)
+                        data: targetProfilePoints,
+                        borderColor: '#6366f1',
                         borderDash: [5, 5],
-                        pointRadius: 0,
+                        pointRadius: 4,
+                        pointHoverRadius: 5,
+                        pointBorderWidth: 1,
+                        pointBackgroundColor: '#0f1115',
+                        pointBorderColor: '#818cf8',
                         tension: 0,
                         fill: false
                     },
                     {
                         label: 'Actual Temp',
                         data: history,
-                        borderColor: '#10b981', // Emerald
+                        borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        pointRadius: 0,
                         tension: 0.4,
                         fill: true
                     }
                 ]
-            }} />
-            
-            <div className="absolute bottom-6 left-16 text-xs text-orange-500 font-medium">
-                {t.dashboard.setpoint}
-            </div>
+            }}
+            />
         </div>
       </div>
 

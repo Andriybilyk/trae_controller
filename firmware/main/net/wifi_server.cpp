@@ -909,9 +909,6 @@ void WiFiServerManager::setupRoutes() {
     httpd_uri_t manifest_uri = make_uri("/manifest.json", HTTP_GET, manifest_handler);
     httpd_register_uri_handler(server, &manifest_uri);
 
-    httpd_uri_t bootstrap_uri = make_uri("/bootstrap.js*", HTTP_GET, static_asset_handler);
-    httpd_register_uri_handler(server, &bootstrap_uri);
-
     httpd_uri_t touch_calib_uri = make_uri("/touch_calibration.html", HTTP_GET, static_asset_handler);
     httpd_register_uri_handler(server, &touch_calib_uri);
     
