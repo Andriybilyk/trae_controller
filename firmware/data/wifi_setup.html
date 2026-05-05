@@ -1,295 +1,182 @@
-<!DOCTYPE html>
+﻿<!doctype html>
 <html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TRAE Kiln Controller - WiFi Setup</title>
-    <style>
-        :root {
-            --primary-color: #ff6b00;
-            --background-color: #f4f4f4;
-            --card-color: #ffffff;
-            --text-color: #333;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--background-color);
-            color: var(--text-color);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            min-height: 100vh;
-        }
-        .container {
-            background-color: var(--card-color);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            padding: 24px;
-            width: 100%;
-            max-width: 420px;
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--primary-color);
-            margin-bottom: 8px;
-        }
-        h2 { margin: 0; font-size: 1.2rem; font-weight: 600; }
-
-        .form-group { margin-bottom: 16px; text-align: left; }
-        label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem; }
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 16px;
-            min-height: 46px;
-        }
-        input:focus {
-            border-color: var(--primary-color);
-            outline: none;
-        }
-
-        button {
-            width: 100%;
-            min-height: 50px;
-            padding: 14px;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 17px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover { background-color: #e65100; }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
-
-        #scan-btn {
-            background-color: #f0f0f0;
-            color: #333;
-            margin-bottom: 16px;
-        }
-        #scan-btn:hover { background-color: #e0e0e0; }
-
-        .network-list {
-            list-style: none;
-            padding: 0;
-            margin: 0 0 16px 0;
-            max-height: 240px;
-            overflow-y: auto;
-            border: 1px solid #eee;
-            border-radius: 8px;
-            display: none;
-        }
-        .network-item {
-            min-height: 46px;
-            padding: 12px 14px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .network-item:last-child { border-bottom: none; }
-        .network-item:hover { background-color: #fafafa; }
-        .rssi { font-size: 0.85em; color: #888; }
-        .lock-icon { font-size: 0.9em; margin-right: 6px; }
-
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid var(--primary-color);
-            border-radius: 50%;
-            width: 16px;
-            height: 16px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        .footer {
-            margin-top: 24px;
-            font-size: 0.8rem;
-            color: #888;
-            text-align: center;
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>TRAE Wi-Fi Setup</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #181b22;
+      --line: #2a2f3a;
+      --text: #eef1f7;
+      --muted: #aab3c3;
+      --accent: #22c55e;
+      --accent-press: #18a34a;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    .wrap { min-height: 100dvh; display: grid; place-items: center; padding: 12px; }
+    .card {
+      width: min(100%, 420px);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    h1 { margin: 0 0 8px; font-size: 20px; line-height: 1.25; }
+    p { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.35; }
+    label { display: block; margin: 8px 0 6px; font-size: 13px; color: var(--muted); }
+    input {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0d0f14;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 16px;
+    }
+    .btn {
+      width: 100%;
+      min-height: 48px;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #06230f;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn:active { background: var(--accent-press); }
+    .btn[disabled] { opacity: .65; cursor: default; }
+    .status {
+      margin-top: 10px;
+      min-height: 18px;
+      font-size: 13px;
+      color: var(--muted);
+      word-wrap: break-word;
+    }
+    .status.err { color: var(--danger); }
+    .status.ok { color: var(--accent); }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">TRAE KILN</div>
-            <h2>Налаштування Wi‑Fi</h2>
-            <p style="color: #666; font-size: 0.9rem;">Оберіть мережу та підключіть контролер</p>
-        </div>
+  <div class="wrap">
+    <section class="card" aria-label="Wi-Fi setup">
+      <h1>Налаштування Wi-Fi</h1>
+      <p>Введіть назву мережі та пароль. Після збереження контролер спробує підключитися.</p>
 
-        <button id="scan-btn" onclick="scanNetworks()">Пошук мереж</button>
-        <ul id="network-list" class="network-list"></ul>
+      <form id="wifiForm" action="/save_wifi" method="POST" autocomplete="on" novalidate>
+        <label for="ssid">SSID (назва мережі)</label>
+        <input id="ssid" name="ssid" type="text" maxlength="32" autocapitalize="none" autocomplete="username" spellcheck="false" required>
 
-        <form action="/save_wifi" method="POST" onsubmit="return validateForm()">
-            <div class="form-group">
-                <label for="ssid">Назва мережі (SSID)</label>
-                <input type="text" id="ssid" name="ssid" placeholder="Введіть або оберіть зі списку" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Пароль</label>
-                <input type="password" id="password" name="password" placeholder="Пароль Wi‑Fi">
-            </div>
-            <button type="submit" id="connect-btn">Підключити</button>
-        </form>
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" maxlength="64" autocomplete="current-password">
 
-        <div class="footer">
-            &copy; 2026 TRAE Controller
-        </div>
-    </div>
+        <button id="connectBtn" class="btn" type="submit">Підключити</button>
+      </form>
 
-    <script>
-        function renderNetworks(networks) {
-            const list = document.getElementById('network-list');
-            const unique = [];
-            const seen = new Set();
-            networks.forEach(n => {
-                if (n.ssid && !seen.has(n.ssid)) {
-                    seen.add(n.ssid);
-                    unique.push(n);
-                }
-            });
+      <div id="status" class="status" aria-live="polite"></div>
+    </section>
+  </div>
 
-            unique.sort((a, b) => b.rssi - a.rssi);
+  <script>
+    const form = document.getElementById('wifiForm');
+    const ssid = document.getElementById('ssid');
+    const password = document.getElementById('password');
+    const btn = document.getElementById('connectBtn');
+    const statusEl = document.getElementById('status');
 
-            if (unique.length === 0) {
-                list.innerHTML = '<li class="network-item" style="justify-content:center;">Мереж не знайдено</li>';
-                return;
-            }
+    function setStatus(msg, cls) {
+      statusEl.textContent = msg || '';
+      statusEl.className = 'status' + (cls ? (' ' + cls) : '');
+    }
 
-            list.innerHTML = '';
-            unique.forEach(net => {
-                const li = document.createElement('li');
-                li.className = 'network-item';
-                const isSecure = net.auth !== 0;
-                li.innerHTML = `
-                    <div style="display:flex; align-items:center;">
-                        ${isSecure ? '<span class="lock-icon">&#x1f512;</span>' : ''}
-                        <span style="font-weight:600">${net.ssid}</span>
-                    </div>
-                    <span class="rssi">${net.rssi} dBm</span>
-                `;
-                li.onclick = () => {
-                    document.getElementById('ssid').value = net.ssid;
-                    document.getElementById('password').focus();
-                    Array.from(list.children).forEach(c => c.style.backgroundColor = '');
-                    li.style.backgroundColor = '#fff3e0';
-                };
-                list.appendChild(li);
-            });
+    function safeTrim(s) {
+      return (s || '').replace(/\s+/g, ' ').trim();
+    }
+
+    async function safeJson(resp) {
+      const t = await resp.text();
+      try { return JSON.parse(t); } catch (_) { return null; }
+    }
+
+    async function waitForConnected(timeoutMs) {
+      const t0 = Date.now();
+      while (Date.now() - t0 < timeoutMs) {
+        try {
+          const r = await fetch('/api/status', { cache: 'no-store' });
+          if (r.ok) {
+            const j = await safeJson(r);
+            if (j && j.wifi_connected) return true;
+          }
+        } catch (_) {}
+        await new Promise(r => setTimeout(r, 500));
+      }
+      return false;
+    }
+
+    function closePortalWindow() {
+      // Best-effort close for captive portal webviews/CNA.
+      try { window.close(); } catch (_) {}
+      setTimeout(() => {
+        try { window.location.replace('about:blank'); } catch (_) {}
+      }, 500);
+      setTimeout(() => {
+        try { document.body.innerHTML = '<div style=\"font-family:Arial,sans-serif;padding:16px;color:#111\">Підключено. Вікно можна закрити.</div>'; } catch (_) {}
+      }, 1000);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const vSsid = safeTrim(ssid.value);
+      const vPass = password.value || '';
+
+      if (!vSsid) {
+        setStatus('Вкажіть SSID мережі.', 'err');
+        ssid.focus();
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Підключення...';
+      setStatus('Надсилаю дані мережі...');
+
+      try {
+        const body = new URLSearchParams({ ssid: vSsid, password: vPass }).toString();
+        const resp = await fetch('/save_wifi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body
+        });
+        const data = await safeJson(resp);
+        if (!resp.ok || !data || data.status === 'error') {
+          setStatus('Не вдалося зберегти дані. Перевірте SSID/пароль.', 'err');
+          btn.disabled = false;
+          btn.textContent = 'Підключити';
+          return;
         }
 
-        async function safeJson(resp) {
-            const text = await resp.text();
-            try {
-                return JSON.parse(text);
-            } catch (_) {
-                return null;
-            }
+        setStatus('Підключаюся до Wi-Fi...');
+        const ok = await waitForConnected(180000);
+        if (ok) {
+          setStatus('Підключено успішно.', 'ok');
+          setTimeout(closePortalWindow, 1200);
+        } else {
+          setStatus('Підключення триває довше зазвичай. Дані збережено, контролер ще намагається підключитися.', '');
+          btn.disabled = false;
+          btn.textContent = 'Оновити статус';
         }
-
-        async function pollScanResults(maxAttempts = 30, intervalMs = 500) {
-            for (let attempt = 0; attempt < maxAttempts; attempt++) {
-                const resp = await fetch('/scan_results', { cache: 'no-store' });
-                if (!resp.ok) {
-                    await new Promise(resolve => setTimeout(resolve, intervalMs));
-                    continue;
-                }
-                const data = await safeJson(resp);
-                if (!data) {
-                    await new Promise(resolve => setTimeout(resolve, intervalMs));
-                    continue;
-                }
-                if (Array.isArray(data)) {
-                    return data;
-                }
-                if (data && data.status === 'scanning') {
-                    await new Promise(resolve => setTimeout(resolve, intervalMs));
-                    continue;
-                }
-                if (data && Array.isArray(data.networks)) {
-                    return data.networks;
-                }
-                await new Promise(resolve => setTimeout(resolve, intervalMs));
-            }
-            return [];
-        }
-
-        function scanNetworks(attempt = 0) {
-            const list = document.getElementById('network-list');
-            const btn = document.getElementById('scan-btn');
-
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner"></div> Сканування...';
-            list.style.display = 'block';
-            list.innerHTML = '';
-
-            fetch('/scan_wifi', { cache: 'no-store' })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('scan_wifi failed: ' + response.status);
-                    }
-                    return safeJson(response);
-                })
-                .then(() => pollScanResults())
-                .then(networks => {
-                    renderNetworks(networks);
-                })
-                .catch(err => {
-                    console.error(err);
-                    if (attempt < 2) {
-                        list.innerHTML = '<li class="network-item" style="justify-content:center;">Повторне сканування...</li>';
-                        setTimeout(() => scanNetworks(attempt + 1), 900);
-                        return;
-                    }
-                    list.innerHTML = '<li class="network-item" style="color:red; justify-content:center;">Помилка сканування. Натисніть «Пошук мереж» ще раз.</li>';
-                })
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = 'Пошук мереж';
-                });
-        }
-
-        function validateForm() {
-            const btn = document.getElementById('connect-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<div class="spinner"></div> Підключення...';
-            
-            // Allow form submission, but intercept the result visually to redirect to the new mDNS host
-            setTimeout(() => {
-                document.body.innerHTML = `
-                    <div class="container" style="text-align: center; margin-top: 50px;">
-                        <h2>Підключення до Wi‑Fi...</h2>
-                        <div class="spinner" style="width: 40px; height: 40px; border-width: 5px; margin: 20px auto;"></div>
-                        <p>Піч перезапускається та підключається до вашої мережі.</p>
-                        <p>Автоматичне перенаправлення через 15 секунд.</p>
-                        <p>Якщо ні — перейдіть за адресою <a href="http://kiln.local">http://kiln.local</a></p>
-                    </div>
-                `;
-                setTimeout(() => {
-                    window.location.href = "http://kiln.local";
-                }, 15000);
-            }, 1000);
-
-            return true;
-        }
-
-        window.onload = scanNetworks;
-    </script>
+      } catch (_) {
+        setStatus('Помилка запиту. Спробуйте ще раз.', 'err');
+        btn.disabled = false;
+        btn.textContent = 'Підключити';
+      }
+    });
+  </script>
 </body>
 </html>

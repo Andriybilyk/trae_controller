@@ -1,0 +1,68 @@
+Command: cmake -G Ninja -B C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16 -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe -DESP_PLATFORM=1 -DCCACHE_ENABLE=True C:\Users\andri\Documents\GitHub\trae_controller\firmware
+CMake Error at C:/esp/.espressif/v6.0/esp-idf/tools/cmake/build.cmake:695 (message):
+  WARNING: 1 unexpected files and directories were found in the
+  "managed_components" directory: lovyangfx
+
+  Content of the managed components directory is managed automatically and
+  it's not recommended to place any files there manually.  To suppress this
+  warning set the environment variable:
+  IDF_COMPONENT_SUPPRESS_UNKNOWN_FILE_WARNINGS=1
+
+  Traceback (most recent call last):
+
+    File "<frozen runpy>", line 198, in _run_module_as_main
+    File "<frozen runpy>", line 88, in _run_code
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_manager\prepare_components\__main__.py", line 6, in <module>
+      main()
+      ~~~~^^
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_manager\prepare_components\prepare.py", line 337, in main
+      args.func(args)
+      ~~~~~~~~~^^^^^^
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_manager\prepare_components\prepare.py", line 157, in prepare_dep_dirs
+      ).prepare_dep_dirs(
+        ~~~~~~~~~~~~~~~~^
+          managed_components_list_file=args.managed_components_list_file,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          component_list_file=_component_list_file(build_dir),
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          local_components_list_file=local_components_list_file,
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+      )
+      ^
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_manager\core.py", line 113, in wrapper
+      return func(self, *args, **kwargs)
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_manager\core.py", line 751, in prepare_dep_dirs
+      downloaded_components = download_project_dependencies(
+          project_requirements,
+          str(self.lock_path),
+          str(self.managed_components_path),
+      )
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_manager\dependencies.py", line 548, in download_project_dependencies
+      download_path = fetcher.download()
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_tools\sources\fetcher.py", line 29, in download
+      download_path = self.source.download(self.component, self.component_path.as_posix())
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_tools\sources\web_service.py", line 308, in download
+      copy_directory(component_cache_path, download_path)
+      ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Lib\site-packages\idf_component_tools\file_tools.py", line 177, in copy_directory
+      copytree(source_directory, destination_directory)
+      ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "C:\Users\andri\scoop\apps\python313\current\Lib\shutil.py", line 593, in copytree
+      return _copytree(entries=entries, src=src, dst=dst, symlinks=symlinks,
+                       ignore=ignore, copy_function=copy_function,
+                       ignore_dangling_symlinks=ignore_dangling_symlinks,
+                       dirs_exist_ok=dirs_exist_ok)
+    File "C:\Users\andri\scoop\apps\python313\current\Lib\shutil.py", line 491, in _copytree
+      os.makedirs(dst, exist_ok=dirs_exist_ok)
+      ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    File "<frozen os>", line 228, in makedirs
+
+  FileExistsError: [WinError 183] Cannot create a file when that file already
+  exists:
+  'C:/Users/andri/Documents/GitHub/trae_controller/firmware/managed_components/espressif__cjson'
+
+Call Stack (most recent call first):
+  C:/esp/.espressif/v6.0/esp-idf/tools/cmake/project.cmake:742 (idf_build_process)
+  CMakeLists.txt:7 (project)
+
+

@@ -4,7 +4,13 @@ idf_component_register(
 )
 
 set(SLINT_UI_DIR "${CMAKE_CURRENT_LIST_DIR}/../../slint_ui")
-set(SLINT_UI_TARGET "xtensa-esp32s3-espidf")
+if (IDF_TARGET STREQUAL "esp32s3")
+    set(SLINT_UI_TARGET "xtensa-esp32s3-espidf")
+elseif (IDF_TARGET STREQUAL "esp32p4")
+    set(SLINT_UI_TARGET "riscv32imafc-esp-espidf")
+else()
+    message(FATAL_ERROR "Unsupported IDF_TARGET for slint_ui rust build: ${IDF_TARGET}")
+endif()
 set(SLINT_UI_LIB "${SLINT_UI_DIR}/target/${SLINT_UI_TARGET}/release/libslint_ui.a")
 
 # Ensure Rust UI is rebuilt when sources/UI change.

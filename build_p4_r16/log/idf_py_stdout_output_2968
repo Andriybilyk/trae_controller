@@ -1,0 +1,1622 @@
+Command: C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:\esp\.espressif\v6.0\esp-idf\tools/idf_monitor.py -p COM11 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\trae_controller.elf C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\bootloader\bootloader.elf --force-color -m 'C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe' 'C:\esp\.espressif\v6.0\esp-idf\tools\idf.py' '-C' 'firmware' '-B' 'build_p4_r16' '-p' 'COM11'
+[0;32mI (1328) esp_image: segment 1: paddr=00771f64 vaddr=30100000 sizESP-ROM:esp32p4-eco2-20240710[0m
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0x30c (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff07116
+Core1 Saved PC:0x4ff0b6fc
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x1738
+load:0x4ff29ed0,len:0xf7c
+load:0x4ff2cbd0,len:0x368c
+entry 0x4ff29eda
+[0;32mI (27) boot: ESP-IDF v6.0 2nd stage bootloader[0m
+[0;32mI (28) boot: compile time Apr 15 2026 21:06:55[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (30) boot: chip revision: v1.3[0m
+[0;32mI (30) boot: efuse block revision: v0.3[0m
+[0;32mI (34) qio_mode: Enabling default flash chip QIO[0m
+[0;32mI (38) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (42) boot.esp32p4: SPI Mode       : QIO[0m
+[0;32mI (46) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (50) boot: Enabling RNG early entropy source...[0m
+[0;32mI (54) boot: Partition Table:[0m
+[0;32mI (57) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (63) boot:  0 nvs              WiFi data        01 02 00009000 00005000[0m
+[0;32mI (70) boot:  1 otadata          OTA data         01 00 0000e000 00002000[0m
+[0;32mI (76) boot:  2 factory          factory app      00 00 00010000 00ca0000[0m
+[0;32mI (83) boot:  3 storage          Unknown data     01 83 00cb0000 00350000[0m
+[0;32mI (90) boot: End of partition table[0m
+[0;32mI (93) boot: Defaulting to factory image[0m
+[0;32mI (96) esp_image: segment 0: paddr=00010020 vaddr=403d0020 size=761f3ch (7741244) map[0m
+[0;32mI (1102) esp_image: segment 1: paddr=00771f64 vaddr=30100000 size=00068h (   104) load[0m
+[0;32mI (1104) esp_image: segment 2: paddr=00771fd4 vaddr=4ff00000 size=0e044h ( 57412) load[0m
+[0;32mI (1115) esp_image: segment 3: paddr=00780020 vaddr=40000020 size=3ce1d0h (3989968) map[0m
+[0;32mI (1631) esp_image: segment 4: paddr=00b4e1f8 vaddr=4ff0e044 size=03080h ( 12416) load[0m
+[0;32mI (1635) esp_image: segment 5: paddr=00b51280 vaddr=4ff11100 size=04280h ( 17024) load[0m
+[0;32mI (1639) esp_image: segment 6: paddr=00b55508 vaddr=50108080 size=00024h (    36) load[0m
+[0;32mI (1647) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (1648) boot: Disabling RNG early entropy source...[0m
+[0;32mI (1666) hex_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (1666) hex_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (1667) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
+[0;32mI (1667) hex_psram: dev id       : 0x03 (generation 4)[0m
+[0;32mI (1672) hex_psram: density      : 0x07 (256 Mbit)[0m
+[0;32mI (1677) hex_psram: good-die     : 0x06 (Pass)[0m
+[0;32mI (1681) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
+[0;32mI (1686) hex_psram: BurstType    : 0x00 ( Wrap)[0m
+[0;32mI (1690) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
+[0;32mI (1695) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
+[0;32mI (1699) hex_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
+[0;32mI (1704) hex_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (1708) MSPI Timing: Enter psram timing tuning[0m
+[0;32mI (1884) esp_psram: Found 32MB PSRAM device[0m
+[0;32mI (1884) esp_psram: Speed: 80MHz[0m
+[0;32mI (1888) hex_psram: psram CS IO is dedicated[0m
+[0;32mI (1888) cpu_start: Multicore app[0m
+[0;32mI (3157) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (3166) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (3167) cpu_start: Pro cpu start user code[0m
+[0;32mI (3167) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (3169) app_init: Application information:[0m
+[0;32mI (3172) app_init: Project name:     trae_controller[0m
+[0;32mI (3177) app_init: App version:      3d6c312-dirty[0m
+[0;32mI (3182) app_init: Compile time:     Apr 15 2026 21:05:38[0m
+[0;32mI (3187) app_init: ELF file SHA256:  3042cff24...[0m
+[0;32mI (3191) app_init: ESP-IDF:          v6.0[0m
+[0;32mI (3195) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (3199) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (3203) efuse_init: Chip rev:         v1.3[0m
+[0;32mI (3207) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (3213) heap_init: At 4FF19780 len 00021840 (134 KiB): RETENT_RAM[0m
+[0;32mI (3219) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (3224) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (3230) heap_init: At 501080A4 len 00007F5C (31 KiB): RTCRAM[0m
+[0;32mI (3235) heap_init: At 30100068 len 00001F98 (7 KiB): TCM[0m
+[0;32mI (3240) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;33mW (3247) spi_flash: Detected boya flash chip but using generic driver. For optimal functionality, enable `SPI_FLASH_SUPPORT_BOYA_CHIP` in menuconfig[0m
+[0;32mI (3260) spi_flash: detected chip: generic[0m
+[0;32mI (3264) spi_flash: flash io: qio[0m
+[0;32mI (3285) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (3290) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (3297) H_SDIO_DRV: sdio_data_to_rx_buf_task started[0m
+[0;32mI (3297) main_task: Started on CPU0[0m
+[0;32mI (3307) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (3317) main_task: Calling app_main()[0m
+[1;31mE (3317) esp_ota_ops: Running firmware is factory[0m
+[0;32mI (3317) MAIN: Reset reason: 11 (USB), free_heap=34041648, min_free_heap=34041568[0m
+[1;31mE (3327) task_wdt: esp_task_wdt_init(517): TWDT already initialized[0m
+[0;32mI (3347) MAIN: TRAE KILN CONTROLLER STARTING...[0m
+[0;32mI (3347) temperature_sensor: Range [-10°C ~ 80°C], error < 1°C[0m
+[0;32mI (3347) MAIN: Board temp sensor enabled[0m
+[0;32mI (3357) MAIN: Skip DS3231 init for NewP4 profile[0m
+[0;32mI (3357) MAIN: Skip fan+buzzer init for NewP4 profile[0m
+[0;32mI (3377) MAIN: LittleFS Mounted[0m
+[0;32mI (3397) MAIN: Init Thermal Control...[0m
+[0;32mI (3397) THERMAL: Thermal Controller initialized[0m
+[0;32mI (3407) THERMAL: KILN STOPPED: System Boot[0m
+[1;31mE (3407) MAIN: mDNS init failed: -1[0m
+[0;32mI (3407) MAIN: Setup Complete.[0m
+[0;32mI (3407) MAIN: Starting tasks...[0m
+[0;32mI (3407) CTRL_TASK: Starting control task[0m
+[0;32mI (3407) SRV_TASK: Starting server task[0m
+[0;32mI (3407) UI_TASK: Starting UI task[0m
+[0;32mI (3417) WIFI_CONN: Connecting to SSID: home[0m
+[1;31mE (3417) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (3427) system_api: 0 mac type is incorrect (not found)[0m
+[0;33mW (3427) WIFI_CONN: AP SSID suffix: MAC unavailable, using random fallback 'TRAE_KILN_SETUP_A328'[0m
+[0;32mI (3437) transport: Attempt connection with slave: retry[0][0m
+[0;33mW (3447) H_SDIO_DRV: Reset slave using GPIO[54][0m
+[0;32mI (3447) os_wrapper_esp: GPIO [54] configured[0m
+[0;32mI (3407) MAIN: Main task done; deleting main task to avoid stack overflow.[0m
+[0;32mI (3627) st7701: version: 2.0.2[0m
+[0;32mI (3877) st7701_mipi: LCD ID: FF FF FF[0m
+[0;32mI (3877) st7701_mipi:  st7701->madctl_val: 0x0, st7701->colmod_val: 0x55[0m
+[0;32mI (4127) DISPLAY: P4 MIPI panel ready (physical): 480x800[0m
+[0;32mI (4127) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (4127) GT911: TouchPad_ID:0x39,0x31,0x31[0m
+[0;32mI (4137) GT911: TouchPad_Config_Version:250[0m
+[0;32mI (4137) DISPLAY: Touch initialized (GT911, I2C addr=0x5D, SDA=7 SCL=8)[0m
+[0;32mI (4207) DISPLAY: Display initialized successfully (P4)[0m
+[0;32mI (4227) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (4297) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (4297) SLINT_BRIDGE: CMD action=load_schedule result=0 ok=1[0m
+[1;31mE (4357) temperature_sensor: temperature_sensor_install(136): Already installed[0m
+[0;32mI (5477) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz][0m
+[0;32mI (5477) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54][0m
+[0;32mI (5477) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1][0m
+[0;32mI (5517) sdio_wrapper: Function 0 Blocksize: 512[0m
+[0;32mI (5517) sdio_wrapper: Function 1 Blocksize: 512[0m
+[0;32mI (5617) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE[0m
+[0;32mI (5617) transport: set_transport_state: 1[0m
+[0;32mI (5617) transport: Waiting for esp_hosted slave to be ready[0m
+[0;32mI (5697) H_SDIO_DRV: SDIO Host operating in STREAMING MODE[0m
+[0;32mI (5697) H_SDIO_DRV: Open data path at slave[0m
+[0;32mI (5697) H_SDIO_DRV: Starting SDIO process rx task[0m
+[0;32mI (5717) H_SDIO_DRV: Received ESP_PRIV_IF type message[0m
+[0;32mI (5727) transport: Received INIT event from ESP32 peripheral[0m
+[0;32mI (5727) transport: EVENT: 12[0m
+[0;32mI (5727) transport: Identified slave [esp32c6][0m
+[0;32mI (5727) transport: EVENT: 11[0m
+[0;32mI (5727) transport: capabilities: 0xd[0m
+[0;32mI (5737) transport: Features supported are:[0m
+[0;32mI (5737) transport: 	 * WLAN[0m
+[0;32mI (5737) transport: 	   - HCI over SDIO[0m
+[0;32mI (5747) transport: 	   - BLE only[0m
+[0;32mI (5747) transport: EVENT: 13[0m
+[0;33mW (5747) transport: Version mismatch: Host [2.12.0] > Co-proc [2.3.0] ==> Upgrade co-proc to avoid RPC timeouts[0m
+[0;32mI (5757) transport: ESP board type is : 13 [0m
+
+[0;32mI (5767) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE[0m
+[0;32mI (5767) H_API: Transport active[0m
+[0;32mI (5777) transport: Slave chip Id[12][0m
+[0;32mI (5777) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80][0m
+[0;32mI (5787) transport: transport_delayed_init[0m
+[0;32mI (5787) hci_stub_drv: Host BT Support: Disabled[0m
+[0;32mI (5787) H_SDIO_DRV: Received INIT event[0m
+[0;32mI (5797) H_SDIO_DRV: Event type: 0x22[0m
+[0;32mI (5797) H_SDIO_DRV: Write thread started[0m
+[0;32mI (6557) WIFI_CONN: AP netif enforced: 192.168.4.1/24[0m
+[0;32mI (6557) WIFI_CONN: CAPPORT DHCP option disabled (legacy captive detection mode)[0m
+[0;32mI (6567) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6567) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (6587) H_API: esp_wifi_remote_connect[0m
+[0;32mI (6587) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6627) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (6647) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[0;32mI (6647) WIFI_CONN: SoftAP started -> starting DNS captive responder[0m
+[0;32mI (6647) DNS_SERVER: DNS server listening on port 53[0m
+[0;32mI (8307) CTRL_TASK: Stack watermark: 3024 words[0m
+[0;32mI (8307) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (8507) THERMAL: Thermo ok raw=0xff301a80 measured=-3.00 filtered=-3.00 cj=26.50[0m
+[0;32mI (9657) RPC_WRAP: ESP Event: Station mode: Connected[0m
+[0;32mI (9657) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x40393a2a[0m
+[0;32mI (10687) esp_netif_handlers: sta ip: 192.168.0.218, mask: 255.255.255.0, gw: 192.168.0.1[0m
+[0;32mI (10687) WIFI_CONN: got ip:192.168.0.218[0m
+[0;32mI (10687) WIFI_CONN: SNTP started (server=pool.ntp.org, TZ=EET-2EEST,M3.5.0/3,M10.5.0/4)[0m
+[0;32mI (10687) WIFI_CONN: connected to ap SSID:home[0m
+[1;31mE (10697) system_api: 0 mac type is incorrect (not found)[0m
+[0;32mI (10717) REMOTE: Remote access initialized (enabled=1, uri=mqtts://kilnpro:8888, device=000000000000)[0m
+[0;32mI (10877) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (10897) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (10897) esp-tls: Failed to open new connection[0m
+[1;31mE (10897) transport_base: Failed to open a new connection[0m
+[1;31mE (10897) mqtt_client: Error transport connect[0m
+[0;33mW (10907) REMOTE: Remote broker disconnected[0m
+[0;32mI (13307) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (13307) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (13607) THERMAL: Thermo ok raw=0xff241a90 measured=-3.75 filtered=-3.75 cj=26.56[0m
+[0;32mI (15887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (18407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (18407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (18707) THERMAL: Thermo ok raw=0xff301a90 measured=-3.00 filtered=-3.00 cj=26.56[0m
+[0;32mI (20887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (23407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (23407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (23807) THERMAL: Thermo ok raw=0xff301a90 measured=-3.00 filtered=-3.25 cj=26.56[0m
+[0;32mI (25887) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (25907) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (25907) esp-tls: Failed to open new connection[0m
+[1;31mE (25907) transport_base: Failed to open a new connection[0m
+[1;31mE (25917) mqtt_client: Error transport connect[0m
+[0;33mW (25917) REMOTE: Remote broker disconnected[0m
+[0;32mI (28407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (28407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (28907) THERMAL: Thermo ok raw=0xff2c1a90 measured=-3.25 filtered=-3.25 cj=26.56[0m
+[0;32mI (30887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (33407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (33407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (34007) THERMAL: Thermo ok raw=0xff241a90 measured=-3.75 filtered=-3.75 cj=26.56[0m
+[0;32mI (35887) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (35927) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (35927) esp-tls: Failed to open new connection[0m
+[1;31mE (35937) transport_base: Failed to open a new connection[0m
+[1;31mE (35937) mqtt_client: Error transport connect[0m
+[0;33mW (35937) REMOTE: Remote broker disconnected[0m
+[0;32mI (38407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (38407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (39107) THERMAL: Thermo ok raw=0xff301a90 measured=-3.00 filtered=-3.25 cj=26.56[0m
+[0;32mI (40887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (43407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (43407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (44207) THERMAL: Thermo ok raw=0xff281a90 measured=-3.50 filtered=-3.75 cj=26.56[0m
+[0;32mI (45887) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (45957) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (45957) esp-tls: Failed to open new connection[0m
+[1;31mE (45957) transport_base: Failed to open a new connection[0m
+[1;31mE (45957) mqtt_client: Error transport connect[0m
+[0;33mW (45967) REMOTE: Remote broker disconnected[0m
+[0;32mI (48407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (48407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (49307) THERMAL: Thermo ok raw=0xff381a90 measured=-2.50 filtered=-2.50 cj=26.56[0m
+[0;32mI (50887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (53407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (53407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (54407) THERMAL: Thermo ok raw=0xff381a90 measured=-2.50 filtered=-2.50 cj=26.56[0m
+[0;32mI (55887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (58407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (58407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (59507) THERMAL: Thermo ok raw=0xff341a90 measured=-2.75 filtered=-2.75 cj=26.56[0m
+[0;32mI (60887) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (60967) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (60967) esp-tls: Failed to open new connection[0m
+[1;31mE (60967) transport_base: Failed to open a new connection[0m
+[1;31mE (60977) mqtt_client: Error transport connect[0m
+[0;33mW (60977) REMOTE: Remote broker disconnected[0m
+[0;32mI (63407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (63407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (64607) THERMAL: Thermo ok raw=0xff341a80 measured=-2.75 filtered=-2.75 cj=26.50[0m
+[0;32mI (65887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (68407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (68407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (69707) THERMAL: Thermo ok raw=0xff341a80 measured=-2.75 filtered=-2.50 cj=26.50[0m
+[0;32mI (70887) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (70987) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (70987) esp-tls: Failed to open new connection[0m
+[1;31mE (70987) transport_base: Failed to open a new connection[0m
+[1;31mE (70997) mqtt_client: Error transport connect[0m
+[0;33mW (70997) REMOTE: Remote broker disconnected[0m
+[0;32mI (73407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (73407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (74807) THERMAL: Thermo ok raw=0xff381a90 measured=-2.50 filtered=-2.75 cj=26.56[0m
+[0;32mI (75887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (78407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (78407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (79907) THERMAL: Thermo ok raw=0xff341a90 measured=-2.75 filtered=-2.75 cj=26.56[0m
+[0;32mI (80887) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (81007) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (81007) esp-tls: Failed to open new connection[0m
+[1;31mE (81007) transport_base: Failed to open a new connection[0m
+[1;31mE (81017) mqtt_client: Error transport connect[0m
+[0;33mW (81017) REMOTE: Remote broker disconnected[0m
+[0;32mI (83407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (83407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (85007) THERMAL: Thermo ok raw=0xff501a80 measured=-1.00 filtered=-1.50 cj=26.50[0m
+[0;32mI (85887) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (88407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (88407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (90107) THERMAL: Thermo ok raw=0xff4c1a90 measured=-1.25 filtered=-1.25 cj=26.56[0m
+[0;32mI (90887) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (91027) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (91037) esp-tls: Failed to open new connection[0m
+[1;31mE (91037) transport_base: Failed to open a new connection[0m
+[1;31mE (91037) mqtt_client: Error transport connect[0m
+[0;33mW (91047) REMOTE: Remote broker disconnected[0m
+[0;32mI (93407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (93407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (95207) THERMAL: Thermo ok raw=0xff481a90 measured=-1.50 filtered=-1.75 cj=26.56[0m
+[0;32mI (95897) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (98407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (98407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (100307) THERMAL: Thermo ok raw=0xff481a80 measured=-1.50 filtered=-1.50 cj=26.50[0m
+[0;32mI (100897) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (103407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (103407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (105407) THERMAL: Thermo ok raw=0xff481a70 measured=-1.50 filtered=-1.50 cj=26.44[0m
+[0;32mI (105897) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (106047) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (106047) esp-tls: Failed to open new connection[0m
+[1;31mE (106047) transport_base: Failed to open a new connection[0m
+[1;31mE (106057) mqtt_client: Error transport connect[0m
+[0;33mW (106057) REMOTE: Remote broker disconnected[0m
+[0;32mI (108407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (108407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (110507) THERMAL: Thermo ok raw=0xff4c1a80 measured=-1.25 filtered=-1.50 cj=26.50[0m
+[0;32mI (110897) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (113407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (113407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (115607) THERMAL: Thermo ok raw=0xff481a80 measured=-1.50 filtered=-1.50 cj=26.50[0m
+[0;32mI (115897) SRV_TASK: Stack watermark: 2976 words[0m
+[1;31mE (116067) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (116067) esp-tls: Failed to open new connection[0m
+[1;31mE (116077) transport_base: Failed to open a new connection[0m
+[1;31mE (116077) mqtt_client: Error transport connect[0m
+[0;33mW (116087) REMOTE: Remote broker disconnected[0m
+[0;32mI (118407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (118407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (120707) THERMAL: Thermo ok raw=0xff401a80 measured=-2.00 filtered=-1.75 cj=26.50[0m
+[0;32mI (120897) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (123407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (123407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (125807) THERMAL: Thermo ok raw=0xff501a70 measured=-1.00 filtered=-1.25 cj=26.44[0m
+[0;32mI (125897) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (128407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (128407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (130897) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (130907) THERMAL: Thermo ok raw=0xff581a80 measured=-0.50 filtered=-0.50 cj=26.50[0m
+[1;31mE (131087) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (131087) esp-tls: Failed to open new connection[0m
+[1;31mE (131087) transport_base: Failed to open a new connection[0m
+[1;31mE (131097) mqtt_client: Error transport connect[0m
+[0;33mW (131097) REMOTE: Remote broker disconnected[0m
+[0;32mI (133407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (133407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (135907) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (136007) THERMAL: Thermo ok raw=0xff541a80 measured=-0.75 filtered=-0.75 cj=26.50[0m
+[0;32mI (138407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (138407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (140907) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (141107) THERMAL: Thermo ok raw=0xffb81a80 measured=5.50 filtered=5.75 cj=26.50[0m
+[1;31mE (141107) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (141117) esp-tls: Failed to open new connection[0m
+[1;31mE (141117) transport_base: Failed to open a new connection[0m
+[1;31mE (141127) mqtt_client: Error transport connect[0m
+[0;33mW (141127) REMOTE: Remote broker disconnected[0m
+[0;32mI (143407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (143407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (145907) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (146207) THERMAL: Thermo ok raw=0xffb81a80 measured=5.50 filtered=5.50 cj=26.50[0m
+[0;32mI (148407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (148407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (150907) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (151307) THERMAL: Thermo ok raw=0xff501a70 measured=-1.00 filtered=-0.75 cj=26.44[0m
+[0;32mI (153407) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (153407) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (154997) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (155067) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (155067) THERMAL: Schedule Started[0m
+[0;32mI (155067) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (155167) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (155327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (155427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (155527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (155627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (155727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (155827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (155907) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (155927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[1;31mE (156127) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (156127) esp-tls: Failed to open new connection[0m
+[1;31mE (156137) transport_base: Failed to open a new connection[0m
+[1;31mE (156137) mqtt_client: Error transport connect[0m
+[0;33mW (156147) REMOTE: Remote broker disconnected[0m
+[0;32mI (156227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156327) THERMAL: Thermo ok raw=0xffdc1a80 measured=7.75 filtered=2.75 cj=26.50[0m
+[0;32mI (156327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (156927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (157927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158427) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (158427) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (158537) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158637) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (158667) THERMAL: KILN STOPPED: User Button[0m
+[0;32mI (159097) SLINT_BRIDGE: CMD action=stop result=0 ok=1[0m
+[0;32mI (160027) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (160087) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (160087) THERMAL: Schedule Started[0m
+[0;32mI (160097) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (160097) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160207) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160307) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160407) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160507) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160607) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160707) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160807) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160907) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (160937) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (161007) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161107) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161207) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161307) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161407) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161507) THERMAL: Thermo ok raw=0xfffc1a80 measured=9.75 filtered=9.75 cj=26.50[0m
+[0;32mI (161507) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161607) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161707) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161807) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (161907) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (162007) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (162107) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (162207) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (162307) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (162327) THERMAL: KILN STOPPED: User Button[0m
+[0;32mI (162817) SLINT_BRIDGE: CMD action=stop result=0 ok=1[0m
+[0;32mI (163517) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (163517) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (163867) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (163937) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (163937) THERMAL: Schedule Started[0m
+[0;32mI (163937) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (164037) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164137) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164237) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164337) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164437) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164537) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164637) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164737) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164837) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (164937) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165037) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165137) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165237) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165337) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165437) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165537) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165637) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165737) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165837) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165937) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (165947) THERMAL: KILN STOPPED: User Button[0m
+[0;32mI (165957) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (166877) THERMAL: Thermo ok raw=0xfff81a80 measured=9.50 filtered=10.50 cj=26.50[0m
+[0;32mI (166877) SLINT_BRIDGE: CMD action=stop result=0 ok=1[0m
+[0;32mI (168577) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (168577) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (169347) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (169417) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (169417) THERMAL: Schedule Started[0m
+[0;32mI (169417) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (169517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (169617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (169717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (169817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (169917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (170967) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (171017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[1;31mE (171147) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (171147) esp-tls: Failed to open new connection[0m
+[1;31mE (171157) transport_base: Failed to open a new connection[0m
+[1;31mE (171157) mqtt_client: Error transport connect[0m
+[0;33mW (171167) REMOTE: Remote broker disconnected[0m
+[0;32mI (171217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (171917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172017) THERMAL: Thermo ok raw=0xffec1a80 measured=8.75 filtered=10.25 cj=26.50[0m
+[0;32mI (172017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (172917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173617) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (173617) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (173717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (173917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (174917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (175967) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (176017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (176917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177117) THERMAL: Thermo ok raw=0xff441a80 measured=-1.75 filtered=-2.25 cj=26.50[0m
+[0;32mI (177117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177717) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177817) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (177917) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178017) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178117) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178217) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178317) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178417) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178517) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178617) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178617) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (178617) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (178727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (178927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (179927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (180967) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (181027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (181927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182227) THERMAL: Thermo ok raw=0xff401a80 measured=-2.00 filtered=-2.25 cj=26.50[0m
+[0;32mI (182227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (182927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183627) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (183627) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (183727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (183927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (184927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (185967) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (186027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[1;31mE (186167) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (186167) esp-tls: Failed to open new connection[0m
+[1;31mE (186167) transport_base: Failed to open a new connection[0m
+[1;31mE (186177) mqtt_client: Error transport connect[0m
+[0;33mW (186177) REMOTE: Remote broker disconnected[0m
+[0;32mI (186227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (186927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187327) THERMAL: Thermo ok raw=0xff401a70 measured=-2.00 filtered=-2.00 cj=26.44[0m
+[0;32mI (187327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (187927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188627) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (188627) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (188727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (188927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (189927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190827) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190927) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (190967) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (191027) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191127) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191227) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191327) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191427) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191527) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191627) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191727) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (191747) THERMAL: KILN STOPPED: User Button[0m
+[0;32mI (192167) SLINT_BRIDGE: CMD action=stop result=0 ok=1[0m
+[0;32mI (192467) THERMAL: Thermo ok raw=0x006c1a80 measured=16.75 filtered=16.25 cj=26.50[0m
+[0;32mI (193087) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (193147) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (193147) THERMAL: Schedule Started[0m
+[0;32mI (193157) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (193167) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193267) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193367) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193467) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193567) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193667) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193667) CTRL_TASK: Stack watermark: 1888 words[0m
+[0;32mI (193667) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (193777) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193877) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (193977) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194077) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194177) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194277) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194377) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194477) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194577) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194677) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194777) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194877) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (194977) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195077) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195177) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195277) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195377) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195477) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195577) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195677) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195777) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195877) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195977) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (195997) SRV_TASK: Stack watermark: 2976 words[0m
+[0;32mI (196077) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (196177) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[1;31mE (196187) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (196187) esp-tls: Failed to open new connection[0m
+[1;31mE (196187) transport_base: Failed to open a new connection[0m
+[1;31mE (196197) mqtt_client: Error transport connect[0m
+[0;33mW (196197) REMOTE: Remote broker disconnected[0m
+[0;32mI (196277) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (196377) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (196477) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (196577) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (1328) esp_image: segment 1: paddr=00771f64 vaddr=30100000 size=00068h (   104) load[0m
+[0;32mI (1330) esp_image: segment 2: paddr=00771fd4 vaddr=4ff00000 size=0e044h ( 57412) load[0m
+[0;32mI (1343) esp_image: segment 3: paddr=00780020 vaddr=40000020 size=3ce1d0h (3989968) map[0m
+[0;32mI (1976) esp_image: segment 4: paddr=00b4e1f8 vaddr=4ff0e044 size=03080h ( 12416) load[0m
+[0;32mI (1980) esp_image: segment 5: paddr=00b51280 vaddr=4ff11100 size=04280h ( 17024) load[0m
+[0;32mI (1985) esp_image: segment 6: paddr=00b55508 vaddr=50108080 size=00024h (    36) load[0m
+[0;32mI (1993) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (1993) boot: Disabling RNG early entropy source...[0m
+[0;32mI (2011) hex_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (2011) hex_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (2011) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
+[0;32mI (2012) hex_psram: dev id       : 0x03 (generation 4)[0m
+[0;32mI (2017) hex_psram: density      : 0x07 (256 Mbit)[0m
+[0;32mI (2021) hex_psram: good-die     : 0x06 (Pass)[0m
+[0;32mI (2026) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
+[0;32mI (2030) hex_psram: BurstType    : 0x00 ( Wrap)[0m
+[0;32mI (2035) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
+[0;32mI (2039) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
+[0;32mI (2044) hex_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
+[0;32mI (2049) hex_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (2053) MSPI Timing: Enter psram timing tuning[0m
+[0;32mI (2229) esp_psram: Found 32MB PSRAM device[0m
+[0;32mI (2229) esp_psram: Speed: 80MHz[0m
+[0;32mI (2231) hex_psram: psram CS IO is dedicated[0m
+[0;32mI (2231) cpu_start: Multicore app[0m
+[0;32mI (3500) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (3509) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (3509) cpu_start: Pro cpu start user code[0m
+[0;32mI (3510) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (3512) app_init: Application information:[0m
+[0;32mI (3515) app_init: Project name:     trae_controller[0m
+[0;32mI (3520) app_init: App version:      3d6c312-dirty[0m
+[0;32mI (3525) app_init: Compile time:     Apr 15 2026 21:05:38[0m
+[0;32mI (3530) app_init: ELF file SHA256:  3042cff24...[0m
+[0;32mI (3534) app_init: ESP-IDF:          v6.0[0m
+[0;32mI (3538) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (3542) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (3546) efuse_init: Chip rev:         v1.3[0m
+[0;32mI (3550) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (3556) heap_init: At 4FF19780 len 00021840 (134 KiB): RETENT_RAM[0m
+[0;32mI (3562) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (3567) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (3573) heap_init: At 501080A4 len 00007F5C (31 KiB): RTCRAM[0m
+[0;32mI (3578) heap_init: At 30100068 len 00001F98 (7 KiB): TCM[0m
+[0;32mI (3583) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;33mW (3590) spi_flash: Detected boya flash chip but using generic driver. For optimal functionality, enable `SPI_FLASH_SUPPORT_BOYA_CHIP` in menuconfig[0m
+[0;32mI (3603) spi_flash: detected chip: generic[0m
+[0;32mI (3607) spi_flash: flash io: qio[0m
+[0;32mI (3628) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (3633) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (3640) H_SDIO_DRV: sdio_data_to_rx_buf_task started[0m
+[0;32mI (3640) main_task: Started on CPU0[0m
+[0;32mI (3650) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (3660) main_task: Calling app_main()[0m
+[1;31mE (3660) esp_ota_ops: Running firmware is factory[0m
+[0;32mI (3660) MAIN: Reset reason: 1 (POWERON), free_heap=34041648, min_free_heap=34041568[0m
+[1;31mE (3670) task_wdt: esp_task_wdt_init(517): TWDT already initialized[0m
+[0;32mI (3690) MAIN: TRAE KILN CONTROLLER STARTING...[0m
+[0;32mI (3690) temperature_sensor: Range [-10°C ~ 80°C], error < 1°C[0m
+[0;32mI (3690) MAIN: Board temp sensor enabled[0m
+[0;32mI (3700) MAIN: Skip DS3231 init for NewP4 profile[0m
+[0;32mI (3700) MAIN: Skip fan+buzzer init for NewP4 profile[0m
+[0;32mI (3720) MAIN: LittleFS Mounted[0m
+[0;32mI (3740) MAIN: Init Thermal Control...[0m
+[0;32mI (3760) THERMAL: Thermal Controller initialized[0m
+[0;32mI (3760) THERMAL: KILN STOPPED: System Boot[0m
+[1;31mE (3760) MAIN: mDNS init failed: -1[0m
+[0;32mI (3760) MAIN: Setup Complete.[0m
+[0;32mI (3760) MAIN: Starting tasks...[0m
+[0;32mI (3760) CTRL_TASK: Starting control task[0m
+[0;32mI (3760) SRV_TASK: Starting server task[0m
+[0;32mI (3760) UI_TASK: Starting UI task[0m
+[0;32mI (3770) WIFI_CONN: Connecting to SSID: home[0m
+[1;31mE (3780) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (3780) system_api: 0 mac type is incorrect (not found)[0m
+[0;33mW (3790) WIFI_CONN: AP SSID suffix: MAC unavailable, using random fallback 'TRAE_KILN_SETUP_495E'[0m
+[0;32mI (3800) transport: Attempt connection with slave: retry[0][0m
+[0;33mW (3800) H_SDIO_DRV: Reset slave using GPIO[54][0m
+[0;32mI (3810) os_wrapper_esp: GPIO [54] configured[0m
+[0;32mI (3760) MAIN: Main task done; deleting main task to avoid stack overflow.[0m
+[0;32mI (3980) st7701: version: 2.0.2[0m
+[0;32mI (4230) st7701_mipi: LCD ID: FF FF FF[0m
+[0;32mI (4230) st7701_mipi:  st7701->madctl_val: 0x0, st7701->colmod_val: 0x55[0m
+[0;32mI (4480) DISPLAY: P4 MIPI panel ready (physical): 480x800[0m
+[0;32mI (4480) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (4480) GT911: TouchPad_ID:0x39,0x31,0x31[0m
+[0;32mI (4490) GT911: TouchPad_Config_Version:250[0m
+[0;32mI (4490) DISPLAY: Touch initialized (GT911, I2C addr=0x5D, SDA=7 SCL=8)[0m
+[0;32mI (4560) DISPLAY: Display initialized successfully (P4)[0m
+[0;32mI (4590) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (4650) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (4650) SLINT_BRIDGE: CMD action=load_schedule result=0 ok=1[0m
+[1;31mE (4720) temperature_sensor: temperature_sensor_install(136): Already installed[0m
+[0;32mI (5830) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz][0m
+[0;32mI (5830) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54][0m
+[0;32mI (5830) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1][0m
+[0;32mI (5870) sdio_wrapper: Function 0 Blocksize: 512[0m
+[0;32mI (5870) sdio_wrapper: Function 1 Blocksize: 512[0m
+[0;32mI (5970) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE[0m
+[0;32mI (5970) transport: set_transport_state: 1[0m
+[0;32mI (5970) transport: Waiting for esp_hosted slave to be ready[0m
+[0;32mI (6040) H_SDIO_DRV: SDIO Host operating in STREAMING MODE[0m
+[0;32mI (6040) H_SDIO_DRV: Open data path at slave[0m
+[0;32mI (6040) H_SDIO_DRV: Starting SDIO process rx task[0m
+[0;32mI (6060) H_SDIO_DRV: Received ESP_PRIV_IF type message[0m
+[0;32mI (6060) transport: Received INIT event from ESP32 peripheral[0m
+[0;32mI (6060) transport: EVENT: 12[0m
+[0;32mI (6070) transport: Identified slave [esp32c6][0m
+[0;32mI (6070) transport: EVENT: 11[0m
+[0;32mI (6070) transport: capabilities: 0xd[0m
+[0;32mI (6080) transport: Features supported are:[0m
+[0;32mI (6080) transport: 	 * WLAN[0m
+[0;32mI (6080) transport: 	   - HCI over SDIO[0m
+[0;32mI (6090) transport: 	   - BLE only[0m
+[0;32mI (6090) transport: EVENT: 13[0m
+[0;33mW (6090) transport: Version mismatch: Host [2.12.0] > Co-proc [2.3.0] ==> Upgrade co-proc to avoid RPC timeouts[0m
+[0;32mI (6100) transport: ESP board type is : 13 [0m
+
+[0;32mI (6110) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE[0m
+[0;32mI (6110) H_API: Transport active[0m
+[0;32mI (6120) transport: Slave chip Id[12][0m
+[0;32mI (6120) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80][0m
+[0;32mI (6120) transport: transport_delayed_init[0m
+[0;32mI (6130) hci_stub_drv: Host BT Support: Disabled[0m
+[0;32mI (6130) H_SDIO_DRV: Received INIT event[0m
+[0;32mI (6140) H_SDIO_DRV: Event type: 0x22[0m
+[0;32mI (6140) H_SDIO_DRV: Write thread started[0m
+[0;32mI (6900) WIFI_CONN: AP netif enforced: 192.168.4.1/24[0m
+[0;32mI (6900) WIFI_CONN: CAPPORT DHCP option disabled (legacy captive detection mode)[0m
+[0;32mI (6910) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6910) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (6930) H_API: esp_wifi_remote_connect[0m
+[0;32mI (6930) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6980) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[0;32mI (6980) WIFI_CONN: SoftAP started -> starting DNS captive responder[0m
+[0;32mI (6990) DNS_SERVER: DNS server listening on port 53[0m
+[0;32mI (6990) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (8670) CTRL_TASK: Stack watermark: 3024 words[0m
+[0;32mI (8670) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (8870) THERMAL: Thermo ok raw=0x003c1a90 measured=13.75 filtered=13.75 cj=26.56[0m
+[0;32mI (10020) RPC_WRAP: ESP Event: Station mode: Connected[0m
+[0;32mI (10020) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x40393a2a[0m
+[0;32mI (11040) esp_netif_handlers: sta ip: 192.168.0.218, mask: 255.255.255.0, gw: 192.168.0.1[0m
+[0;32mI (11040) WIFI_CONN: got ip:192.168.0.218[0m
+[0;32mI (11040) WIFI_CONN: SNTP started (server=pool.ntp.org, TZ=EET-2EEST,M3.5.0/3,M10.5.0/4)[0m
+[0;32mI (11050) WIFI_CONN: connected to ap SSID:home[0m
+[1;31mE (11060) system_api: 0 mac type is incorrect (not found)[0m
+[0;32mI (11070) REMOTE: Remote access initialized (enabled=1, uri=mqtts://kilnpro:8888, device=000000000000)[0m
+[0;32mI (11240) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (11250) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (11250) esp-tls: Failed to open new connection[0m
+[1;31mE (11250) transport_base: Failed to open a new connection[0m
+[1;31mE (11260) mqtt_client: Error transport connect[0m
+[0;33mW (11260) REMOTE: Remote broker disconnected[0m
+[0;32mI (13300) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (13370) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (13370) THERMAL: Schedule Started[0m
+[0;32mI (13370) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13380) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (13480) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13580) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13680) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13680) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (13680) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (13780) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13880) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13980) THERMAL: Thermo ok raw=0x009c1a80 measured=19.75 filtered=19.50 cj=26.50[0m
+[0;32mI (13980) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14080) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14180) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14280) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14380) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14480) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14580) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14680) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14780) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14880) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14980) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (15080) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (15080) THERMAL: KILN STOPPED: User Button[0m
+[0;32mI (15530) SLINT_BRIDGE: CMD action=stop result=0 ok=1[0m
+[0;32mI (16270) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (18730) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (18730) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (19130) THERMAL: Thermo ok raw=0xff601a90 measured=0.00 filtered=0.25 cj=26.56[0m
+[0;32mI (21270) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (21270) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (21270) esp-tls: Failed to open new connection[0m
+[1;31mE (21270) transport_base: Failed to open a new connection[0m
+[1;31mE (21280) mqtt_client: Error transport connect[0m
+[0;33mW (21280) REMOTE: Remote broker disconnected[0m
+[0;32mI (23730) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (23730) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (24230) THERMAL: Thermo ok raw=0xff701a80 measured=1.00 filtered=0.50 cj=26.50[0m
+[0;32mI (26320) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (28730) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (28730) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (29330) THERMAL: Thermo ok raw=0xff601a80 measured=0.00 filtered=0.00 cj=26.50[0m
+[1;31mE (31290) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (31290) esp-tls: Failed to open new connection[0m
+[1;31mE (31290) transport_base: Failed to open a new connection[0m
+[1;31mE (31300) mqtt_client: Error transport connect[0m
+[0;33mW (31300) REMOTE: Remote broker disconnected[0m
+[0;32mI (31320) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (33730) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (33730) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (34430) THERMAL: Thermo ok raw=0xff641a80 measured=0.25 filtered=0.25 cj=26.50[0m
+[0;32mI (36320) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (38830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (38830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (39530) THERMAL: Thermo ok raw=0xff681a80 measured=0.50 filtered=0.50 cj=26.50[0m
+[1;31mE (41310) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (41310) esp-tls: Failed to open new connection[0m
+[1;31mE (41310) transport_base: Failed to open a new connection[0m
+[1;31mE (41320) mqtt_client: Error transport connect[0m
+[0;33mW (41320) REMOTE: Remote broker disconnected[0m
+[0;32mI (41330) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (43830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (43830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (44630) THERMAL: Thermo ok raw=0xff541a90 measured=-0.75 filtered=-0.75 cj=26.56[0m
+[0;32mI (46380) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (48830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (48830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (49730) THERMAL: Thermo ok raw=0xff541a90 measured=-0.75 filtered=-0.75 cj=26.56[0m
+[1;31mE (51330) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (51330) esp-tls: Failed to open new connection[0m
+[1;31mE (51330) transport_base: Failed to open a new connection[0m
+[1;31mE (51340) mqtt_client: Error transport connect[0m
+[0;33mW (51340) REMOTE: Remote broker disconnected[0m
+[0;32mI (51380) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (53830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (53830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (54830) THERMAL: Thermo ok raw=0xff601a80 measured=0.00 filtered=0.00 cj=26.50[0m
+[0;32mI (56380) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (58830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (58830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (59930) THERMAL: Thermo ok raw=0xff601a90 measured=0.00 filtered=0.50 cj=26.56[0m
+[1;31mE (61350) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (61350) esp-tls: Failed to open new connection[0m
+[1;31mE (61350) transport_base: Failed to open a new connection[0m
+[1;31mE (61360) mqtt_client: Error transport connect[0m
+[0;33mW (61360) REMOTE: Remote broker disconnected[0m
+[0;32mI (61380) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (63830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (63830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (65030) THERMAL: Thermo ok raw=0xff6c1a90 measured=0.75 filtered=0.75 cj=26.56[0m
+[0;32mI (66380) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (68830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (68830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (70130) THERMAL: Thermo ok raw=0xff641a90 measured=0.25 filtered=0.00 cj=26.56[0m
+[1;31mE (71370) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (71370) esp-tls: Failed to open new connection[0m
+[1;31mE (71370) transport_base: Failed to open a new connection[0m
+[1;31mE (71380) mqtt_client: Error transport connect[0m
+[0;33mW (71380) REMOTE: Remote broker disconnected[0m
+[0;32mI (71390) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (73830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (73830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (75230) THERMAL: Thermo ok raw=0xff5c1a90 measured=-0.25 filtered=-0.25 cj=26.56[0m
+[0;32mI (76390) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (78830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (78830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (80330) THERMAL: Thermo ok raw=0xff5c1a90 measured=-0.25 filtered=-0.25 cj=26.56[0m
+[0;32mI (81390) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (81390) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (81390) esp-tls: Failed to open new connection[0m
+[1;31mE (81390) transport_base: Failed to open a new connection[0m
+[1;31mE (81400) mqtt_client: Error transport connect[0m
+[0;33mW (81400) REMOTE: Remote broker disconnected[0m
+[0;32mI (83830) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (83830) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (85430) THERMAL: Thermo ok raw=0xff601a80 measured=0.00 filtered=0.00 cj=26.50[0m
+[0;32mI (86440) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (88930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (88930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (90530) THERMAL: Thermo ok raw=0xff581a90 measured=-0.50 filtered=-0.25 cj=26.56[0m
+[1;31mE (91410) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (91410) esp-tls: Failed to open new connection[0m
+[1;31mE (91410) transport_base: Failed to open a new connection[0m
+[1;31mE (91420) mqtt_client: Error transport connect[0m
+[0;33mW (91420) REMOTE: Remote broker disconnected[0m
+[0;32mI (91440) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (93930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (93930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (95630) THERMAL: Thermo ok raw=0xff701a80 measured=1.00 filtered=1.00 cj=26.50[0m
+[0;32mI (96440) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (98930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (98930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (100730) THERMAL: Thermo ok raw=0xff6c1a80 measured=0.75 filtered=1.25 cj=26.50[0m
+[1;31mE (101430) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (101430) esp-tls: Failed to open new connection[0m
+[1;31mE (101430) transport_base: Failed to open a new connection[0m
+[1;31mE (101440) mqtt_client: Error transport connect[0m
+[0;33mW (101440) REMOTE: Remote broker disconnected[0m
+[0;32mI (101450) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (103930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (103930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (105830) THERMAL: Thermo ok raw=0xff641a80 measured=0.25 filtered=0.50 cj=26.50[0m
+[0;32mI (106500) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (108930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (108930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (110930) THERMAL: Thermo ok raw=0xff701a90 measured=1.00 filtered=1.25 cj=26.56[0m
+[1;31mE (111460) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (111460) esp-tls: Failed to open new connection[0m
+[1;31mE (111460) transport_base: Failed to open a new connection[0m
+[1;31mE (111470) mqtt_client: Error transport connect[0m
+[0;33mW (111470) REMOTE: Remote broker disconnected[0m
+[0;32mI (111500) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (113930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (113930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (116030) THERMAL: Thermo ok raw=0xff601a90 measured=0.00 filtered=0.00 cj=26.56[0m
+[0;32mI (116500) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (118930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (118930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (121130) THERMAL: Thermo ok raw=0xff581aa0 measured=-0.50 filtered=-0.25 cj=26.62[0m
+[1;31mE (121480) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (121480) esp-tls: Failed to open new connection[0m
+[1;31mE (121480) transport_base: Failed to open a new connection[0m
+[1;31mE (121490) mqtt_client: Error transport connect[0m
+[0;33mW (121490) REMOTE: Remote broker disconnected[0m
+[0;32mI (121500) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (123930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (123930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (126230) THERMAL: Thermo ok raw=0xff541a90 measured=-0.75 filtered=-0.50 cj=26.56[0m
+[0;32mI (126550) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (128930) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (128930) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (131330) THERMAL: Thermo ok raw=0xff581a90 measured=-0.50 filtered=-0.50 cj=26.56[0m
+[1;31mE (131500) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (131500) esp-tls: Failed to open new connection[0m
+[1;31mE (131510) transport_base: Failed to open a new connection[0m
+[1;31mE (131510) mqtt_client: Error transport connect[0m
+[0;33mW (131520) REMOTE: Remote broker disconnected[0m
+[0;32mI (131550) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (134030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (134030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (136430) THERMAL: Thermo ok raw=0xff581a90 measured=-0.50 filtered=-0.50 cj=26.56[0m
+[0;32mI (136550) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (139030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (139030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (141530) THERMAL: Thermo ok raw=0xff541a90 measured=-0.75 filtered=-0.75 cj=26.56[0m
+[0;32mI (141550) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (144030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (144030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[1;31mE (146520) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (146520) esp-tls: Failed to open new connection[0m
+[1;31mE (146520) transport_base: Failed to open a new connection[0m
+[1;31mE (146530) mqtt_client: Error transport connect[0m
+[0;33mW (146530) REMOTE: Remote broker disconnected[0m
+[0;32mI (146550) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (146630) THERMAL: Thermo ok raw=0xff541aa0 measured=-0.75 filtered=-1.00 cj=26.62[0m
+[0;32mI (149030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (149030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (151550) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (151730) THERMAL: Thermo ok raw=0xff541aa0 measured=-0.75 filtered=-1.00 cj=26.62[0m
+[0;32mI (154030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (154030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[1;31mE (156540) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (156540) esp-tls: Failed to open new connection[0m
+[1;31mE (156540) transport_base: Failed to open a new connection[0m
+[1;31mE (156550) mqtt_client: Error transport connect[0m
+[0;33mW (156550) REMOTE: Remote broker disconnected[0m
+[0;32mI (156560) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (156830) THERMAL: Thermo ok raw=0xff241aa0 measured=-3.75 filtered=-3.50 cj=26.62[0m
+[0;32mI (159030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (159030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (161610) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (161930) THERMAL: Thermo ok raw=0xff2c1aa0 measured=-3.25 filtered=-3.00 cj=26.62[0m
+[0;32mI (164030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (164030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[1;31mE (166560) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (166560) esp-tls: Failed to open new connection[0m
+[1;31mE (166560) transport_base: Failed to open a new connection[0m
+[1;31mE (166570) mqtt_client: Error transport connect[0m
+[0;33mW (166570) REMOTE: Remote broker disconnected[0m
+[0;32mI (166610) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (167030) THERMAL: Thermo ok raw=0xff101a80 measured=-5.00 filtered=-5.25 cj=26.50[0m
+[0;32mI (169030) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (169030) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (171610) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (172130) THERMAL: Thermo ok raw=0xff2c1a90 measured=-3.25 filtered=-2.75 cj=26.56[0m
+[0;32mI (174130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (174130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[1;31mE (176580) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (176580) esp-tls: Failed to open new connection[0m
+[1;31mE (176590) transport_base: Failed to open a new connection[0m
+[1;31mE (176590) mqtt_client: Error transport connect[0m
+[0;33mW (176600) REMOTE: Remote broker disconnected[0m
+[0;32mI (176610) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (177230) THERMAL: Thermo ok raw=0xff281a90 measured=-3.50 filtered=-3.00 cj=26.56[0m
+[0;32mI (179130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (179130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (181610) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (182330) THERMAL: Thermo ok raw=0xff341a90 measured=-2.75 filtered=-2.75 cj=26.56[0m
+[0;32mI (184130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (184130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (186610) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (187430) THERMAL: Thermo ok raw=0xff381a90 measured=-2.50 filtered=-3.00 cj=26.56[0m
+[0;32mI (189130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (189130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[1;31mE (191600) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (191600) esp-tls: Failed to open new connection[0m
+[1;31mE (191600) transport_base: Failed to open a new connection[0m
+[1;31mE (191610) mqtt_client: Error transport connect[0m
+[0;33mW (191610) REMOTE: Remote broker disconnected[0m
+[0;32mI (191620) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (192530) THERMAL: Thermo ok raw=0xff381a80 measured=-2.50 filtered=-2.50 cj=26.50[0m
+[0;32mI (194130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (194130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (196620) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (197630) THERMAL: Thermo ok raw=0xff2c1a80 measured=-3.25 filtered=-1.75 cj=26.50[0m
+[0;32mI (199130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (199130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (201620) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (201620) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (201630) esp-tls: Failed to open new connection[0m
+[1;31mE (201630) transport_base: Failed to open a new connection[0m
+[1;31mE (201630) mqtt_client: Error transport connect[0m
+[0;33mW (201640) REMOTE: Remote broker disconnected[0m
+[0;32mI (202730) THERMAL: Thermo ok raw=0xff341a80 measured=-2.75 filtered=-2.75 cj=26.50[0m
+[0;32mI (204130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (204130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (206620) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (207830) THERMAL: Thermo ok raw=0xff281a90 measured=-3.50 filtered=-3.00 cj=26.56[0m
+[0;32mI (209130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (209130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (211620) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (212930) THERMAL: Thermo ok raw=0xff281a90 measured=-3.50 filtered=-3.75 cj=26.56[0m
+[0;32mI (214130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (214130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (216620) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (216640) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (216640) esp-tls: Failed to open new connection[0m
+[1;31mE (216640) transport_base: Failed to open a new connection[0m
+[1;31mE (216650) mqtt_client: Error transport connect[0m
+[0;33mW (216650) REMOTE: Remote broker disconnected[0m
+[0;32mI (218030) THERMAL: Thermo ok raw=0xff341a90 measured=-2.75 filtered=-3.75 cj=26.56[0m
+[0;32mI (219130) CTRL_TASK: Stack watermark: 2696 words[0m
+[0;32mI (219130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (221620) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (223130) THERMAL: Thermo ok raw=0xff101a90 measured=-5.00 filtered=-4.75 cj=26.56[0m
+[0;32mI (224130) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (224130) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (226620) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (226660) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (226660) esp-tls: Failed to open new connection[0m
+[1;31mE (226670) transport_base: Failed to open a new connection[0m
+[1;31mE (226670) mqtt_client: Error transport connect[0m
+[0;33mW (226680) REMOTE: Remote broker disconnected[0m
+[0;32mI (228230) THERMAL: Thermo ok raw=0xff001a80 measured=-6.00 filtered=-5.50 cj=26.50[0m
+[0;32mI (229230) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (229230) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (231630) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (233330) THERMAL: Thermo ok raw=0xff081a90 measured=-5.50 filtered=-5.25 cj=26.56[0m
+[0;32mI (234230) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (234230) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (236630) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (238430) THERMAL: Thermo ok raw=0xff101a90 measured=-5.00 filtered=-5.00 cj=26.56[0m
+[0;32mI (239230) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (239230) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (241630) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (241680) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (241680) esp-tls: Failed to open new connection[0m
+[1;31mE (241680) transport_base: Failed to open a new connection[0m
+[1;31mE (241690) mqtt_client: Error transport connect[0m
+[0;33mW (241690) REMOTE: Remote broker disconnected[0m
+[0;32mI (243530) THERMAL: Thermo ok raw=0xff041a90 measured=-5.75 filtered=-5.75 cj=26.56[0m
+[0;32mI (244230) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (244230) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (246630) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (248630) THERMAL: Thermo ok raw=0xfee41a90 measured=-7.75 filtered=-8.75 cj=26.56[0m
+[0;32mI (249230) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (249230) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (251630) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (251700) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (251700) esp-tls: Failed to open new connection[0m
+[1;31mE (251710) transport_base: Failed to open a new connection[0m
+[1;31mE (251710) mqtt_client: Error transport connect[0m
+[0;33mW (251720) REMOTE: Remote broker disconnected[0m
+[0;32mI (253730) THERMAL: Thermo ok raw=0xfed01a80 measured=-9.00 filtered=-9.00 cj=26.50[0m
+[0;32mI (254230) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (254230) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (256630) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (258830) THERMAL: Thermo ok raw=0xfec81a80 measured=-9.50 filtered=-10.50 cj=26.50[0m
+[0;32mI (259330) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (259330) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (261630) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (263930) THERMAL: Thermo ok raw=0xfed41a80 measured=-8.75 filtered=-8.75 cj=26.50[0m
+[0;32mI (264330) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (264330) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (266630) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (266720) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (266720) esp-tls: Failed to open new connection[0m
+[1;31mE (266730) transport_base: Failed to open a new connection[0m
+[1;31mE (266730) mqtt_client: Error transport connect[0m
+[0;33mW (266730) REMOTE: Remote broker disconnected[0m
+[0;32mI (269030) THERMAL: Thermo ok raw=0xff0c1a80 measured=-5.25 filtered=-6.25 cj=26.50[0m
+[0;32mI (269330) CTRL_TASK: Stack watermark: 2680 words[0m
+[0;32mI (269330) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (269990) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (270050) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (270060) THERMAL: Schedule Started[0m
+[0;32mI (270060) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (270160) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (270410) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (270510) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (270610) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (270710) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (270810) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (270910) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271010) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271110) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271210) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271310) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271410) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271510) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271610) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271640) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (271710) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271810) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (271910) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (272010) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (272110) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (272200) THERMAL: KILN STOPPED: User Button[0m
+[0;32mI (273140) SLINT_BRIDGE: CMD action=stop result=0 ok=1[0m
+[0;33mW (273740) THERMAL: Thermo spike raw=0xff041a80 last=5.75 now=-5.75 max_jump=10.00[0m
+[0;32mI (274040) THERMAL: Thermo ok raw=0xff041a90 measured=-5.75 filtered=-5.75 cj=26.56[0m
+[0;32mI (274340) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (274340) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (276660) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (276740) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (276740) esp-tls: Failed to open new connection[0m
+[1;31mE (276750) transport_base: Failed to open a new connection[0m
+[1;31mE (276750) mqtt_client: Error transport connect[0m
+[0;33mW (276760) REMOTE: Remote broker disconnected[0m
+[0;32mI (279140) THERMAL: Thermo ok raw=0xfee41a90 measured=-7.75 filtered=-7.75 cj=26.56[0m
+[0;32mI (279340) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (279340) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (281660) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (284240) THERMAL: Thermo ok raw=0xfed81aa0 measured=-8.50 filtered=-9.00 cj=26.62[0m
+[0;32mI (284340) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (284340) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (286660) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (289340) THERMAL: Thermo ok raw=0xff381a90 measured=-2.50 filtered=-2.75 cj=26.56[0m
+[0;32mI (289340) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (289340) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (291660) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (291760) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (291760) esp-tls: Failed to open new connection[0m
+[1;31mE (291770) transport_base: Failed to open a new connection[0m
+[1;31mE (291770) mqtt_client: Error transport connect[0m
+[0;33mW (291780) REMOTE: Remote broker disconnected[0m
+[0;32mI (294350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (294350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (294450) THERMAL: Thermo ok raw=0xff541aa0 measured=-0.75 filtered=-0.75 cj=26.62[0m
+[0;32mI (296660) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (299350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (299350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (299550) THERMAL: Thermo ok raw=0xff581a90 measured=-0.50 filtered=-1.00 cj=26.56[0m
+[0;32mI (301660) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (301780) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (301780) esp-tls: Failed to open new connection[0m
+[1;31mE (301780) transport_base: Failed to open a new connection[0m
+[1;31mE (301790) mqtt_client: Error transport connect[0m
+[0;33mW (301790) REMOTE: Remote broker disconnected[0m
+[0;32mI (304350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (304350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (304650) THERMAL: Thermo ok raw=0xff541a90 measured=-0.75 filtered=-0.50 cj=26.56[0m
+[0;32mI (306660) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (309350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (309350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (309750) THERMAL: Thermo ok raw=0xff4c1a90 measured=-1.25 filtered=-0.50 cj=26.56[0m
+[0;32mI (311660) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (311800) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (311800) esp-tls: Failed to open new connection[0m
+[1;31mE (311810) transport_base: Failed to open a new connection[0m
+[1;31mE (311810) mqtt_client: Error transport connect[0m
+[0;33mW (311820) REMOTE: Remote broker disconnected[0m
+[0;32mI (314350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (314350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (314850) THERMAL: Thermo ok raw=0xff6c1a90 measured=0.75 filtered=0.75 cj=26.56[0m
+[0;32mI (316670) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (319350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (319350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (319950) THERMAL: Thermo ok raw=0xff441a90 measured=-1.75 filtered=-1.75 cj=26.56[0m
+[0;32mI (321670) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (324350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (324350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (325050) THERMAL: Thermo ok raw=0xff341a90 measured=-2.75 filtered=-1.50 cj=26.56[0m
+[0;32mI (326670) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (326820) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (326820) esp-tls: Failed to open new connection[0m
+[1;31mE (326820) transport_base: Failed to open a new connection[0m
+[1;31mE (326830) mqtt_client: Error transport connect[0m
+[0;33mW (326830) REMOTE: Remote broker disconnected[0m
+[0;32mI (329350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (329350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (330150) THERMAL: Thermo ok raw=0xff601aa0 measured=0.00 filtered=0.00 cj=26.62[0m
+[0;32mI (331670) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (334350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (334350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (335250) THERMAL: Thermo ok raw=0xff5c1a90 measured=-0.25 filtered=-1.00 cj=26.56[0m
+[0;32mI (336670) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (336850) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (336850) esp-tls: Failed to open new connection[0m
+[1;31mE (336850) transport_base: Failed to open a new connection[0m
+[1;31mE (336860) mqtt_client: Error transport connect[0m
+[0;33mW (336860) REMOTE: Remote broker disconnected[0m
+[0;32mI (339350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (339350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (340350) THERMAL: Thermo ok raw=0xff5c1a90 measured=-0.25 filtered=-0.75 cj=26.56[0m
+[0;32mI (341670) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (344350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (344350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (345450) THERMAL: Thermo ok raw=0xff5c1a90 measured=-0.25 filtered=-0.25 cj=26.56[0m
+[0;32mI (346670) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (346870) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (346870) esp-tls: Failed to open new connection[0m
+[1;31mE (346870) transport_base: Failed to open a new connection[0m
+[1;31mE (346880) mqtt_client: Error transport connect[0m
+[0;33mW (346880) REMOTE: Remote broker disconnected[0m
+[0;32mI (349350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (349350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (350550) THERMAL: Thermo ok raw=0xff601a90 measured=0.00 filtered=0.25 cj=26.56[0m
+[0;32mI (351670) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (354350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (354350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (355650) THERMAL: Thermo ok raw=0xff581a90 measured=-0.50 filtered=0.00 cj=26.56[0m
+[0;32mI (356670) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (356890) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (356890) esp-tls: Failed to open new connection[0m
+[1;31mE (356890) transport_base: Failed to open a new connection[0m
+[1;31mE (356900) mqtt_client: Error transport connect[0m
+[0;33mW (356900) REMOTE: Remote broker disconnected[0m
+[0;32mI (359350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (359350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (360750) THERMAL: Thermo ok raw=0xff441a90 measured=-1.75 filtered=-1.00 cj=26.56[0m
+[0;32mI (361670) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (364350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (364350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (365850) THERMAL: Thermo ok raw=0xff641a90 measured=0.25 filtered=-0.75 cj=26.56[0m
+[0;32mI (366670) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (366910) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (366910) esp-tls: Failed to open new connection[0m
+[1;31mE (366910) transport_base: Failed to open a new connection[0m
+[1;31mE (366920) mqtt_client: Error transport connect[0m
+[0;33mW (366920) REMOTE: Remote broker disconnected[0m
+[0;32mI (369350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (369350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (370950) THERMAL: Thermo ok raw=0xff501a90 measured=-1.00 filtered=0.00 cj=26.56[0m
+[0;32mI (371680) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (374350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (374350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (376050) THERMAL: Thermo ok raw=0xff501a90 measured=-1.00 filtered=-1.00 cj=26.56[0m
+[0;32mI (376680) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (376930) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (376930) esp-tls: Failed to open new connection[0m
+[1;31mE (376930) transport_base: Failed to open a new connection[0m
+[1;31mE (376940) mqtt_client: Error transport connect[0m
+[0;33mW (376940) REMOTE: Remote broker disconnected[0m
+[0;32mI (379350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (379350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (381150) THERMAL: Thermo ok raw=0xff581a80 measured=-0.50 filtered=-0.50 cj=26.50[0m
+[0;32mI (381680) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (384350) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (384350) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (386250) THERMAL: Thermo ok raw=0xff681a80 measured=0.50 filtered=-2.25 cj=26.50[0m
+[0;32mI (386680) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (386950) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (386950) esp-tls: Failed to open new connection[0m
+[1;31mE (386950) transport_base: Failed to open a new connection[0m
+[1;31mE (386960) mqtt_client: Error transport connect[0m
+[0;33mW (386960) REMOTE: Remote broker disconnected[0m
+[0;32mI (389450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (389450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (391350) THERMAL: Thermo ok raw=0xff701a80 measured=1.00 filtered=0.50 cj=26.50[0m
+[0;32mI (391680) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (394450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (394450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (396450) THERMAL: Thermo ok raw=0xff481a90 measured=-1.50 filtered=-1.50 cj=26.56[0m
+[0;32mI (396680) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (396970) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (396970) esp-tls: Failed to open new connection[0m
+[1;31mE (396970) transport_base: Failed to open a new connection[0m
+[1;31mE (396980) mqtt_client: Error transport connect[0m
+[0;33mW (396980) REMOTE: Remote broker disconnected[0m
+[0;32mI (399450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (399450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (401550) THERMAL: Thermo ok raw=0xff3c1a90 measured=-2.25 filtered=-2.25 cj=26.56[0m
+[0;32mI (401690) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (404450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (404450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (406650) THERMAL: Thermo ok raw=0xff581a80 measured=-0.50 filtered=-0.75 cj=26.50[0m
+[0;32mI (406690) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (406990) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (406990) esp-tls: Failed to open new connection[0m
+[1;31mE (406990) transport_base: Failed to open a new connection[0m
+[1;31mE (407000) mqtt_client: Error transport connect[0m
+[0;33mW (407000) REMOTE: Remote broker disconnected[0m
+[0;32mI (409450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (409450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (411690) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (411750) THERMAL: Thermo ok raw=0xff601a80 measured=0.00 filtered=-0.25 cj=26.50[0m
+[0;32mI (414450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (414450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (416690) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (416850) THERMAL: Thermo ok raw=0xff341a90 measured=-2.75 filtered=-2.75 cj=26.56[0m
+[1;31mE (417010) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (417010) esp-tls: Failed to open new connection[0m
+[1;31mE (417010) transport_base: Failed to open a new connection[0m
+[1;31mE (417020) mqtt_client: Error transport connect[0m
+[0;33mW (417020) REMOTE: Remote broker disconnected[0m
+[0;32mI (419450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (419450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (421690) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (421950) THERMAL: Thermo ok raw=0xff401a90 measured=-2.00 filtered=-3.00 cj=26.56[0m
+[0;32mI (424450) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (424450) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (426690) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (427030) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (427030) esp-tls: Failed to open new connection[0m
+[1;31mE (427030) transport_base: Failed to open a new connection[0m
+[1;31mE (427040) mqtt_client: Error transport connect[0m
+[0;33mW (427040) REMOTE: Remote broker disconnected[0m
+[0;32mI (427050) THERMAL: Thermo ok raw=0xff181a80 measured=-4.50 filtered=-4.50 cj=26.50[0m
+[0;32mI (429460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (429460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (431700) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (432160) THERMAL: Thermo ok raw=0xff381a80 measured=-2.50 filtered=-2.00 cj=26.50[0m
+[0;32mI (434460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (434460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (436700) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (437050) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (437050) esp-tls: Failed to open new connection[0m
+[1;31mE (437050) transport_base: Failed to open a new connection[0m
+[1;31mE (437060) mqtt_client: Error transport connect[0m
+[0;33mW (437060) REMOTE: Remote broker disconnected[0m
+[0;32mI (437260) THERMAL: Thermo ok raw=0xff381a80 measured=-2.50 filtered=-2.75 cj=26.50[0m
+[0;32mI (439460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (439460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (441700) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (442360) THERMAL: Thermo ok raw=0xff481a80 measured=-1.50 filtered=-1.50 cj=26.50[0m
+[0;32mI (444460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (444460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (446700) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (447070) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (447070) esp-tls: Failed to open new connection[0m
+[1;31mE (447070) transport_base: Failed to open a new connection[0m
+[1;31mE (447080) mqtt_client: Error transport connect[0m
+[0;33mW (447080) REMOTE: Remote broker disconnected[0m
+[0;32mI (447460) THERMAL: Thermo ok raw=0xff3c1a80 measured=-2.25 filtered=-2.25 cj=26.50[0m
+[0;32mI (449460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (449460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (451700) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (452560) THERMAL: Thermo ok raw=0xff381a80 measured=-2.50 filtered=-2.00 cj=26.50[0m
+[0;32mI (454460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (454460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (456700) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (457090) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (457090) esp-tls: Failed to open new connection[0m
+[1;31mE (457090) transport_base: Failed to open a new connection[0m
+[1;31mE (457100) mqtt_client: Error transport connect[0m
+[0;33mW (457100) REMOTE: Remote broker disconnected[0m
+[0;32mI (457660) THERMAL: Thermo ok raw=0xff401a80 measured=-2.00 filtered=-1.50 cj=26.50[0m
+[0;32mI (459460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (459460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (461710) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (462760) THERMAL: Thermo ok raw=0xff5c1a80 measured=-0.25 filtered=-0.50 cj=26.50[0m
+[0;32mI (464460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (464460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (466710) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (467110) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (467110) esp-tls: Failed to open new connection[0m
+[1;31mE (467120) transport_base: Failed to open a new connection[0m
+[1;31mE (467120) mqtt_client: Error transport connect[0m
+[0;33mW (467130) REMOTE: Remote broker disconnected[0m
+[0;32mI (467860) THERMAL: Thermo ok raw=0xff541a80 measured=-0.75 filtered=-1.00 cj=26.50[0m
+[0;32mI (469460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (469460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (471710) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (472960) THERMAL: Thermo ok raw=0xff541a80 measured=-0.75 filtered=-0.75 cj=26.50[0m
+[0;32mI (474460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (474460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (476710) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (477130) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (477130) esp-tls: Failed to open new connection[0m
+[1;31mE (477130) transport_base: Failed to open a new connection[0m
+[1;31mE (477140) mqtt_client: Error transport connect[0m
+[0;33mW (477140) REMOTE: Remote broker disconnected[0m
+[0;32mI (478060) THERMAL: Thermo ok raw=0xff501a80 measured=-1.00 filtered=-1.00 cj=26.50[0m
+[0;32mI (479460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (479460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (481710) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (483160) THERMAL: Thermo ok raw=0xff541a80 measured=-0.75 filtered=-0.50 cj=26.50[0m
+[0;32mI (484460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (484460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (486710) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (487150) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (487150) esp-tls: Failed to open new connection[0m
+[1;31mE (487150) transport_base: Failed to open a new connection[0m
+[1;31mE (487160) mqtt_client: Error transport connect[0m
+[0;33mW (487160) REMOTE: Remote broker disconnected[0m
+[0;32mI (488260) THERMAL: Thermo ok raw=0xff401a90 measured=-2.00 filtered=-2.00 cj=26.56[0m
+[0;32mI (489460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (489460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (491720) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (493360) THERMAL: Thermo ok raw=0xff441a80 measured=-1.75 filtered=-0.75 cj=26.50[0m
+[0;32mI (494460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (494460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (496720) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (497170) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (497170) esp-tls: Failed to open new connection[0m
+[1;31mE (497170) transport_base: Failed to open a new connection[0m
+[1;31mE (497180) mqtt_client: Error transport connect[0m
+[0;33mW (497180) REMOTE: Remote broker disconnected[0m
+[0;32mI (498460) THERMAL: Thermo ok raw=0xff3c1a80 measured=-2.25 filtered=-2.25 cj=26.50[0m
+[0;32mI (499460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (499460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (501720) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (503560) THERMAL: Thermo ok raw=0xff181a80 measured=-4.50 filtered=-2.25 cj=26.50[0m
+[0;32mI (504460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (504460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (506720) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (507200) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (507200) esp-tls: Failed to open new connection[0m
+[1;31mE (507200) transport_base: Failed to open a new connection[0m
+[1;31mE (507210) mqtt_client: Error transport connect[0m
+[0;33mW (507210) REMOTE: Remote broker disconnected[0m
+[0;32mI (508660) THERMAL: Thermo ok raw=0xff3c1a80 measured=-2.25 filtered=-1.75 cj=26.50[0m
+[0;32mI (509460) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (509460) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (511720) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (513760) THERMAL: Thermo ok raw=0xff501a80 measured=-1.00 filtered=-2.50 cj=26.50[0m
+[0;32mI (514560) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (514560) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (516720) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (518240) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (518240) esp-tls: Failed to open new connection[0m
+[1;31mE (518240) transport_base: Failed to open a new connection[0m
+[1;31mE (518250) mqtt_client: Error transport connect[0m
+[0;33mW (518250) REMOTE: Remote broker disconnected[0m
+[0;32mI (518860) THERMAL: Thermo ok raw=0xff2c1a80 measured=-3.25 filtered=-2.75 cj=26.50[0m
+[0;32mI (519560) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (519560) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (521720) SRV_TASK: Stack watermark: 2856 words[0m
+[0;32mI (523960) THERMAL: Thermo ok raw=0xff381a80 measured=-2.50 filtered=-2.00 cj=26.50[0m
+[0;32mI (524560) CTRL_TASK: Stack watermark: 1504 words[0m
+[0;32mI (524560) CTRL_TASK: UI stack watermark: 17760 words[0m
+[0;32mI (526720) SRV_TASK: Stack watermark: 2856 words[0m
+[1;31mE (528270) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (528270) esp-tls: Failed to open new connection[0m
+[1;31mE (528270) transport_bas

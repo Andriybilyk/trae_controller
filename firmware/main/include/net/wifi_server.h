@@ -95,6 +95,7 @@ private:
     static esp_err_t api_touch_stats_handler(httpd_req_t *req);
     static esp_err_t api_fault_clear_handler(httpd_req_t *req);
     static esp_err_t api_fault_get_handler(httpd_req_t *req);
+    static esp_err_t api_events_handler(httpd_req_t *req);
     static esp_err_t api_history_list_handler(httpd_req_t *req);
     static esp_err_t api_history_clear_handler(httpd_req_t *req);
     static esp_err_t api_history_detail_handler(httpd_req_t *req);
@@ -118,6 +119,7 @@ private:
     uint64_t lastSkipCommandMs = 0;
     uint64_t lastAddTempCommandMs = 0;
     uint64_t lastAddTimeCommandMs = 0;
+    uint64_t lastSetRateCommandMs = 0;
 };
 
 extern WiFiServerManager wifiServer;

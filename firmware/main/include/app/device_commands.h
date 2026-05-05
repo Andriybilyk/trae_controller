@@ -9,6 +9,7 @@ enum class ResultCode {
     Ok = 0,
     InvalidPayload,
     InvalidSchedule,
+    InvalidState,
     NoSchedule,
     SensorInvalid,
     TouchNotCalibrated,

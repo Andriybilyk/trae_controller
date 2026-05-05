@@ -22,12 +22,14 @@
 #include "slint_ui.h"
 #include "ui/slint_bridge.h"
 #include "net/wifi_server.h"
+#include "net/wifi_connection.h"
 #include "net/remote_access.h"
 #include "drivers/fan_driver.h"
 #include "drivers/buzzer_driver.h"
 #include "drivers/rtc_ds3231.h"
 #include "kiln_config/config_store.h"
 #include "kiln_config/fs_utils.h"
+#include "config/board_profile.h"
 
 static const char *TAG = "MAIN";
 static constexpr uint32_t UI_TASK_STACK_BYTES = 32768;
@@ -39,6 +41,28 @@ static std::atomic<uint64_t> s_server_heartbeat_ms{0};
 static std::atomic<bool> s_server_watchdog_armed{false};
 static std::atomic<float> s_board_temp_c{25.0f};
 static temperature_sensor_handle_t s_board_temp_sensor = nullptr;
+
+static const char* reset_reason_to_str(esp_reset_reason_t r) {
+    switch (r) {
+        case ESP_RST_UNKNOWN: return "UNKNOWN";
+        case ESP_RST_POWERON: return "POWERON";
+        case ESP_RST_EXT: return "EXT";
+        case ESP_RST_SW: return "SW";
+        case ESP_RST_PANIC: return "PANIC";
+        case ESP_RST_INT_WDT: return "INT_WDT";
+        case ESP_RST_TASK_WDT: return "TASK_WDT";
+        case ESP_RST_WDT: return "WDT";
+        case ESP_RST_DEEPSLEEP: return "DEEPSLEEP";
+        case ESP_RST_BROWNOUT: return "BROWNOUT";
+        case ESP_RST_SDIO: return "SDIO";
+        case ESP_RST_USB: return "USB";
+        case ESP_RST_JTAG: return "JTAG";
+        case ESP_RST_EFUSE: return "EFUSE";
+        case ESP_RST_PWR_GLITCH: return "PWR_GLITCH";
+        case ESP_RST_CPU_LOCKUP: return "CPU_LOCKUP";
+        default: return "UNMAPPED";
+    }
+}
 
 static void board_temp_init(void) {
     temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
@@ -72,7 +96,8 @@ static float board_temp_read_c(void) {
 static void ui_task(void *arg) {
     (void)arg;
     ESP_LOGI("UI_TASK", "Starting UI task");
-    (void)esp_task_wdt_add(nullptr);
+    // slint_ui_run() is a long-running blocking loop; this task cannot feed TWDT directly.
+    // Keep UI watchdoging via heartbeat in control_task instead of task_wdt registration.
     slint_bridge_ui_heartbeat();
 
     slint_ui_run();
@@ -81,7 +106,8 @@ static void ui_task(void *arg) {
 static void control_task(void *arg) {
     (void)arg;
     ESP_LOGI("CTRL_TASK", "Starting control task");
-    (void)esp_task_wdt_add(nullptr);
+    const bool wdt_registered = (esp_task_wdt_add(nullptr) == ESP_OK);
+    const bool is_new_p4 = (board_profile::current_board() == board_profile::BoardId::NewP4);
 
     uint64_t lastLog = 0;
     bool watchdog_latched = false;
@@ -91,16 +117,20 @@ static void control_task(void *arg) {
     KilnStatus prev_status = KILN_IDLE;
 
     while (true) {
-        (void)esp_task_wdt_reset();
+        if (wdt_registered) {
+            (void)esp_task_wdt_reset();
+        }
         thermalCtrl.loop();
         const KilnState st = thermalCtrl.getState();
-        fan_driver_update_from_temperature(board_temp_read_c(), st.isFiring);
-        buzzer_driver_tick();
-        if (prev_firing && st.isFiring && st.currentStep != prev_step && st.currentStep >= 0) {
-            buzzer_driver_beep_segment();
-        }
-        if (prev_status != KILN_COMPLETE && st.status == KILN_COMPLETE) {
-            buzzer_driver_beep_complete();
+        if (!is_new_p4) {
+            fan_driver_update_from_temperature(board_temp_read_c(), st.isFiring);
+            buzzer_driver_tick();
+            if (prev_firing && st.isFiring && st.currentStep != prev_step && st.currentStep >= 0) {
+                buzzer_driver_beep_segment();
+            }
+            if (prev_status != KILN_COMPLETE && st.status == KILN_COMPLETE) {
+                buzzer_driver_beep_complete();
+            }
         }
         prev_step = st.currentStep;
         prev_firing = st.isFiring;
@@ -180,7 +210,12 @@ extern "C" void app_main(void) {
     // Confirm OTA update if we booted successfully
     esp_ota_mark_app_valid_cancel_rollback();
 
-    ESP_LOGI(TAG, "Reset reason: %d", (int)esp_reset_reason());
+    const esp_reset_reason_t rr = esp_reset_reason();
+    ESP_LOGI(TAG, "Reset reason: %d (%s), free_heap=%u, min_free_heap=%u",
+             (int)rr,
+             reset_reason_to_str(rr),
+             (unsigned)esp_get_free_heap_size(),
+             (unsigned)esp_get_minimum_free_heap_size());
 
     esp_task_wdt_config_t twdt_config = {};
     twdt_config.timeout_ms = 12000;
@@ -197,19 +232,32 @@ extern "C" void app_main(void) {
     ESP_ERROR_CHECK(ret);
 
     ESP_LOGI(TAG, "TRAE KILN CONTROLLER STARTING...");
+    const bool is_new_p4 = (board_profile::current_board() == board_profile::BoardId::NewP4);
+    if (is_new_p4) {
+        // Keep relay control pin in safe input state during early boot and display bring-up.
+        heater_hal_set_display_ready(false);
+    }
     board_temp_init();
-    (void)rtc_ds3231_init();
-    if (rtc_ds3231_apply_time_to_system()) {
-        ESP_LOGI(TAG, "Time restored from DS3231");
+    if (!is_new_p4) {
+        (void)rtc_ds3231_init();
+        if (rtc_ds3231_apply_time_to_system()) {
+            ESP_LOGI(TAG, "Time restored from DS3231");
+        } else {
+            ESP_LOGW(TAG, "DS3231 time not available yet");
+        }
     } else {
-        ESP_LOGW(TAG, "DS3231 time not available yet");
+        ESP_LOGI(TAG, "Skip DS3231 init for NewP4 profile");
     }
 
-    // Init fan PWM (manual override from UI; default OFF).
-    fan_driver_init();
-    fan_driver_set_manual(false);
-    fan_driver_set_power_percent(0);
-    buzzer_driver_init();
+    // Init fan/buzzer only on non-P4 boards during P4 display bring-up.
+    if (!is_new_p4) {
+        fan_driver_init();
+        fan_driver_set_manual(false);
+        fan_driver_set_power_percent(0);
+        buzzer_driver_init();
+    } else {
+        ESP_LOGI(TAG, "Skip fan+buzzer init for NewP4 profile");
+    }
 
     // Init LittleFS
     esp_vfs_littlefs_conf_t conf = {};
@@ -304,7 +352,6 @@ extern "C" void app_main(void) {
         }
     }
 
-    // Init Thermal Control
     ESP_LOGI(TAG, "Init Thermal Control...");
     thermalCtrl.begin();
     // Do not call stop() immediately, as it clears the recovery state.
@@ -313,15 +360,23 @@ extern "C" void app_main(void) {
         thermalCtrl.stop("System Boot");
     }
 
-    // 6. Initialize mDNS so we can resolve http://kiln.local
-    esp_err_t err = mdns_init();
-    if (err == ESP_OK) {
-        mdns_hostname_set("kiln");
-        mdns_instance_name_set("Trae Kiln Controller");
-        mdns_service_add("Kiln Web UI", "_http", "_tcp", 80, NULL, 0);
-        ESP_LOGI(TAG, "mDNS initialized. Hostname: kiln.local");
+    // Network services are enabled only when a real Wi-Fi backend is compiled in.
+    const bool network_enabled = wifi_backend_available();
+    if (network_enabled) {
+        // 6. Initialize mDNS so we can resolve http://kiln.local
+        esp_err_t err = mdns_init();
+        if (err == ESP_OK) {
+            mdns_hostname_set("kiln");
+            mdns_instance_name_set("Trae Kiln Controller");
+            mdns_service_add("Kiln Web UI", "_http", "_tcp", 80, NULL, 0);
+            ESP_LOGI(TAG, "mDNS initialized. Hostname: kiln.local");
+        } else {
+            ESP_LOGE(TAG, "mDNS init failed: %d", err);
+        }
     } else {
-        ESP_LOGE(TAG, "mDNS init failed: %d", err);
+        ESP_LOGW(TAG, "Network stack disabled (board=%s, wifi_backend=%s)",
+                 board_profile::current_board_name(),
+                 wifi_backend_name());
     }
 
     ESP_LOGI(TAG, "Setup Complete.");
@@ -331,13 +386,16 @@ extern "C" void app_main(void) {
 
     // Slint + Rust std (software renderer) is stack-hungry during layout/render and key handling.
     // Keep a larger stack to prevent overflow when opening complex overlays/keyboards.
-    (void)xTaskCreatePinnedToCore(ui_task, "ui", UI_TASK_STACK_BYTES, nullptr, 6, &s_ui_task, 1);
+    // Priority is increased to 10 on NewP4 to ensure smooth display refresh despite background WiFi/SDIO activity.
+    (void)xTaskCreatePinnedToCore(ui_task, "ui", UI_TASK_STACK_BYTES, nullptr, 10, &s_ui_task, 1);
 
     // Control loop task (safety-critical: keep running even if UI stalls).
-    (void)xTaskCreatePinnedToCore(control_task, "ctrl", 4096, nullptr, 8, nullptr, 1);
+    (void)xTaskCreatePinnedToCore(control_task, "ctrl", 4096, nullptr, 11, nullptr, 1);
 
     // Networking + periodic WS broadcast task.
-    (void)xTaskCreatePinnedToCore(server_task, "srv", 6144, nullptr, 5, nullptr, 0);
+    if (network_enabled) {
+        (void)xTaskCreatePinnedToCore(server_task, "srv", 6144, nullptr, 6, nullptr, 0);
+    }
 
     ESP_LOGI(TAG, "Main task done; deleting main task to avoid stack overflow.");
     vTaskDelete(NULL);

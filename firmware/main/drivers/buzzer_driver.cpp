@@ -12,7 +12,8 @@ static int s_pattern = 0;
 static int s_phase = 0;
 
 static constexpr ledc_mode_t kMode = LEDC_LOW_SPEED_MODE;
-static constexpr ledc_timer_t kTimer = LEDC_TIMER_1;
+// Keep buzzer on a dedicated timer to avoid affecting display backlight PWM on NewP4.
+static constexpr ledc_timer_t kTimer = LEDC_TIMER_3;
 static constexpr ledc_channel_t kChannel = LEDC_CHANNEL_1;
 static constexpr ledc_timer_bit_t kDutyRes = LEDC_TIMER_8_BIT;
 

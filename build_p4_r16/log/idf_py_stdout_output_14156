@@ -1,0 +1,1316 @@
+Command: C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:\esp\.espressif\v6.0\esp-idf\tools/idf_monitor.py -p COM11 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\trae_controller.elf C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\bootloader\bootloader.elf --force-color -m 'C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe' 'C:\esp\.espressif\v6.0\esp-idf\tools\idf.py' '-C' 'firmware' '-B' 'build_p4_r16' '-p' 'COM11'
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff07116
+Core1 Saved PC:0x4003f5ae
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x1738
+load:0x4ff29ed0,len:0xf7c
+load:0x4ff2cbd0,len:0x368c
+entry 0x4ff29eda
+[0;32mI (27) boot: ESP-IDF v6.0 2nd stage bootloader[0m
+[0;32mI (28) boot: compile time Apr 15 2026 21:06:55[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (29) boot: chip revision: v1.3[0m
+[0;32mI (30) boot: efuse block revision: v0.3[0m
+[0;32mI (34) qio_mode: Enabling default flash chip QIO[0m
+[0;32mI (38) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (42) boot.esp32p4: SPI Mode       : QIO[0m
+[0;32mI (46) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (50) boot: Enabling RNG early entropy source...[0m
+[0;32mI (54) boot: Partition Table:[0m
+[0;32mI (57) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (63) boot:  0 nvs              WiFi data        01 02 00009000 00005000[0m
+[0;32mI (70) boot:  1 otadata          OTA data         01 00 0000e000 00002000[0m
+[0;32mI (76) boot:  2 factory          factory app      00 00 00010000 00ca0000[0m
+[0;32mI (83) boot:  3 storage          Unknown data     01 83 00cb0000 00350000[0m
+[0;32mI (90) boot: End of partition table[0m
+[0;32mI (93) boot: Defaulting to factory image[0m
+[0;32mI (96) esp_image: segment 0: paddr=00010020 vaddr=403d0020 size=1a0b84h (1706884) map[0m
+[0;32mI (324) esp_image: segment 1: paddr=001b0bac vaddr=30100000 size=00068h (   104) load[0m
+[0;32mI (326) esp_image: segment 2: paddr=001b0c1c vaddr=4ff00000 size=0f3fch ( 62460) load[0m
+[0;32mI (338) esp_image: segment 3: paddr=001c0020 vaddr=40000020 size=3caf28h (3977000) map[0m
+[0;32mI (853) esp_image: segment 4: paddr=0058af50 vaddr=4ff0f3fc size=01cc8h (  7368) load[0m
+[0;32mI (855) esp_image: segment 5: paddr=0058cc20 vaddr=4ff11100 size=042c0h ( 17088) load[0m
+[0;32mI (860) esp_image: segment 6: paddr=00590ee8 vaddr=50108080 size=00024h (    36) load[0m
+[0;32mI (869) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (869) boot: Disabling RNG early entropy source...[0m
+[0;32mI (887) hex_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (887) hex_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (888) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
+[0;32mI (888) hex_psram: dev id       : 0x03 (generation 4)[0m
+[0;32mI (893) hex_psram: density      : 0x07 (256 Mbit)[0m
+[0;32mI (897) hex_psram: good-die     : 0x06 (Pass)[0m
+[0;32mI (901) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
+[0;32mI (906) hex_psram: BurstType    : 0x00 ( Wrap)[0m
+[0;32mI (910) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
+[0;32mI (915) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
+[0;32mI (919) hex_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
+[0;32mI (924) hex_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (928) MSPI Timing: Enter psram timing tuning[0m
+[0;32mI (1104) esp_psram: Found 32MB PSRAM device[0m
+[0;32mI (1104) esp_psram: Speed: 80MHz[0m
+[0;32mI (1107) hex_psram: psram CS IO is dedicated[0m
+[0;32mI (1108) cpu_start: Multicore app[0m
+[0;32mI (2387) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (2396) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (2397) cpu_start: Pro cpu start user code[0m
+[0;32mI (2397) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (2399) app_init: Application information:[0m
+[0;32mI (2403) app_init: Project name:     trae_controller[0m
+[0;32mI (2407) app_init: App version:      3d6c312-dirty[0m
+[0;32mI (2412) app_init: Compile time:     Apr 15 2026 21:05:38[0m
+[0;32mI (2417) app_init: ELF file SHA256:  2af66429e...[0m
+[0;32mI (2421) app_init: ESP-IDF:          v6.0[0m
+[0;32mI (2425) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (2429) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (2433) efuse_init: Chip rev:         v1.3[0m
+[0;32mI (2437) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (2443) heap_init: At 4FF19790 len 00021830 (134 KiB): RETENT_RAM[0m
+[0;32mI (2449) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (2454) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (2460) heap_init: At 501080A4 len 00007F5C (31 KiB): RTCRAM[0m
+[0;32mI (2465) heap_init: At 30100068 len 00001F98 (7 KiB): TCM[0m
+[0;32mI (2471) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;33mW (2477) spi_flash: Detected boya flash chip but using generic driver. For optimal functionality, enable `SPI_FLASH_SUPPORT_BOYA_CHIP` in menuconfig[0m
+[0;32mI (2490) spi_flash: detected chip: generic[0m
+[0;32mI (2494) spi_flash: flash io: qio[0m
+[0;32mI (2515) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (2521) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (2527) H_SDIO_DRV: sdio_data_to_rx_buf_task started[0m
+[0;32mI (2527) main_task: Started on CPU0[0m
+[0;32mI (2537) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (2547) main_task: Calling app_main()[0m
+[1;31mE (2547) esp_ota_ops: Running firmware is factory[0m
+[0;32mI (2547) MAIN: Reset reason: 11 (USB), free_heap=34041632, min_free_heap=34041552[0m
+[1;31mE (2557) task_wdt: esp_task_wdt_init(517): TWDT already initialized[0m
+[0;32mI (2577) MAIN: TRAE KILN CONTROLLER STARTING...[0m
+[0;32mI (2577) temperature_sensor: Range [-10°C ~ 80°C], error < 1°C[0m
+[0;32mI (2577) MAIN: Board temp sensor enabled[0m
+[0;32mI (2587) MAIN: Skip DS3231 init for NewP4 profile[0m
+[0;32mI (2587) MAIN: Skip fan+buzzer init for NewP4 profile[0m
+[0;32mI (2597) MAIN: LittleFS Mounted[0m
+[0;33mW (2617) MAIN: Skip thermal control init for NewP4 profile (display-only mode)[0m
+[1;31mE (2617) MAIN: mDNS init failed: -1[0m
+[0;32mI (2617) MAIN: Setup Complete.[0m
+[0;32mI (2617) MAIN: Starting tasks...[0m
+[0;32mI (2627) CTRL_TASK: Starting control task[0m
+[0;32mI (2627) SRV_TASK: Starting server task[0m
+[0;33mW (2627) CTRL_TASK: NewP4 bring-up: thermal control disabled (display-only mode)[0m
+[0;32mI (2627) UI_TASK: Starting UI task[0m
+[1;31mE (2627) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (2647) DISPLAY: P4 backlight PWM ready (timer=1 ch=2 target=20000Hz actual=20000Hz)[0m
+[1;31mE (2647) system_api: 0 mac type is incorrect (not found)[0m
+[0;33mW (2657) WIFI_CONN: AP SSID suffix: MAC unavailable, using random fallback 'TRAE_KILN_SETUP_952E'[0m
+[0;32mI (2667) transport: Attempt connection with slave: retry[0][0m
+[0;33mW (2667) H_SDIO_DRV: Reset slave using GPIO[54][0m
+[0;32mI (2677) os_wrapper_esp: GPIO [54] configured[0m
+[0;32mI (2627) MAIN: Main task done; deleting main task to avoid stack overflow.[0m
+[0;32mI (2857) st7701: version: 2.0.2[0m
+[0;32mI (3107) st7701_mipi: LCD ID: FF FF FF[0m
+[0;32mI (3107) st7701_mipi:  st7701->madctl_val: 0x0, st7701->colmod_val: 0x55[0m
+[0;32mI (3357) DISPLAY: P4 MIPI panel ready (physical): 480x800[0m
+[0;32mI (3357) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (3357) GT911: TouchPad_ID:0x39,0x31,0x31[0m
+[0;32mI (3367) GT911: TouchPad_Config_Version:250[0m
+[0;32mI (3367) DISPLAY: Touch initialized (GT911, I2C addr=0x5D, SDA=7 SCL=8)[0m
+[0;32mI (3437) DISPLAY: P4 BL req=100[0m
+[0;32mI (3437) DISPLAY: Display initialized successfully (P4)[0m
+[1;31mE (3487) temperature_sensor: temperature_sensor_install(136): Already installed[0m
+[1;31mE (3487) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (3707) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (3877) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4037) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4037) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4217) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4387) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4547) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4547) H_API: ESP-Hosted link not yet up[0m
+[0;32mI (4697) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz][0m
+[0;32mI (4697) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54][0m
+[0;32mI (4697) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1][0m
+[1;31mE (4717) H_API: ESP-Hosted link not yet up[0m
+[0;32mI (4737) sdio_wrapper: Function 0 Blocksize: 512[0m
+[0;32mI (4737) sdio_wrapper: Function 1 Blocksize: 512[0m
+[0;32mI (4837) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE[0m
+[0;32mI (4837) transport: set_transport_state: 1[0m
+[0;32mI (4837) transport: Waiting for esp_hosted slave to be ready[0m
+[1;31mE (4877) H_API: ESP-Hosted link not yet up[0m
+[0;32mI (4927) H_SDIO_DRV: SDIO Host operating in STREAMING MODE[0m
+[0;32mI (4927) H_SDIO_DRV: Open data path at slave[0m
+[0;32mI (4927) H_SDIO_DRV: Starting SDIO process rx task[0m
+[0;32mI (4957) H_SDIO_DRV: Received ESP_PRIV_IF type message[0m
+[0;32mI (4957) transport: Received INIT event from ESP32 peripheral[0m
+[0;32mI (4957) transport: EVENT: 12[0m
+[0;32mI (4957) transport: Identified slave [esp32c6][0m
+[0;32mI (4957) transport: EVENT: 11[0m
+[0;32mI (4957) transport: capabilities: 0xd[0m
+[0;32mI (4967) transport: Features supported are:[0m
+[0;32mI (4967) transport: 	 * WLAN[0m
+[0;32mI (4967) transport: 	   - HCI over SDIO[0m
+[0;32mI (4977) transport: 	   - BLE only[0m
+[0;32mI (4977) transport: EVENT: 13[0m
+[0;33mW (4977) transport: Version mismatch: Host [2.12.0] > Co-proc [2.3.0] ==> Upgrade co-proc to avoid RPC timeouts[0m
+[0;32mI (4987) transport: ESP board type is : 13 [0m
+
+[0;32mI (4997) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE[0m
+[0;32mI (4997) H_API: Transport active[0m
+[0;32mI (5007) transport: Slave chip Id[12][0m
+[0;32mI (5007) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80][0m
+[0;32mI (5017) transport: transport_delayed_init[0m
+[0;32mI (5017) hci_stub_drv: Host BT Support: Disabled[0m
+[0;32mI (5017) H_SDIO_DRV: Received INIT event[0m
+[0;32mI (5027) H_SDIO_DRV: Event type: 0x22[0m
+[0;32mI (5027) H_SDIO_DRV: Write thread started[0m
+[0;33mW (5677) rpc_rsp: Hosted RPC_Resp [0x226], uid [2], resp code [12295][0m
+[0;33mW (5707) rpc_rsp: Hosted RPC_Resp [0x226], uid [4], resp code [12295][0m
+[0;32mI (5787) WIFI_CONN: AP netif enforced: 192.168.4.1/24[0m
+[0;32mI (5787) WIFI_CONN: CAPPORT URI set: http://192.168.4.1/captive-portal/api[0m
+[0;32mI (5787) WIFI_CONN: wifi_init_softap finished. SSID:TRAE_KILN_SETUP_952E[0m
+[0;32mI (5787) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (5797) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (5807) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[0;32mI (5807) WIFI_CONN: SoftAP started -> starting DNS captive responder[0m
+[1;31mE (5827) system_api: 0 mac type is incorrect (not found)[0m
+[0;32mI (5827) REMOTE: Remote access initialized (enabled=1, uri=mqtts://kilnpro:8888, device=000000000000)[0m
+[0;32mI (5837) DNS_SERVER: DNS server listening on port 53[0m
+[0;33mW (5947) rpc_rsp: Hosted RPC_Resp [0x226], uid [8], resp code [12295][0m
+[0;33mW (5967) rpc_rsp: Hosted RPC_Resp [0x226], uid [9], resp code [12295][0m
+[0;33mW (6007) rpc_rsp: Hosted RPC_Resp [0x226], uid [10], resp code [12295][0m
+[0;33mW (6067) rpc_rsp: Hosted RPC_Resp [0x226], uid [11], resp code [12295][0m
+[0;33mW (6127) rpc_rsp: Hosted RPC_Resp [0x226], uid [12], resp code [12295][0m
+[0;33mW (6137) rpc_rsp: Hosted RPC_Resp [0x226], uid [13], resp code [12295][0m
+[0;33mW (6187) rpc_rsp: Hosted RPC_Resp [0x226], uid [14], resp code [12295][0m
+[0;33mW (6247) rpc_rsp: Hosted RPC_Resp [0x226], uid [15], resp code [12295][0m
+[0;33mW (6307) rpc_rsp: Hosted RPC_Resp [0x226], uid [16], resp code [12295][0m
+[0;33mW (6317) rpc_rsp: Hosted RPC_Resp [0x226], uid [17], resp code [12295][0m
+[0;33mW (6337) rpc_rsp: Hosted RPC_Resp [0x226], uid [18], resp code [12295][0m
+[0;33mW (6367) rpc_rsp: Hosted RPC_Resp [0x226], uid [19], resp code [12295][0m
+[0;33mW (6427) rpc_rsp: Hosted RPC_Resp [0x226], uid [20], resp code [12295][0m
+[0;33mW (6487) rpc_rsp: Hosted RPC_Resp [0x226], uid [21], resp code [12295][0m
+[0;33mW (6517) rpc_rsp: Hosted RPC_Resp [0x226], uid [22], resp code [12295][0m
+[0;33mW (6547) rpc_rsp: Hosted RPC_Resp [0x226], uid [23], resp code [12295][0m
+[0;33mW (6607) rpc_rsp: Hosted RPC_Resp [0x226], uid [24], resp code [12295][0m
+[0;33mW (6667) rpc_rsp: Hosted RPC_Resp [0x226], uid [25], resp code [12295][0m
+[0;33mW (6697) rpc_rsp: Hosted RPC_Resp [0x226], uid [26], resp code [12295][0m
+[0;33mW (6727) rpc_rsp: Hosted RPC_Resp [0x226], uid [27], resp code [12295][0m
+[0;33mW (6787) rpc_rsp: Hosted RPC_Resp [0x226], uid [28], resp code [12295][0m
+[0;33mW (6847) rpc_rsp: Hosted RPC_Resp [0x226], uid [29], resp code [12295][0m
+[0;33mW (6867) rpc_rsp: Hosted RPC_Resp [0x226], uid [30], resp code [12295][0m
+[0;33mW (6887) rpc_rsp: Hosted RPC_Resp [0x226], uid [31], resp code [12295][0m
+[0;33mW (6907) rpc_rsp: Hosted RPC_Resp [0x226], uid [32], resp code [12295][0m
+[0;33mW (6967) rpc_rsp: Hosted RPC_Resp [0x226], uid [33], resp code [12295][0m
+[0;33mW (7027) rpc_rsp: Hosted RPC_Resp [0x226], uid [34], resp code [12295][0m
+[0;33mW (7067) rpc_rsp: Hosted RPC_Resp [0x226], uid [35], resp code [12295][0m
+[0;33mW (7087) rpc_rsp: Hosted RPC_Resp [0x226], uid [36], resp code [12295][0m
+[0;33mW (7147) rpc_rsp: Hosted RPC_Resp [0x226], uid [37], resp code [12295][0m
+[0;33mW (7207) rpc_rsp: Hosted RPC_Resp [0x226], uid [38], resp code [12295][0m
+[0;33mW (7237) rpc_rsp: Hosted RPC_Resp [0x226], uid [39], resp code [12295][0m
+[0;33mW (7267) rpc_rsp: Hosted RPC_Resp [0x226], uid [40], resp code [12295][0m
+[0;33mW (7327) rpc_rsp: Hosted RPC_Resp [0x226], uid [41], resp code [12295][0m
+[0;33mW (7387) rpc_rsp: Hosted RPC_Resp [0x226], uid [42], resp code [12295][0m
+[0;33mW (7407) rpc_rsp: Hosted RPC_Resp [0x226], uid [43], resp code [12295][0m
+[0;33mW (7427) rpc_rsp: Hosted RPC_Resp [0x226], uid [44], resp code [12295][0m
+[0;33mW (7447) rpc_rsp: Hosted RPC_Resp [0x226], uid [45], resp code [12295][0m
+[0;33mW (7507) rpc_rsp: Hosted RPC_Resp [0x226], uid [46], resp code [12295][0m
+[0;32mI (7507) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (7567) rpc_rsp: Hosted RPC_Resp [0x226], uid [47], resp code [12295][0m
+[0;33mW (7607) rpc_rsp: Hosted RPC_Resp [0x226], uid [48], resp code [12295][0m
+[0;33mW (7627) rpc_rsp: Hosted RPC_Resp [0x226], uid [49], resp code [12295][0m
+[0;33mW (7687) rpc_rsp: Hosted RPC_Resp [0x226], uid [50], resp code [12295][0m
+[0;33mW (7747) rpc_rsp: Hosted RPC_Resp [0x226], uid [51], resp code [12295][0m
+[0;33mW (7777) rpc_rsp: Hosted RPC_Resp [0x226], uid [52], resp code [12295][0m
+[0;33mW (7807) rpc_rsp: Hosted RPC_Resp [0x226], uid [53], resp code [12295][0m
+[0;33mW (7867) rpc_rsp: Hosted RPC_Resp [0x226], uid [54], resp code [12295][0m
+[0;33mW (7927) rpc_rsp: Hosted RPC_Resp [0x226], uid [55], resp code [12295][0m
+[0;33mW (7957) rpc_rsp: Hosted RPC_Resp [0x226], uid [56], resp code [12295][0m
+[0;33mW (7967) rpc_rsp: Hosted RPC_Resp [0x226], uid [57], resp code [12295][0m
+[0;33mW (7987) rpc_rsp: Hosted RPC_Resp [0x226], uid [58], resp code [12295][0m
+[0;33mW (8047) rpc_rsp: Hosted RPC_Resp [0x226], uid [59], resp code [12295][0m
+[0;33mW (8107) rpc_rsp: Hosted RPC_Resp [0x226], uid [60], resp code [12295][0m
+[0;33mW (8147) rpc_rsp: Hosted RPC_Resp [0x226], uid [61], resp code [12295][0m
+[0;33mW (8167) rpc_rsp: Hosted RPC_Resp [0x226], uid [62], resp code [12295][0m
+[0;33mW (8227) rpc_rsp: Hosted RPC_Resp [0x226], uid [63], resp code [12295][0m
+[0;33mW (8287) rpc_rsp: Hosted RPC_Resp [0x226], uid [64], resp code [12295][0m
+[0;33mW (8327) rpc_rsp: Hosted RPC_Resp [0x226], uid [65], resp code [12295][0m
+[0;33mW (8347) rpc_rsp: Hosted RPC_Resp [0x226], uid [66], resp code [12295][0m
+[0;33mW (8407) rpc_rsp: Hosted RPC_Resp [0x226], uid [67], resp code [12295][0m
+[0;33mW (8467) rpc_rsp: Hosted RPC_Resp [0x226], uid [68], resp code [12295][0m
+[0;33mW (8507) rpc_rsp: Hosted RPC_Resp [0x226], uid [69], resp code [12295][0m
+[0;33mW (8527) rpc_rsp: Hosted RPC_Resp [0x226], uid [70], resp code [12295][0m
+[0;33mW (8547) rpc_rsp: Hosted RPC_Resp [0x226], uid [71], resp code [12295][0m
+[0;33mW (8607) rpc_rsp: Hosted RPC_Resp [0x226], uid [72], resp code [12295][0m
+[0;33mW (8667) rpc_rsp: Hosted RPC_Resp [0x226], uid [73], resp code [12295][0m
+[0;33mW (8707) rpc_rsp: Hosted RPC_Resp [0x226], uid [74], resp code [12295][0m
+[0;33mW (8727) rpc_rsp: Hosted RPC_Resp [0x226], uid [75], resp code [12295][0m
+[0;33mW (8787) rpc_rsp: Hosted RPC_Resp [0x226], uid [76], resp code [12295][0m
+[0;33mW (8847) rpc_rsp: Hosted RPC_Resp [0x226], uid [77], resp code [12295][0m
+[0;33mW (8877) rpc_rsp: Hosted RPC_Resp [0x226], uid [78], resp code [12295][0m
+[0;33mW (8907) rpc_rsp: Hosted RPC_Resp [0x226], uid [79], resp code [12295][0m
+[0;33mW (8967) rpc_rsp: Hosted RPC_Resp [0x226], uid [80], resp code [12295][0m
+[0;33mW (9027) rpc_rsp: Hosted RPC_Resp [0x226], uid [81], resp code [12295][0m
+[0;33mW (9047) rpc_rsp: Hosted RPC_Resp [0x226], uid [82], resp code [12295][0m
+[0;33mW (9067) rpc_rsp: Hosted RPC_Resp [0x226], uid [83], resp code [12295][0m
+[0;33mW (9087) rpc_rsp: Hosted RPC_Resp [0x226], uid [84], resp code [12295][0m
+[0;33mW (9147) rpc_rsp: Hosted RPC_Resp [0x226], uid [85], resp code [12295][0m
+[0;33mW (9207) rpc_rsp: Hosted RPC_Resp [0x226], uid [86], resp code [12295][0m
+[0;33mW (9247) rpc_rsp: Hosted RPC_Resp [0x226], uid [87], resp code [12295][0m
+[0;33mW (9267) rpc_rsp: Hosted RPC_Resp [0x226], uid [88], resp code [12295][0m
+[0;33mW (9327) rpc_rsp: Hosted RPC_Resp [0x226], uid [89], resp code [12295][0m
+[0;33mW (9387) rpc_rsp: Hosted RPC_Resp [0x226], uid [90], resp code [12295][0m
+[0;33mW (9417) rpc_rsp: Hosted RPC_Resp [0x226], uid [91], resp code [12295][0m
+[0;33mW (9447) rpc_rsp: Hosted RPC_Resp [0x226], uid [92], resp code [12295][0m
+[0;33mW (9507) rpc_rsp: Hosted RPC_Resp [0x226], uid [93], resp code [12295][0m
+[0;33mW (9567) rpc_rsp: Hosted RPC_Resp [0x226], uid [94], resp code [12295][0m
+[0;33mW (9597) rpc_rsp: Hosted RPC_Resp [0x226], uid [95], resp code [12295][0m
+[0;33mW (9607) rpc_rsp: Hosted RPC_Resp [0x226], uid [96], resp code [12295][0m
+[0;33mW (9627) rpc_rsp: Hosted RPC_Resp [0x226], uid [97], resp code [12295][0m
+[0;33mW (9697) rpc_rsp: Hosted RPC_Resp [0x226], uid [98], resp code [12295][0m
+[0;33mW (9757) rpc_rsp: Hosted RPC_Resp [0x226], uid [99], resp code [12295][0m
+[0;33mW (9787) rpc_rsp: Hosted RPC_Resp [0x226], uid [100], resp code [12295][0m
+[0;33mW (9817) rpc_rsp: Hosted RPC_Resp [0x226], uid [101], resp code [12295][0m
+[0;33mW (9877) rpc_rsp: Hosted RPC_Resp [0x226], uid [102], resp code [12295][0m
+[0;33mW (9937) rpc_rsp: Hosted RPC_Resp [0x226], uid [103], resp code [12295][0m
+[0;33mW (9967) rpc_rsp: Hosted RPC_Resp [0x226], uid [104], resp code [12295][0m
+[0;33mW (9997) rpc_rsp: Hosted RPC_Resp [0x226], uid [105], resp code [12295][0m
+[0;33mW (10057) rpc_rsp: Hosted RPC_Resp [0x226], uid [106], resp code [12295][0m
+[0;33mW (10117) rpc_rsp: Hosted RPC_Resp [0x226], uid [107], resp code [12295][0m
+[0;33mW (10137) rpc_rsp: Hosted RPC_Resp [0x226], uid [108], resp code [12295][0m
+[0;33mW (10157) rpc_rsp: Hosted RPC_Resp [0x226], uid [109], resp code [12295][0m
+[0;33mW (10177) rpc_rsp: Hosted RPC_Resp [0x226], uid [110], resp code [12295][0m
+[0;33mW (10237) rpc_rsp: Hosted RPC_Resp [0x226], uid [111], resp code [12295][0m
+[0;33mW (10297) rpc_rsp: Hosted RPC_Resp [0x226], uid [112], resp code [12295][0m
+[0;33mW (10337) rpc_rsp: Hosted RPC_Resp [0x226], uid [113], resp code [12295][0m
+[0;33mW (10357) rpc_rsp: Hosted RPC_Resp [0x226], uid [114], resp code [12295][0m
+[0;33mW (10417) rpc_rsp: Hosted RPC_Resp [0x226], uid [115], resp code [12295][0m
+[0;33mW (10477) rpc_rsp: Hosted RPC_Resp [0x226], uid [116], resp code [12295][0m
+[0;33mW (10507) rpc_rsp: Hosted RPC_Resp [0x226], uid [117], resp code [12295][0m
+[0;33mW (10537) rpc_rsp: Hosted RPC_Resp [0x226], uid [118], resp code [12295][0m
+[0;33mW (10597) rpc_rsp: Hosted RPC_Resp [0x226], uid [119], resp code [12295][0m
+[0;33mW (10657) rpc_rsp: Hosted RPC_Resp [0x226], uid [120], resp code [12295][0m
+[0;33mW (10677) rpc_rsp: Hosted RPC_Resp [0x226], uid [121], resp code [12295][0m
+[0;33mW (10697) rpc_rsp: Hosted RPC_Resp [0x226], uid [122], resp code [12295][0m
+[0;33mW (10717) rpc_rsp: Hosted RPC_Resp [0x226], uid [123], resp code [12295][0m
+[0;33mW (10777) rpc_rsp: Hosted RPC_Resp [0x226], uid [124], resp code [12295][0m
+[0;33mW (10837) rpc_rsp: Hosted RPC_Resp [0x226], uid [125], resp code [12295][0m
+[0;33mW (10877) rpc_rsp: Hosted RPC_Resp [0x226], uid [126], resp code [12295][0m
+[0;33mW (10897) rpc_rsp: Hosted RPC_Resp [0x226], uid [127], resp code [12295][0m
+[0;33mW (10957) rpc_rsp: Hosted RPC_Resp [0x226], uid [128], resp code [12295][0m
+[0;33mW (11017) rpc_rsp: Hosted RPC_Resp [0x226], uid [129], resp code [12295][0m
+[0;33mW (11047) rpc_rsp: Hosted RPC_Resp [0x226], uid [130], resp code [12295][0m
+[0;33mW (11077) rpc_rsp: Hosted RPC_Resp [0x226], uid [131], resp code [12295][0m
+[0;33mW (11137) rpc_rsp: Hosted RPC_Resp [0x226], uid [132], resp code [12295][0m
+[0;33mW (11197) rpc_rsp: Hosted RPC_Resp [0x226], uid [133], resp code [12295][0m
+[0;33mW (11227) rpc_rsp: Hosted RPC_Resp [0x226], uid [134], resp code [12295][0m
+[0;33mW (11247) rpc_rsp: Hosted RPC_Resp [0x226], uid [135], resp code [12295][0m
+[0;33mW (11267) rpc_rsp: Hosted RPC_Resp [0x226], uid [136], resp code [12295][0m
+[0;33mW (11327) rpc_rsp: Hosted RPC_Resp [0x226], uid [137], resp code [12295][0m
+[0;33mW (11387) rpc_rsp: Hosted RPC_Resp [0x226], uid [138], resp code [12295][0m
+[0;33mW (11417) rpc_rsp: Hosted RPC_Resp [0x226], uid [139], resp code [12295][0m
+[0;33mW (11447) rpc_rsp: Hosted RPC_Resp [0x226], uid [140], resp code [12295][0m
+[0;33mW (11507) rpc_rsp: Hosted RPC_Resp [0x226], uid [141], resp code [12295][0m
+[0;33mW (11567) rpc_rsp: Hosted RPC_Resp [0x226], uid [142], resp code [12295][0m
+[0;33mW (11597) rpc_rsp: Hosted RPC_Resp [0x226], uid [143], resp code [12295][0m
+[0;33mW (11627) rpc_rsp: Hosted RPC_Resp [0x226], uid [144], resp code [12295][0m
+[0;33mW (11687) rpc_rsp: Hosted RPC_Resp [0x226], uid [145], resp code [12295][0m
+[0;33mW (11747) rpc_rsp: Hosted RPC_Resp [0x226], uid [146], resp code [12295][0m
+[0;33mW (11767) rpc_rsp: Hosted RPC_Resp [0x226], uid [147], resp code [12295][0m
+[0;33mW (11787) rpc_rsp: Hosted RPC_Resp [0x226], uid [148], resp code [12295][0m
+[0;33mW (11807) rpc_rsp: Hosted RPC_Resp [0x226], uid [149], resp code [12295][0m
+[0;33mW (11867) rpc_rsp: Hosted RPC_Resp [0x226], uid [150], resp code [12295][0m
+[0;33mW (11927) rpc_rsp: Hosted RPC_Resp [0x226], uid [151], resp code [12295][0m
+[0;33mW (11967) rpc_rsp: Hosted RPC_Resp [0x226], uid [152], resp code [12295][0m
+[0;33mW (11987) rpc_rsp: Hosted RPC_Resp [0x226], uid [153], resp code [12295][0m
+[0;33mW (12047) rpc_rsp: Hosted RPC_Resp [0x226], uid [154], resp code [12295][0m
+[0;33mW (12107) rpc_rsp: Hosted RPC_Resp [0x226], uid [155], resp code [12295][0m
+[0;33mW (12137) rpc_rsp: Hosted RPC_Resp [0x226], uid [156], resp code [12295][0m
+[0;33mW (12167) rpc_rsp: Hosted RPC_Resp [0x226], uid [157], resp code [12295][0m
+[0;33mW (12227) rpc_rsp: Hosted RPC_Resp [0x226], uid [158], resp code [12295][0m
+[0;33mW (12287) rpc_rsp: Hosted RPC_Resp [0x226], uid [159], resp code [12295][0m
+[0;33mW (12307) rpc_rsp: Hosted RPC_Resp [0x226], uid [160], resp code [12295][0m
+[0;33mW (12327) rpc_rsp: Hosted RPC_Resp [0x226], uid [161], resp code [12295][0m
+[0;33mW (12347) rpc_rsp: Hosted RPC_Resp [0x226], uid [162], resp code [12295][0m
+[0;33mW (12407) rpc_rsp: Hosted RPC_Resp [0x226], uid [163], resp code [12295][0m
+[0;33mW (12467) rpc_rsp: Hosted RPC_Resp [0x226], uid [164], resp code [12295][0m
+[0;33mW (12507) rpc_rsp: Hosted RPC_Resp [0x226], uid [165], resp code [12295][0m
+[0;33mW (12527) rpc_rsp: Hosted RPC_Resp [0x226], uid [166], resp code [12295][0m
+[0;32mI (12527) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (12587) rpc_rsp: Hosted RPC_Resp [0x226], uid [167], resp code [12295][0m
+[0;33mW (12647) rpc_rsp: Hosted RPC_Resp [0x226], uid [168], resp code [12295][0m
+[0;33mW (12677) rpc_rsp: Hosted RPC_Resp [0x226], uid [169], resp code [12295][0m
+[0;33mW (12707) rpc_rsp: Hosted RPC_Resp [0x226], uid [170], resp code [12295][0m
+[0;33mW (12767) rpc_rsp: Hosted RPC_Resp [0x226], uid [171], resp code [12295][0m
+[0;33mW (12827) rpc_rsp: Hosted RPC_Resp [0x226], uid [172], resp code [12295][0m
+[0;33mW (12857) rpc_rsp: Hosted RPC_Resp [0x226], uid [173], resp code [12295][0m
+[0;33mW (12877) rpc_rsp: Hosted RPC_Resp [0x226], uid [174], resp code [12295][0m
+[0;33mW (12897) rpc_rsp: Hosted RPC_Resp [0x226], uid [175], resp code [12295][0m
+[0;33mW (12957) rpc_rsp: Hosted RPC_Resp [0x226], uid [176], resp code [12295][0m
+[0;33mW (13017) rpc_rsp: Hosted RPC_Resp [0x226], uid [177], resp code [12295][0m
+[0;33mW (13057) rpc_rsp: Hosted RPC_Resp [0x226], uid [178], resp code [12295][0m
+[0;33mW (13077) rpc_rsp: Hosted RPC_Resp [0x226], uid [179], resp code [12295][0m
+[0;33mW (13137) rpc_rsp: Hosted RPC_Resp [0x226], uid [180], resp code [12295][0m
+[0;33mW (13197) rpc_rsp: Hosted RPC_Resp [0x226], uid [181], resp code [12295][0m
+[0;33mW (13227) rpc_rsp: Hosted RPC_Resp [0x226], uid [182], resp code [12295][0m
+[0;33mW (13257) rpc_rsp: Hosted RPC_Resp [0x226], uid [183], resp code [12295][0m
+[0;33mW (13317) rpc_rsp: Hosted RPC_Resp [0x226], uid [184], resp code [12295][0m
+[0;33mW (13377) rpc_rsp: Hosted RPC_Resp [0x226], uid [185], resp code [12295][0m
+[0;33mW (13397) rpc_rsp: Hosted RPC_Resp [0x226], uid [186], resp code [12295][0m
+[0;33mW (13417) rpc_rsp: Hosted RPC_Resp [0x226], uid [187], resp code [12295][0m
+[0;33mW (13437) rpc_rsp: Hosted RPC_Resp [0x226], uid [188], resp code [12295][0m
+[0;33mW (13497) rpc_rsp: Hosted RPC_Resp [0x226], uid [189], resp code [12295][0m
+[0;33mW (13557) rpc_rsp: Hosted RPC_Resp [0x226], uid [190], resp code [12295][0m
+[0;33mW (13607) rpc_rsp: Hosted RPC_Resp [0x226], uid [191], resp code [12295][0m
+[0;33mW (13627) rpc_rsp: Hosted RPC_Resp [0x226], uid [192], resp code [12295][0m
+[0;33mW (13687) rpc_rsp: Hosted RPC_Resp [0x226], uid [193], resp code [12295][0m
+[0;33mW (13747) rpc_rsp: Hosted RPC_Resp [0x226], uid [194], resp code [12295][0m
+[0;33mW (13777) rpc_rsp: Hosted RPC_Resp [0x226], uid [195], resp code [12295][0m
+[0;33mW (13807) rpc_rsp: Hosted RPC_Resp [0x226], uid [196], resp code [12295][0m
+[0;33mW (13867) rpc_rsp: Hosted RPC_Resp [0x226], uid [197], resp code [12295][0m
+[0;33mW (13927) rpc_rsp: Hosted RPC_Resp [0x226], uid [198], resp code [12295][0m
+[0;33mW (13957) rpc_rsp: Hosted RPC_Resp [0x226], uid [199], resp code [12295][0m
+[0;33mW (13977) rpc_rsp: Hosted RPC_Resp [0x226], uid [200], resp code [12295][0m
+[0;33mW (13997) rpc_rsp: Hosted RPC_Resp [0x226], uid [201], resp code [12295][0m
+[0;33mW (14057) rpc_rsp: Hosted RPC_Resp [0x226], uid [202], resp code [12295][0m
+[0;33mW (14117) rpc_rsp: Hosted RPC_Resp [0x226], uid [203], resp code [12295][0m
+[0;33mW (14157) rpc_rsp: Hosted RPC_Resp [0x226], uid [204], resp code [12295][0m
+[0;33mW (14177) rpc_rsp: Hosted RPC_Resp [0x226], uid [205], resp code [12295][0m
+[0;33mW (14237) rpc_rsp: Hosted RPC_Resp [0x226], uid [206], resp code [12295][0m
+[0;33mW (14297) rpc_rsp: Hosted RPC_Resp [0x226], uid [207], resp code [12295][0m
+[0;33mW (14327) rpc_rsp: Hosted RPC_Resp [0x226], uid [208], resp code [12295][0m
+[0;33mW (14357) rpc_rsp: Hosted RPC_Resp [0x226], uid [209], resp code [12295][0m
+[0;33mW (14417) rpc_rsp: Hosted RPC_Resp [0x226], uid [210], resp code [12295][0m
+[0;33mW (14477) rpc_rsp: Hosted RPC_Resp [0x226], uid [211], resp code [12295][0m
+[0;33mW (14497) rpc_rsp: Hosted RPC_Resp [0x226], uid [212], resp code [12295][0m
+[0;33mW (14517) rpc_rsp: Hosted RPC_Resp [0x226], uid [213], resp code [12295][0m
+[0;33mW (14537) rpc_rsp: Hosted RPC_Resp [0x226], uid [214], resp code [12295][0m
+[0;33mW (14597) rpc_rsp: Hosted RPC_Resp [0x226], uid [215], resp code [12295][0m
+[0;33mW (14657) rpc_rsp: Hosted RPC_Resp [0x226], uid [216], resp code [12295][0m
+[0;33mW (14697) rpc_rsp: Hosted RPC_Resp [0x226], uid [217], resp code [12295][0m
+[0;33mW (14717) rpc_rsp: Hosted RPC_Resp [0x226], uid [218], resp code [12295][0m
+[0;33mW (14777) rpc_rsp: Hosted RPC_Resp [0x226], uid [219], resp code [12295][0m
+[0;33mW (14837) rpc_rsp: Hosted RPC_Resp [0x226], uid [220], resp code [12295][0m
+[0;33mW (14867) rpc_rsp: Hosted RPC_Resp [0x226], uid [221], resp code [12295][0m
+[0;33mW (14897) rpc_rsp: Hosted RPC_Resp [0x226], uid [222], resp code [12295][0m
+[0;33mW (14957) rpc_rsp: Hosted RPC_Resp [0x226], uid [223], resp code [12295][0m
+[0;33mW (15017) rpc_rsp: Hosted RPC_Resp [0x226], uid [224], resp code [12295][0m
+[0;33mW (15047) rpc_rsp: Hosted RPC_Resp [0x226], uid [225], resp code [12295][0m
+[0;33mW (15067) rpc_rsp: Hosted RPC_Resp [0x226], uid [226], resp code [12295][0m
+[0;33mW (15087) rpc_rsp: Hosted RPC_Resp [0x226], uid [227], resp code [12295][0m
+[0;33mW (15147) rpc_rsp: Hosted RPC_Resp [0x226], uid [228], resp code [12295][0m
+[0;33mW (15207) rpc_rsp: Hosted RPC_Resp [0x226], uid [229], resp code [12295][0m
+[0;33mW (15247) rpc_rsp: Hosted RPC_Resp [0x226], uid [230], resp code [12295][0m
+[0;33mW (15267) rpc_rsp: Hosted RPC_Resp [0x226], uid [231], resp code [12295][0m
+[0;33mW (15327) rpc_rsp: Hosted RPC_Resp [0x226], uid [232], resp code [12295][0m
+[0;33mW (15387) rpc_rsp: Hosted RPC_Resp [0x226], uid [233], resp code [12295][0m
+[0;33mW (15417) rpc_rsp: Hosted RPC_Resp [0x226], uid [234], resp code [12295][0m
+[0;33mW (15447) rpc_rsp: Hosted RPC_Resp [0x226], uid [235], resp code [12295][0m
+[0;33mW (15507) rpc_rsp: Hosted RPC_Resp [0x226], uid [236], resp code [12295][0m
+[0;33mW (15567) rpc_rsp: Hosted RPC_Resp [0x226], uid [237], resp code [12295][0m
+[0;33mW (15587) rpc_rsp: Hosted RPC_Resp [0x226], uid [238], resp code [12295][0m
+[0;33mW (15607) rpc_rsp: Hosted RPC_Resp [0x226], uid [239], resp code [12295][0m
+[0;33mW (15627) rpc_rsp: Hosted RPC_Resp [0x226], uid [240], resp code [12295][0m
+[0;33mW (15687) rpc_rsp: Hosted RPC_Resp [0x226], uid [241], resp code [12295][0m
+[0;33mW (15747) rpc_rsp: Hosted RPC_Resp [0x226], uid [242], resp code [12295][0m
+[0;33mW (15787) rpc_rsp: Hosted RPC_Resp [0x226], uid [243], resp code [12295][0m
+[0;33mW (15807) rpc_rsp: Hosted RPC_Resp [0x226], uid [244], resp code [12295][0m
+[0;33mW (15867) rpc_rsp: Hosted RPC_Resp [0x226], uid [245], resp code [12295][0m
+[0;33mW (15927) rpc_rsp: Hosted RPC_Resp [0x226], uid [246], resp code [12295][0m
+[0;33mW (15967) rpc_rsp: Hosted RPC_Resp [0x226], uid [247], resp code [12295][0m
+[0;33mW (15987) rpc_rsp: Hosted RPC_Resp [0x226], uid [248], resp code [12295][0m
+[0;33mW (16047) rpc_rsp: Hosted RPC_Resp [0x226], uid [249], resp code [12295][0m
+[0;33mW (16107) rpc_rsp: Hosted RPC_Resp [0x226], uid [250], resp code [12295][0m
+[0;33mW (16127) rpc_rsp: Hosted RPC_Resp [0x226], uid [251], resp code [12295][0m
+[0;33mW (16147) rpc_rsp: Hosted RPC_Resp [0x226], uid [252], resp code [12295][0m
+[0;33mW (16167) rpc_rsp: Hosted RPC_Resp [0x226], uid [253], resp code [12295][0m
+[0;33mW (16227) rpc_rsp: Hosted RPC_Resp [0x226], uid [254], resp code [12295][0m
+[0;33mW (16287) rpc_rsp: Hosted RPC_Resp [0x226], uid [255], resp code [12295][0m
+[0;33mW (16327) rpc_rsp: Hosted RPC_Resp [0x226], uid [256], resp code [12295][0m
+[0;33mW (16347) rpc_rsp: Hosted RPC_Resp [0x226], uid [257], resp code [12295][0m
+[0;33mW (16407) rpc_rsp: Hosted RPC_Resp [0x226], uid [258], resp code [12295][0m
+[0;33mW (16467) rpc_rsp: Hosted RPC_Resp [0x226], uid [259], resp code [12295][0m
+[0;33mW (16487) rpc_rsp: Hosted RPC_Resp [0x226], uid [260], resp code [12295][0m
+[0;33mW (16527) rpc_rsp: Hosted RPC_Resp [0x226], uid [261], resp code [12295][0m
+[0;33mW (16587) rpc_rsp: Hosted RPC_Resp [0x226], uid [262], resp code [12295][0m
+[0;33mW (16647) rpc_rsp: Hosted RPC_Resp [0x226], uid [263], resp code [12295][0m
+[0;33mW (16667) rpc_rsp: Hosted RPC_Resp [0x226], uid [264], resp code [12295][0m
+[0;33mW (16677) rpc_rsp: Hosted RPC_Resp [0x226], uid [265], resp code [12295][0m
+[0;33mW (16707) rpc_rsp: Hosted RPC_Resp [0x226], uid [266], resp code [12295][0m
+[0;33mW (16767) rpc_rsp: Hosted RPC_Resp [0x226], uid [267], resp code [12295][0m
+[0;33mW (16827) rpc_rsp: Hosted RPC_Resp [0x226], uid [268], resp code [12295][0m
+[0;33mW (16857) rpc_rsp: Hosted RPC_Resp [0x226], uid [269], resp code [12295][0m
+[0;33mW (16887) rpc_rsp: Hosted RPC_Resp [0x226], uid [270], resp code [12295][0m
+[0;33mW (16947) rpc_rsp: Hosted RPC_Resp [0x226], uid [271], resp code [12295][0m
+[0;33mW (17007) rpc_rsp: Hosted RPC_Resp [0x226], uid [272], resp code [12295][0m
+[0;33mW (17027) rpc_rsp: Hosted RPC_Resp [0x226], uid [273], resp code [12295][0m
+[0;33mW (17067) rpc_rsp: Hosted RPC_Resp [0x226], uid [274], resp code [12295][0m
+[0;33mW (17127) rpc_rsp: Hosted RPC_Resp [0x226], uid [275], resp code [12295][0m
+[0;33mW (17187) rpc_rsp: Hosted RPC_Resp [0x226], uid [276], resp code [12295][0m
+[0;33mW (17207) rpc_rsp: Hosted RPC_Resp [0x226], uid [277], resp code [12295][0m
+[0;33mW (17217) rpc_rsp: Hosted RPC_Resp [0x226], uid [278], resp code [12295][0m
+[0;33mW (17247) rpc_rsp: Hosted RPC_Resp [0x226], uid [279], resp code [12295][0m
+[0;33mW (17307) rpc_rsp: Hosted RPC_Resp [0x226], uid [280], resp code [12295][0m
+[0;33mW (17367) rpc_rsp: Hosted RPC_Resp [0x226], uid [281], resp code [12295][0m
+[0;33mW (17397) rpc_rsp: Hosted RPC_Resp [0x226], uid [282], resp code [12295][0m
+[0;33mW (17427) rpc_rsp: Hosted RPC_Resp [0x226], uid [283], resp code [12295][0m
+[0;33mW (17487) rpc_rsp: Hosted RPC_Resp [0x226], uid [284], resp code [12295][0m
+[0;33mW (17547) rpc_rsp: Hosted RPC_Resp [0x226], uid [285], resp code [12295][0m
+[0;32mI (17547) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (17567) rpc_rsp: Hosted RPC_Resp [0x226], uid [286], resp code [12295][0m
+[0;33mW (17607) rpc_rsp: Hosted RPC_Resp [0x226], uid [287], resp code [12295][0m
+[0;33mW (17667) rpc_rsp: Hosted RPC_Resp [0x226], uid [288], resp code [12295][0m
+[0;33mW (17727) rpc_rsp: Hosted RPC_Resp [0x226], uid [289], resp code [12295][0m
+[0;33mW (17747) rpc_rsp: Hosted RPC_Resp [0x226], uid [290], resp code [12295][0m
+[0;33mW (17757) rpc_rsp: Hosted RPC_Resp [0x226], uid [291], resp code [12295][0m
+[0;33mW (17787) rpc_rsp: Hosted RPC_Resp [0x226], uid [292], resp code [12295][0m
+[0;33mW (17847) rpc_rsp: Hosted RPC_Resp [0x226], uid [293], resp code [12295][0m
+[0;33mW (17907) rpc_rsp: Hosted RPC_Resp [0x226], uid [294], resp code [12295][0m
+[0;33mW (17937) rpc_rsp: Hosted RPC_Resp [0x226], uid [295], resp code [12295][0m
+[0;33mW (17967) rpc_rsp: Hosted RPC_Resp [0x226], uid [296], resp code [12295][0m
+[0;33mW (18027) rpc_rsp: Hosted RPC_Resp [0x226], uid [297], resp code [12295][0m
+[0;33mW (18087) rpc_rsp: Hosted RPC_Resp [0x226], uid [298], resp code [12295][0m
+[0;33mW (18107) rpc_rsp: Hosted RPC_Resp [0x226], uid [299], resp code [12295][0m
+[0;33mW (18147) rpc_rsp: Hosted RPC_Resp [0x226], uid [300], resp code [12295][0m
+[0;33mW (18207) rpc_rsp: Hosted RPC_Resp [0x226], uid [301], resp code [12295][0m
+[0;33mW (18267) rpc_rsp: Hosted RPC_Resp [0x226], uid [302], resp code [12295][0m
+[0;33mW (18287) rpc_rsp: Hosted RPC_Resp [0x226], uid [303], resp code [12295][0m
+[0;33mW (18297) rpc_rsp: Hosted RPC_Resp [0x226], uid [304], resp code [12295][0m
+[0;33mW (18327) rpc_rsp: Hosted RPC_Resp [0x226], uid [305], resp code [12295][0m
+[0;33mW (18387) rpc_rsp: Hosted RPC_Resp [0x226], uid [306], resp code [12295][0m
+[0;33mW (18447) rpc_rsp: Hosted RPC_Resp [0x226], uid [307], resp code [12295][0m
+[0;33mW (18477) rpc_rsp: Hosted RPC_Resp [0x226], uid [308], resp code [12295][0m
+[0;33mW (18507) rpc_rsp: Hosted RPC_Resp [0x226], uid [309], resp code [12295][0m
+[0;33mW (18567) rpc_rsp: Hosted RPC_Resp [0x226], uid [310], resp code [12295][0m
+[0;33mW (18627) rpc_rsp: Hosted RPC_Resp [0x226], uid [311], resp code [12295][0m
+[0;33mW (18657) rpc_rsp: Hosted RPC_Resp [0x226], uid [312], resp code [12295][0m
+[0;33mW (18687) rpc_rsp: Hosted RPC_Resp [0x226], uid [313], resp code [12295][0m
+[0;33mW (18747) rpc_rsp: Hosted RPC_Resp [0x226], uid [314], resp code [12295][0m
+[0;33mW (18807) rpc_rsp: Hosted RPC_Resp [0x226], uid [315], resp code [12295][0m
+[0;33mW (18827) rpc_rsp: Hosted RPC_Resp [0x226], uid [316], resp code [12295][0m
+[0;33mW (18837) rpc_rsp: Hosted RPC_Resp [0x226], uid [317], resp code [12295][0m
+[0;33mW (18867) rpc_rsp: Hosted RPC_Resp [0x226], uid [318], resp code [12295][0m
+[0;33mW (18927) rpc_rsp: Hosted RPC_Resp [0x226], uid [319], resp code [12295][0m
+[0;33mW (18987) rpc_rsp: Hosted RPC_Resp [0x226], uid [320], resp code [12295][0m
+[0;33mW (19017) rpc_rsp: Hosted RPC_Resp [0x226], uid [321], resp code [12295][0m
+[0;33mW (19047) rpc_rsp: Hosted RPC_Resp [0x226], uid [322], resp code [12295][0m
+[0;33mW (19107) rpc_rsp: Hosted RPC_Resp [0x226], uid [323], resp code [12295][0m
+[0;33mW (19167) rpc_rsp: Hosted RPC_Resp [0x226], uid [324], resp code [12295][0m
+[0;33mW (19187) rpc_rsp: Hosted RPC_Resp [0x226], uid [325], resp code [12295][0m
+[0;33mW (19227) rpc_rsp: Hosted RPC_Resp [0x226], uid [326], resp code [12295][0m
+[0;33mW (19287) rpc_rsp: Hosted RPC_Resp [0x226], uid [327], resp code [12295][0m
+[0;33mW (19347) rpc_rsp: Hosted RPC_Resp [0x226], uid [328], resp code [12295][0m
+[0;33mW (19367) rpc_rsp: Hosted RPC_Resp [0x226], uid [329], resp code [12295][0m
+[0;33mW (19377) rpc_rsp: Hosted RPC_Resp [0x226], uid [330], resp code [12295][0m
+[0;33mW (19407) rpc_rsp: Hosted RPC_Resp [0x226], uid [331], resp code [12295][0m
+[0;33mW (19467) rpc_rsp: Hosted RPC_Resp [0x226], uid [332], resp code [12295][0m
+[0;33mW (19527) rpc_rsp: Hosted RPC_Resp [0x226], uid [333], resp code [12295][0m
+[0;33mW (19557) rpc_rsp: Hosted RPC_Resp [0x226], uid [334], resp code [12295][0m
+[0;33mW (19587) rpc_rsp: Hosted RPC_Resp [0x226], uid [335], resp code [12295][0m
+[0;33mW (19647) rpc_rsp: Hosted RPC_Resp [0x226], uid [336], resp code [12295][0m
+[0;33mW (19707) rpc_rsp: Hosted RPC_Resp [0x226], uid [337], resp code [12295][0m
+[0;33mW (19727) rpc_rsp: Hosted RPC_Resp [0x226], uid [338], resp code [12295][0m
+[0;33mW (19767) rpc_rsp: Hosted RPC_Resp [0x226], uid [339], resp code [12295][0m
+[0;33mW (19827) rpc_rsp: Hosted RPC_Resp [0x226], uid [340], resp code [12295][0m
+[0;33mW (19887) rpc_rsp: Hosted RPC_Resp [0x226], uid [341], resp code [12295][0m
+[0;33mW (19917) rpc_rsp: Hosted RPC_Resp [0x226], uid [342], resp code [12295][0m
+[0;33mW (19937) rpc_rsp: Hosted RPC_Resp [0x226], uid [343], resp code [12295][0m
+[0;33mW (19957) rpc_rsp: Hosted RPC_Resp [0x226], uid [344], resp code [12295][0m
+[0;33mW (20017) rpc_rsp: Hosted RPC_Resp [0x226], uid [345], resp code [12295][0m
+[0;33mW (20077) rpc_rsp: Hosted RPC_Resp [0x226], uid [346], resp code [12295][0m
+[0;33mW (20137) rpc_rsp: Hosted RPC_Resp [0x226], uid [347], resp code [12295][0m
+[0;33mW (20157) rpc_rsp: Hosted RPC_Resp [0x226], uid [348], resp code [12295][0m
+[0;33mW (20197) rpc_rsp: Hosted RPC_Resp [0x226], uid [349], resp code [12295][0m
+[0;33mW (20257) rpc_rsp: Hosted RPC_Resp [0x226], uid [350], resp code [12295][0m
+[0;33mW (20317) rpc_rsp: Hosted RPC_Resp [0x226], uid [351], resp code [12295][0m
+[0;33mW (20347) rpc_rsp: Hosted RPC_Resp [0x226], uid [352], resp code [12295][0m
+[0;33mW (20377) rpc_rsp: Hosted RPC_Resp [0x226], uid [353], resp code [12295][0m
+[0;33mW (20437) rpc_rsp: Hosted RPC_Resp [0x226], uid [354], resp code [12295][0m
+[0;33mW (20497) rpc_rsp: Hosted RPC_Resp [0x226], uid [355], resp code [12295][0m
+[0;33mW (20547) rpc_rsp: Hosted RPC_Resp [0x226], uid [356], resp code [12295][0m
+[0;33mW (20557) rpc_rsp: Hosted RPC_Resp [0x226], uid [357], resp code [12295][0m
+[0;33mW (20577) rpc_rsp: Hosted RPC_Resp [0x226], uid [358], resp code [12295][0m
+[0;33mW (20627) rpc_rsp: Hosted RPC_Resp [0x226], uid [359], resp code [12295][0m
+[0;33mW (20687) rpc_rsp: Hosted RPC_Resp [0x226], uid [360], resp code [12295][0m
+[0;33mW (20747) rpc_rsp: Hosted RPC_Resp [0x226], uid [361], resp code [12295][0m
+[0;33mW (20787) rpc_rsp: Hosted RPC_Resp [0x226], uid [362], resp code [12295][0m
+[0;33mW (20807) rpc_rsp: Hosted RPC_Resp [0x226], uid [363], resp code [12295][0m
+[0;33mW (20867) rpc_rsp: Hosted RPC_Resp [0x226], uid [364], resp code [12295][0m
+[0;33mW (20927) rpc_rsp: Hosted RPC_Resp [0x226], uid [365], resp code [12295][0m
+[0;33mW (20977) rpc_rsp: Hosted RPC_Resp [0x226], uid [366], resp code [12295][0m
+[0;33mW (20997) rpc_rsp: Hosted RPC_Resp [0x226], uid [367], resp code [12295][0m
+[0;33mW (21057) rpc_rsp: Hosted RPC_Resp [0x226], uid [368], resp code [12295][0m
+[0;33mW (21117) rpc_rsp: Hosted RPC_Resp [0x226], uid [369], resp code [12295][0m
+[0;33mW (21167) rpc_rsp: Hosted RPC_Resp [0x226], uid [370], resp code [12295][0m
+[0;33mW (21187) rpc_rsp: Hosted RPC_Resp [0x226], uid [371], resp code [12295][0m
+[0;33mW (21207) rpc_rsp: Hosted RPC_Resp [0x226], uid [372], resp code [12295][0m
+[0;33mW (21247) rpc_rsp: Hosted RPC_Resp [0x226], uid [373], resp code [12295][0m
+[0;33mW (21307) rpc_rsp: Hosted RPC_Resp [0x226], uid [374], resp code [12295][0m
+[0;33mW (21367) rpc_rsp: Hosted RPC_Resp [0x226], uid [375], resp code [12295][0m
+[0;33mW (21407) rpc_rsp: Hosted RPC_Resp [0x226], uid [376], resp code [12295][0m
+[0;33mW (21427) rpc_rsp: Hosted RPC_Resp [0x226], uid [377], resp code [12295][0m
+[0;33mW (21487) rpc_rsp: Hosted RPC_Resp [0x226], uid [378], resp code [12295][0m
+[0;33mW (21547) rpc_rsp: Hosted RPC_Resp [0x226], uid [379], resp code [12295][0m
+[0;33mW (21607) rpc_rsp: Hosted RPC_Resp [0x226], uid [380], resp code [12295][0m
+[0;33mW (21627) rpc_rsp: Hosted RPC_Resp [0x226], uid [381], resp code [12295][0m
+[0;33mW (21667) rpc_rsp: Hosted RPC_Resp [0x226], uid [382], resp code [12295][0m
+[0;33mW (21727) rpc_rsp: Hosted RPC_Resp [0x226], uid [383], resp code [12295][0m
+[0;33mW (21787) rpc_rsp: Hosted RPC_Resp [0x226], uid [384], resp code [12295][0m
+[0;33mW (21817) rpc_rsp: Hosted RPC_Resp [0x226], uid [385], resp code [12295][0m
+[0;33mW (21837) rpc_rsp: Hosted RPC_Resp [0x226], uid [386], resp code [12295][0m
+[0;33mW (21857) rpc_rsp: Hosted RPC_Resp [0x226], uid [387], resp code [12295][0m
+[0;33mW (21917) rpc_rsp: Hosted RPC_Resp [0x226], uid [388], resp code [12295][0m
+[0;33mW (21977) rpc_rsp: Hosted RPC_Resp [0x226], uid [389], resp code [12295][0m
+[0;33mW (22037) rpc_rsp: Hosted RPC_Resp [0x226], uid [390], resp code [12295][0m
+[0;33mW (22057) rpc_rsp: Hosted RPC_Resp [0x226], uid [391], resp code [12295][0m
+[0;33mW (22097) rpc_rsp: Hosted RPC_Resp [0x226], uid [392], resp code [12295][0m
+[0;33mW (22157) rpc_rsp: Hosted RPC_Resp [0x226], uid [393], resp code [12295][0m
+[0;33mW (22217) rpc_rsp: Hosted RPC_Resp [0x226], uid [394], resp code [12295][0m
+[0;33mW (22247) rpc_rsp: Hosted RPC_Resp [0x226], uid [395], resp code [12295][0m
+[0;33mW (22277) rpc_rsp: Hosted RPC_Resp [0x226], uid [396], resp code [12295][0m
+[0;33mW (22337) rpc_rsp: Hosted RPC_Resp [0x226], uid [397], resp code [12295][0m
+[0;33mW (22397) rpc_rsp: Hosted RPC_Resp [0x226], uid [398], resp code [12295][0m
+[0;33mW (22447) rpc_rsp: Hosted RPC_Resp [0x226], uid [399], resp code [12295][0m
+[0;33mW (22467) rpc_rsp: Hosted RPC_Resp [0x226], uid [400], resp code [12295][0m
+[0;33mW (22477) rpc_rsp: Hosted RPC_Resp [0x226], uid [401], resp code [12295][0m
+[0;33mW (22527) rpc_rsp: Hosted RPC_Resp [0x226], uid [402], resp code [12295][0m
+[0;33mW (22587) rpc_rsp: Hosted RPC_Resp [0x226], uid [403], resp code [12295][0m
+[0;32mI (22587) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (22647) rpc_rsp: Hosted RPC_Resp [0x226], uid [404], resp code [12295][0m
+[0;33mW (22687) rpc_rsp: Hosted RPC_Resp [0x226], uid [405], resp code [12295][0m
+[0;33mW (22707) rpc_rsp: Hosted RPC_Resp [0x226], uid [406], resp code [12295][0m
+[0;33mW (22767) rpc_rsp: Hosted RPC_Resp [0x226], uid [407], resp code [12295][0m
+[0;33mW (22827) rpc_rsp: Hosted RPC_Resp [0x226], uid [408], resp code [12295][0m
+[0;33mW (22877) rpc_rsp: Hosted RPC_Resp [0x226], uid [409], resp code [12295][0m
+[0;33mW (22897) rpc_rsp: Hosted RPC_Resp [0x226], uid [410], resp code [12295][0m
+[0;33mW (22957) rpc_rsp: Hosted RPC_Resp [0x226], uid [411], resp code [12295][0m
+[0;33mW (23017) rpc_rsp: Hosted RPC_Resp [0x226], uid [412], resp code [12295][0m
+[0;33mW (23077) rpc_rsp: Hosted RPC_Resp [0x226], uid [413], resp code [12295][0m
+[0;33mW (23087) rpc_rsp: Hosted RPC_Resp [0x226], uid [414], resp code [12295][0m
+[0;33mW (23107) rpc_rsp: Hosted RPC_Resp [0x226], uid [415], resp code [12295][0m
+[0;33mW (23137) rpc_rsp: Hosted RPC_Resp [0x226], uid [416], resp code [12295][0m
+[0;33mW (23197) rpc_rsp: Hosted RPC_Resp [0x226], uid [417], resp code [12295][0m
+[0;33mW (23257) rpc_rsp: Hosted RPC_Resp [0x226], uid [418], resp code [12295][0m
+[0;33mW (23317) rpc_rsp: Hosted RPC_Resp [0x226], uid [419], resp code [12295][0m
+[0;33mW (23337) rpc_rsp: Hosted RPC_Resp [0x226], uid [420], resp code [12295][0m
+[0;33mW (23397) rpc_rsp: Hosted RPC_Resp [0x226], uid [421], resp code [12295][0m
+[0;33mW (23457) rpc_rsp: Hosted RPC_Resp [0x226], uid [422], resp code [12295][0m
+[0;33mW (23507) rpc_rsp: Hosted RPC_Resp [0x226], uid [423], resp code [12295][0m
+[0;33mW (23527) rpc_rsp: Hosted RPC_Resp [0x226], uid [424], resp code [12295][0m
+[0;33mW (23587) rpc_rsp: Hosted RPC_Resp [0x226], uid [425], resp code [12295][0m
+[0;33mW (23647) rpc_rsp: Hosted RPC_Resp [0x226], uid [426], resp code [12295][0m
+[0;33mW (23707) rpc_rsp: Hosted RPC_Resp [0x226], uid [427], resp code [12295][0m
+[0;33mW (23727) rpc_rsp: Hosted RPC_Resp [0x226], uid [428], resp code [12295][0m
+[0;33mW (23737) rpc_rsp: Hosted RPC_Resp [0x226], uid [429], resp code [12295][0m
+[0;33mW (23767) rpc_rsp: Hosted RPC_Resp [0x226], uid [430], resp code [12295][0m
+[0;33mW (23827) rpc_rsp: Hosted RPC_Resp [0x226], uid [431], resp code [12295][0m
+[0;33mW (23887) rpc_rsp: Hosted RPC_Resp [0x226], uid [432], resp code [12295][0m
+[0;33mW (23947) rpc_rsp: Hosted RPC_Resp [0x226], uid [433], resp code [12295][0m
+[0;33mW (23967) rpc_rsp: Hosted RPC_Resp [0x226], uid [434], resp code [12295][0m
+[0;33mW (24027) rpc_rsp: Hosted RPC_Resp [0x226], uid [435], resp code [12295][0m
+[0;33mW (24087) rpc_rsp: Hosted RPC_Resp [0x226], uid [436], resp code [12295][0m
+[0;33mW (24137) rpc_rsp: Hosted RPC_Resp [0x226], uid [437], resp code [12295][0m
+[0;33mW (24157) rpc_rsp: Hosted RPC_Resp [0x226], uid [438], resp code [12295][0m
+[0;33mW (24217) rpc_rsp: Hosted RPC_Resp [0x226], uid [439], resp code [12295][0m
+[0;33mW (24277) rpc_rsp: Hosted RPC_Resp [0x226], uid [440], resp code [12295][0m
+[0;33mW (24327) rpc_rsp: Hosted RPC_Resp [0x226], uid [441], resp code [12295][0m
+[0;33mW (24347) rpc_rsp: Hosted RPC_Resp [0x226], uid [442], resp code [12295][0m
+[0;33mW (24367) rpc_rsp: Hosted RPC_Resp [0x226], uid [443], resp code [12295][0m
+[0;33mW (24407) rpc_rsp: Hosted RPC_Resp [0x226], uid [444], resp code [12295][0m
+[0;33mW (24467) rpc_rsp: Hosted RPC_Resp [0x226], uid [445], resp code [12295][0m
+[0;33mW (24527) rpc_rsp: Hosted RPC_Resp [0x226], uid [446], resp code [12295][0m
+[0;33mW (24567) rpc_rsp: Hosted RPC_Resp [0x226], uid [447], resp code [12295][0m
+[0;33mW (24587) rpc_rsp: Hosted RPC_Resp [0x226], uid [448], resp code [12295][0m
+[0;33mW (24647) rpc_rsp: Hosted RPC_Resp [0x226], uid [449], resp code [12295][0m
+[0;33mW (24707) rpc_rsp: Hosted RPC_Resp [0x226], uid [450], resp code [12295][0m
+[0;33mW (24767) rpc_rsp: Hosted RPC_Resp [0x226], uid [451], resp code [12295][0m
+[0;33mW (24777) rpc_rsp: Hosted RPC_Resp [0x226], uid [452], resp code [12295][0m
+[0;33mW (24827) rpc_rsp: Hosted RPC_Resp [0x226], uid [453], resp code [12295][0m
+[0;33mW (24887) rpc_rsp: Hosted RPC_Resp [0x226], uid [454], resp code [12295][0m
+[0;33mW (24947) rpc_rsp: Hosted RPC_Resp [0x226], uid [455], resp code [12295][0m
+[0;33mW (24977) rpc_rsp: Hosted RPC_Resp [0x226], uid [456], resp code [12295][0m
+[0;33mW (24997) rpc_rsp: Hosted RPC_Resp [0x226], uid [457], resp code [12295][0m
+[0;33mW (25017) rpc_rsp: Hosted RPC_Resp [0x226], uid [458], resp code [12295][0m
+[0;33mW (25077) rpc_rsp: Hosted RPC_Resp [0x226], uid [459], resp code [12295][0m
+[0;33mW (25137) rpc_rsp: Hosted RPC_Resp [0x226], uid [460], resp code [12295][0m
+[0;33mW (25197) rpc_rsp: Hosted RPC_Resp [0x226], uid [461], resp code [12295][0m
+[0;33mW (25217) rpc_rsp: Hosted RPC_Resp [0x226], uid [462], resp code [12295][0m
+[0;33mW (25257) rpc_rsp: Hosted RPC_Resp [0x226], uid [463], resp code [12295][0m
+[0;33mW (25317) rpc_rsp: Hosted RPC_Resp [0x226], uid [464], resp code [12295][0m
+[0;33mW (25377) rpc_rsp: Hosted RPC_Resp [0x226], uid [465], resp code [12295][0m
+[0;33mW (25407) rpc_rsp: Hosted RPC_Resp [0x226], uid [466], resp code [12295][0m
+[0;33mW (25437) rpc_rsp: Hosted RPC_Resp [0x226], uid [467], resp code [12295][0m
+[0;33mW (25497) rpc_rsp: Hosted RPC_Resp [0x226], uid [468], resp code [12295][0m
+[0;33mW (25557) rpc_rsp: Hosted RPC_Resp [0x226], uid [469], resp code [12295][0m
+[0;33mW (25607) rpc_rsp: Hosted RPC_Resp [0x226], uid [470], resp code [12295][0m
+[0;33mW (25617) rpc_rsp: Hosted RPC_Resp [0x226], uid [471], resp code [12295][0m
+[0;33mW (25637) rpc_rsp: Hosted RPC_Resp [0x226], uid [472], resp code [12295][0m
+[0;33mW (25677) rpc_rsp: Hosted RPC_Resp [0x226], uid [473], resp code [12295][0m
+[0;33mW (25737) rpc_rsp: Hosted RPC_Resp [0x226], uid [474], resp code [12295][0m
+[0;33mW (25797) rpc_rsp: Hosted RPC_Resp [0x226], uid [475], resp code [12295][0m
+[0;33mW (25837) rpc_rsp: Hosted RPC_Resp [0x226], uid [476], resp code [12295][0m
+[0;33mW (25867) rpc_rsp: Hosted RPC_Resp [0x226], uid [477], resp code [12295][0m
+[0;33mW (25927) rpc_rsp: Hosted RPC_Resp [0x226], uid [478], resp code [12295][0m
+[0;33mW (25987) rpc_rsp: Hosted RPC_Resp [0x226], uid [479], resp code [12295][0m
+[0;33mW (26037) rpc_rsp: Hosted RPC_Resp [0x226], uid [480], resp code [12295][0m
+[0;33mW (26057) rpc_rsp: Hosted RPC_Resp [0x226], uid [481], resp code [12295][0m
+[0;33mW (26117) rpc_rsp: Hosted RPC_Resp [0x226], uid [482], resp code [12295][0m
+[0;33mW (26177) rpc_rsp: Hosted RPC_Resp [0x226], uid [483], resp code [12295][0m
+[0;33mW (26227) rpc_rsp: Hosted RPC_Resp [0x226], uid [484], resp code [12295][0m
+[0;33mW (26247) rpc_rsp: Hosted RPC_Resp [0x226], uid [485], resp code [12295][0m
+[0;33mW (26267) rpc_rsp: Hosted RPC_Resp [0x226], uid [486], resp code [12295][0m
+[0;33mW (26307) rpc_rsp: Hosted RPC_Resp [0x226], uid [487], resp code [12295][0m
+[0;33mW (26367) rpc_rsp: Hosted RPC_Resp [0x226], uid [488], resp code [12295][0m
+[0;33mW (26427) rpc_rsp: Hosted RPC_Resp [0x226], uid [489], resp code [12295][0m
+[0;33mW (26467) rpc_rsp: Hosted RPC_Resp [0x226], uid [490], resp code [12295][0m
+[0;33mW (26487) rpc_rsp: Hosted RPC_Resp [0x226], uid [491], resp code [12295][0m
+[0;33mW (26547) rpc_rsp: Hosted RPC_Resp [0x226], uid [492], resp code [12295][0m
+[0;33mW (26607) rpc_rsp: Hosted RPC_Resp [0x226], uid [493], resp code [12295][0m
+[0;33mW (26667) rpc_rsp: Hosted RPC_Resp [0x226], uid [494], resp code [12295][0m
+[0;33mW (26687) rpc_rsp: Hosted RPC_Resp [0x226], uid [495], resp code [12295][0m
+[0;33mW (26747) rpc_rsp: Hosted RPC_Resp [0x226], uid [496], resp code [12295][0m
+[0;33mW (26807) rpc_rsp: Hosted RPC_Resp [0x226], uid [497], resp code [12295][0m
+[0;33mW (26917) rpc_rsp: Hosted RPC_Resp [0x226], uid [498], resp code [12295][0m
+[0;33mW (26927) rpc_rsp: Hosted RPC_Resp [0x226], uid [499], resp code [12295][0m
+[0;33mW (26947) rpc_rsp: Hosted RPC_Resp [0x226], uid [500], resp code [12295][0m
+[0;32mI (26957) RPC_WRAP: ESP Event: SoftAP mode: station connected with MAC Addr d6:e4:bc:f9:c5:99[0m
+[0;32mI (26957) WIFI_CONN: station d6:e4:bc:f9:c5:99 join, AID=1[0m
+[0;33mW (26997) rpc_rsp: Hosted RPC_Resp [0x226], uid [501], resp code [12295][0m
+[0;33mW (27057) rpc_rsp: Hosted RPC_Resp [0x226], uid [502], resp code [12295][0m
+[0;33mW (27117) rpc_rsp: Hosted RPC_Resp [0x226], uid [503], resp code [12295][0m
+[0;33mW (27157) rpc_rsp: Hosted RPC_Resp [0x226], uid [504], resp code [12295][0m
+[0;33mW (27177) rpc_rsp: Hosted RPC_Resp [0x226], uid [505], resp code [12295][0m
+[0;33mW (27237) rpc_rsp: Hosted RPC_Resp [0x226], uid [506], resp code [12295][0m
+[0;33mW (27297) rpc_rsp: Hosted RPC_Resp [0x226], uid [507], resp code [12295][0m
+[0;33mW (27347) rpc_rsp: Hosted RPC_Resp [0x226], uid [508], resp code [12295][0m
+[0;33mW (27367) rpc_rsp: Hosted RPC_Resp [0x226], uid [509], resp code [12295][0m
+[0;33mW (27437) rpc_rsp: Hosted RPC_Resp [0x226], uid [510], resp code [12295][0m
+[0;33mW (27497) rpc_rsp: Hosted RPC_Resp [0x226], uid [511], resp code [12295][0m
+[0;33mW (27547) rpc_rsp: Hosted RPC_Resp [0x226], uid [512], resp code [12295][0m
+[0;33mW (27567) rpc_rsp: Hosted RPC_Resp [0x226], uid [513], resp code [12295][0m
+[0;33mW (27587) rpc_rsp: Hosted RPC_Resp [0x226], uid [514], resp code [12295][0m
+[0;33mW (27627) rpc_rsp: Hosted RPC_Resp [0x226], uid [515], resp code [12295][0m
+[0;32mI (27627) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (27687) rpc_rsp: Hosted RPC_Resp [0x226], uid [516], resp code [12295][0m
+[0;33mW (27747) rpc_rsp: Hosted RPC_Resp [0x226], uid [517], resp code [12295][0m
+[0;33mW (27787) rpc_rsp: Hosted RPC_Resp [0x226], uid [518], resp code [12295][0m
+[0;33mW (27807) rpc_rsp: Hosted RPC_Resp [0x226], uid [519], resp code [12295][0m
+[0;33mW (27867) rpc_rsp: Hosted RPC_Resp [0x226], uid [520], resp code [12295][0m
+[0;33mW (27927) rpc_rsp: Hosted RPC_Resp [0x226], uid [521], resp code [12295][0m
+[0;33mW (27977) rpc_rsp: Hosted RPC_Resp [0x226], uid [522], resp code [12295][0m
+[0;33mW (27997) rpc_rsp: Hosted RPC_Resp [0x226], uid [523], resp code [12295][0m
+[0;32mI (28027) esp_netif_lwip: DHCP server assigned IP to a client, IP is: 192.168.4.2[0m
+[0;33mW (28057) rpc_rsp: Hosted RPC_Resp [0x226], uid [524], resp code [12295][0m
+[0;33mW (28117) rpc_rsp: Hosted RPC_Resp [0x226], uid [525], resp code [12295][0m
+[0;33mW (28177) rpc_rsp: Hosted RPC_Resp [0x226], uid [526], resp code [12295][0m
+[0;33mW (28197) rpc_rsp: Hosted RPC_Resp [0x226], uid [527], resp code [12295][0m
+[0;33mW (28207) rpc_rsp: Hosted RPC_Resp [0x226], uid [528], resp code [12295][0m
+[0;33mW (28237) rpc_rsp: Hosted RPC_Resp [0x226], uid [529], resp code [12295][0m
+[0;33mW (28297) rpc_rsp: Hosted RPC_Resp [0x226], uid [530], resp code [12295][0m
+[0;33mW (28357) rpc_rsp: Hosted RPC_Resp [0x226], uid [531], resp code [12295][0m
+[0;33mW (28417) rpc_rsp: Hosted RPC_Resp [0x226], uid [532], resp code [12295][0m
+[0;33mW (28437) rpc_rsp: Hosted RPC_Resp [0x226], uid [533], resp code [12295][0m
+[0;33mW (28497) rpc_rsp: Hosted RPC_Resp [0x226], uid [534], resp code [12295][0m
+[0;33mW (28557) rpc_rsp: Hosted RPC_Resp [0x226], uid [535], resp code [12295][0m
+[0;33mW (28607) rpc_rsp: Hosted RPC_Resp [0x226], uid [536], resp code [12295][0m
+[0;33mW (28627) rpc_rsp: Hosted RPC_Resp [0x226], uid [537], resp code [12295][0m
+[0;33mW (28687) rpc_rsp: Hosted RPC_Resp [0x226], uid [538], resp code [12295][0m
+[0;33mW (28747) rpc_rsp: Hosted RPC_Resp [0x226], uid [539], resp code [12295][0m
+[0;33mW (28807) rpc_rsp: Hosted RPC_Resp [0x226], uid [540], resp code [12295][0m
+[0;33mW (28827) rpc_rsp: Hosted RPC_Resp [0x226], uid [541], resp code [12295][0m
+[0;33mW (28847) rpc_rsp: Hosted RPC_Resp [0x226], uid [542], resp code [12295][0m
+[0;33mW (28867) rpc_rsp: Hosted RPC_Resp [0x226], uid [543], resp code [12295][0m
+[0;33mW (28927) rpc_rsp: Hosted RPC_Resp [0x226], uid [544], resp code [12295][0m
+[0;33mW (28987) rpc_rsp: Hosted RPC_Resp [0x226], uid [545], resp code [12295][0m
+[0;33mW (29047) rpc_rsp: Hosted RPC_Resp [0x226], uid [546], resp code [12295][0m
+[0;33mW (29057) rpc_rsp: Hosted RPC_Resp [0x226], uid [547], resp code [12295][0m
+[0;33mW (29107) rpc_rsp: Hosted RPC_Resp [0x226], uid [548], resp code [12295][0m
+[0;33mW (29167) rpc_rsp: Hosted RPC_Resp [0x226], uid [549], resp code [12295][0m
+[0;33mW (29227) rpc_rsp: Hosted RPC_Resp [0x226], uid [550], resp code [12295][0m
+[0;33mW (29257) rpc_rsp: Hosted RPC_Resp [0x226], uid [551], resp code [12295][0m
+[0;33mW (29287) rpc_rsp: Hosted RPC_Resp [0x226], uid [552], resp code [12295][0m
+[0;33mW (29347) rpc_rsp: Hosted RPC_Resp [0x226], uid [553], resp code [12295][0m
+[0;33mW (29407) rpc_rsp: Hosted RPC_Resp [0x226], uid [554], resp code [12295][0m
+[0;33mW (29457) rpc_rsp: Hosted RPC_Resp [0x226], uid [555], resp code [12295][0m
+[0;33mW (29477) rpc_rsp: Hosted RPC_Resp [0x226], uid [556], resp code [12295][0m
+[0;33mW (29487) rpc_rsp: Hosted RPC_Resp [0x226], uid [557], resp code [12295][0m
+[0;33mW (29537) rpc_rsp: Hosted RPC_Resp [0x226], uid [558], resp code [12295][0m
+[0;33mW (29597) rpc_rsp: Hosted RPC_Resp [0x226], uid [559], resp code [12295][0m
+[0;33mW (29667) rpc_rsp: Hosted RPC_Resp [0x226], uid [560], resp code [12295][0m
+[0;33mW (29697) rpc_rsp: Hosted RPC_Resp [0x226], uid [561], resp code [12295][0m
+[0;33mW (29727) rpc_rsp: Hosted RPC_Resp [0x226], uid [562], resp code [12295][0m
+[0;33mW (29787) rpc_rsp: Hosted RPC_Resp [0x226], uid [563], resp code [12295][0m
+[0;33mW (29847) rpc_rsp: Hosted RPC_Resp [0x226], uid [564], resp code [12295][0m
+[0;33mW (29887) rpc_rsp: Hosted RPC_Resp [0x226], uid [565], resp code [12295][0m
+[0;33mW (29907) rpc_rsp: Hosted RPC_Resp [0x226], uid [566], resp code [12295][0m
+[0;33mW (29977) rpc_rsp: Hosted RPC_Resp [0x226], uid [567], resp code [12295][0m
+[0;33mW (30037) rpc_rsp: Hosted RPC_Resp [0x226], uid [568], resp code [12295][0m
+[0;33mW (30087) rpc_rsp: Hosted RPC_Resp [0x226], uid [569], resp code [12295][0m
+[0;33mW (30117) rpc_rsp: Hosted RPC_Resp [0x226], uid [570], resp code [12295][0m
+[0;33mW (30137) rpc_rsp: Hosted RPC_Resp [0x226], uid [571], resp code [12295][0m
+[0;33mW (30177) rpc_rsp: Hosted RPC_Resp [0x226], uid [572], resp code [12295][0m
+[0;32mI (30217) SERVER: captive_probe: uri=/hotspot-detect.html host=captive.apple.com ua=CaptiveNetworkSupport-514.100.16 wispr method=1[0m
+[0;33mW (30237) rpc_rsp: Hosted RPC_Resp [0x226], uid [573], resp code [12295][0m
+[0;33mW (30297) rpc_rsp: Hosted RPC_Resp [0x226], uid [574], resp code [12295][0m
+[0;33mW (30347) rpc_rsp: Hosted RPC_Resp [0x226], uid [575], resp code [12295][0m
+[0;33mW (30367) rpc_rsp: Hosted RPC_Resp [0x226], uid [576], resp code [12295][0m
+[0;33mW (30427) rpc_rsp: Hosted RPC_Resp [0x226], uid [577], resp code [12295][0m
+[0;33mW (30487) rpc_rsp: Hosted RPC_Resp [0x226], uid [578], resp code [12295][0m
+[0;33mW (30537) rpc_rsp: Hosted RPC_Resp [0x226], uid [579], resp code [12295][0m
+[0;33mW (30557) rpc_rsp: Hosted RPC_Resp [0x226], uid [580], resp code [12295][0m
+[0;33mW (30617) rpc_rsp: Hosted RPC_Resp [0x226], uid [581], resp code [12295][0m
+[0;33mW (30677) rpc_rsp: Hosted RPC_Resp [0x226], uid [582], resp code [12295][0m
+[0;33mW (30737) rpc_rsp: Hosted RPC_Resp [0x226], uid [583], resp code [12295][0m
+[0;33mW (30747) rpc_rsp: Hosted RPC_Resp [0x226], uid [584], resp code [12295][0m
+[0;33mW (30767) rpc_rsp: Hosted RPC_Resp [0x226], uid [585], resp code [12295][0m
+[0;33mW (30807) rpc_rsp: Hosted RPC_Resp [0x226], uid [586], resp code [12295][0m
+[0;33mW (30867) rpc_rsp: Hosted RPC_Resp [0x226], uid [587], resp code [12295][0m
+[0;33mW (30927) rpc_rsp: Hosted RPC_Resp [0x226], uid [588], resp code [12295][0m
+[0;33mW (30977) rpc_rsp: Hosted RPC_Resp [0x226], uid [589], resp code [12295][0m
+[0;33mW (30997) rpc_rsp: Hosted RPC_Resp [0x226], uid [590], resp code [12295][0m
+[0;33mW (31057) rpc_rsp: Hosted RPC_Resp [0x226], uid [591], resp code [12295][0m
+[0;33mW (31117) rpc_rsp: Hosted RPC_Resp [0x226], uid [592], resp code [12295][0m
+[0;33mW (31167) rpc_rsp: Hosted RPC_Resp [0x226], uid [593], resp code [12295][0m
+[0;33mW (31187) rpc_rsp: Hosted RPC_Resp [0x226], uid [594], resp code [12295][0m
+[0;33mW (31247) rpc_rsp: Hosted RPC_Resp [0x226], uid [595], resp code [12295][0m
+[0;33mW (31307) rpc_rsp: Hosted RPC_Resp [0x226], uid [596], resp code [12295][0m
+[0;33mW (31357) rpc_rsp: Hosted RPC_Resp [0x226], uid [597], resp code [12295][0m
+[0;33mW (31377) rpc_rsp: Hosted RPC_Resp [0x226], uid [598], resp code [12295][0m
+[0;33mW (31397) rpc_rsp: Hosted RPC_Resp [0x226], uid [599], resp code [12295][0m
+[0;33mW (31437) rpc_rsp: Hosted RPC_Resp [0x226], uid [600], resp code [12295][0m
+[0;33mW (31497) rpc_rsp: Hosted RPC_Resp [0x226], uid [601], resp code [12295][0m
+[0;33mW (31557) rpc_rsp: Hosted RPC_Resp [0x226], uid [602], resp code [12295][0m
+[0;33mW (31597) rpc_rsp: Hosted RPC_Resp [0x226], uid [603], resp code [12295][0m
+[0;33mW (31617) rpc_rsp: Hosted RPC_Resp [0x226], uid [604], resp code [12295][0m
+[0;33mW (31677) rpc_rsp: Hosted RPC_Resp [0x226], uid [605], resp code [12295][0m
+[0;33mW (31737) rpc_rsp: Hosted RPC_Resp [0x226], uid [606], resp code [12295][0m
+[0;33mW (31797) rpc_rsp: Hosted RPC_Resp [0x226], uid [607], resp code [12295][0m
+[0;33mW (31807) rpc_rsp: Hosted RPC_Resp [0x226], uid [608], resp code [12295][0m
+[0;33mW (31857) rpc_rsp: Hosted RPC_Resp [0x226], uid [609], resp code [12295][0m
+[0;33mW (31917) rpc_rsp: Hosted RPC_Resp [0x226], uid [610], resp code [12295][0m
+[0;33mW (31977) rpc_rsp: Hosted RPC_Resp [0x226], uid [611], resp code [12295][0m
+[0;33mW (32007) rpc_rsp: Hosted RPC_Resp [0x226], uid [612], resp code [12295][0m
+[0;33mW (32027) rpc_rsp: Hosted RPC_Resp [0x226], uid [613], resp code [12295][0m
+[0;33mW (32047) rpc_rsp: Hosted RPC_Resp [0x226], uid [614], resp code [12295][0m
+[0;33mW (32107) rpc_rsp: Hosted RPC_Resp [0x226], uid [615], resp code [12295][0m
+[0;33mW (32167) rpc_rsp: Hosted RPC_Resp [0x226], uid [616], resp code [12295][0m
+[0;33mW (32227) rpc_rsp: Hosted RPC_Resp [0x226], uid [617], resp code [12295][0m
+[0;33mW (32247) rpc_rsp: Hosted RPC_Resp [0x226], uid [618], resp code [12295][0m
+[0;33mW (32287) rpc_rsp: Hosted RPC_Resp [0x226], uid [619], resp code [12295][0m
+[0;33mW (32347) rpc_rsp: Hosted RPC_Resp [0x226], uid [620], resp code [12295][0m
+[0;33mW (32407) rpc_rsp: Hosted RPC_Resp [0x226], uid [621], resp code [12295][0m
+[0;33mW (32437) rpc_rsp: Hosted RPC_Resp [0x226], uid [622], resp code [12295][0m
+[0;33mW (32467) rpc_rsp: Hosted RPC_Resp [0x226], uid [623], resp code [12295][0m
+[0;33mW (32527) rpc_rsp: Hosted RPC_Resp [0x226], uid [624], resp code [12295][0m
+[0;33mW (32587) rpc_rsp: Hosted RPC_Resp [0x226], uid [625], resp code [12295][0m
+[0;33mW (32637) rpc_rsp: Hosted RPC_Resp [0x226], uid [626], resp code [12295][0m
+[0;33mW (32657) rpc_rsp: Hosted RPC_Resp [0x226], uid [627], resp code [12295][0m
+[0;32mI (32657) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (32667) rpc_rsp: Hosted RPC_Resp [0x226], uid [628], resp code [12295][0m
+[0;33mW (32717) rpc_rsp: Hosted RPC_Resp [0x226], uid [629], resp code [12295][0m
+[0;33mW (32777) rpc_rsp: Hosted RPC_Resp [0x226], uid [630], resp code [12295][0m
+[0;33mW (32837) rpc_rsp: Hosted RPC_Resp [0x226], uid [631], resp code [12295][0m
+[0;33mW (32877) rpc_rsp: Hosted RPC_Resp [0x226], uid [632], resp code [12295][0m
+[0;33mW (32897) rpc_rsp: Hosted RPC_Resp [0x226], uid [633], resp code [12295][0m
+[0;33mW (32957) rpc_rsp: Hosted RPC_Resp [0x226], uid [634], resp code [12295][0m
+[0;33mW (33017) rpc_rsp: Hosted RPC_Resp [0x226], uid [635], resp code [12295][0m
+[0;33mW (33067) rpc_rsp: Hosted RPC_Resp [0x226], uid [636], resp code [12295][0m
+[0;33mW (33087) rpc_rsp: Hosted RPC_Resp [0x226], uid [637], resp code [12295][0m
+[0;33mW (33147) rpc_rsp: Hosted RPC_Resp [0x226], uid [638], resp code [12295][0m
+[0;33mW (33207) rpc_rsp: Hosted RPC_Resp [0x226], uid [639], resp code [12295][0m
+[0;33mW (33267) rpc_rsp: Hosted RPC_Resp [0x226], uid [640], resp code [12295][0m
+[0;33mW (33277) rpc_rsp: Hosted RPC_Resp [0x226], uid [641], resp code [12295][0m
+[0;33mW (33297) rpc_rsp: Hosted RPC_Resp [0x226], uid [642], resp code [12295][0m
+[0;33mW (33327) rpc_rsp: Hosted RPC_Resp [0x226], uid [643], resp code [12295][0m
+[0;33mW (33387) rpc_rsp: Hosted RPC_Resp [0x226], uid [644], resp code [12295][0m
+[0;33mW (33447) rpc_rsp: Hosted RPC_Resp [0x226], uid [645], resp code [12295][0m
+[0;33mW (33507) rpc_rsp: Hosted RPC_Resp [0x226], uid [646], resp code [12295][0m
+[0;33mW (33527) rpc_rsp: Hosted RPC_Resp [0x226], uid [647], resp code [12295][0m
+[0;33mW (33587) rpc_rsp: Hosted RPC_Resp [0x226], uid [648], resp code [12295][0m
+[0;33mW (33647) rpc_rsp: Hosted RPC_Resp [0x226], uid [649], resp code [12295][0m
+[0;33mW (33697) rpc_rsp: Hosted RPC_Resp [0x226], uid [650], resp code [12295][0m
+[0;33mW (33717) rpc_rsp: Hosted RPC_Resp [0x226], uid [651], resp code [12295][0m
+[0;33mW (33777) rpc_rsp: Hosted RPC_Resp [0x226], uid [652], resp code [12295][0m
+[0;33mW (33837) rpc_rsp: Hosted RPC_Resp [0x226], uid [653], resp code [12295][0m
+[0;33mW (33897) rpc_rsp: Hosted RPC_Resp [0x226], uid [654], resp code [12295][0m
+[0;33mW (33917) rpc_rsp: Hosted RPC_Resp [0x226], uid [655], resp code [12295][0m
+[0;33mW (33927) rpc_rsp: Hosted RPC_Resp [0x226], uid [656], resp code [12295][0m
+[0;33mW (33957) rpc_rsp: Hosted RPC_Resp [0x226], uid [657], resp code [12295][0m
+[0;33mW (34017) rpc_rsp: Hosted RPC_Resp [0x226], uid [658], resp code [12295][0m
+[0;33mW (34077) rpc_rsp: Hosted RPC_Resp [0x226], uid [659], resp code [12295][0m
+[0;33mW (34137) rpc_rsp: Hosted RPC_Resp [0x226], uid [660], resp code [12295][0m
+[0;33mW (34147) rpc_rsp: Hosted RPC_Resp [0x226], uid [661], resp code [12295][0m
+[0;33mW (34197) rpc_rsp: Hosted RPC_Resp [0x226], uid [662], resp code [12295][0m
+[0;33mW (34257) rpc_rsp: Hosted RPC_Resp [0x226], uid [663], resp code [12295][0m
+[0;33mW (34317) rpc_rsp: Hosted RPC_Resp [0x226], uid [664], resp code [12295][0m
+[0;33mW (34347) rpc_rsp: Hosted RPC_Resp [0x226], uid [665], resp code [12295][0m
+[0;33mW (34377) rpc_rsp: Hosted RPC_Resp [0x226], uid [666], resp code [12295][0m
+[0;33mW (34437) rpc_rsp: Hosted RPC_Resp [0x226], uid [667], resp code [12295][0m
+[0;33mW (34497) rpc_rsp: Hosted RPC_Resp [0x226], uid [668], resp code [12295][0m
+[0;33mW (34547) rpc_rsp: Hosted RPC_Resp [0x226], uid [669], resp code [12295][0m
+[0;33mW (34557) rpc_rsp: Hosted RPC_Resp [0x226], uid [670], resp code [12295][0m
+[0;33mW (34577) rpc_rsp: Hosted RPC_Resp [0x226], uid [671], resp code [12295][0m
+[0;33mW (34617) rpc_rsp: Hosted RPC_Resp [0x226], uid [672], resp code [12295][0m
+[0;33mW (34677) rpc_rsp: Hosted RPC_Resp [0x226], uid [673], resp code [12295][0m
+[0;33mW (34737) rpc_rsp: Hosted RPC_Resp [0x226], uid [674], resp code [12295][0m
+[0;33mW (34787) rpc_rsp: Hosted RPC_Resp [0x226], uid [675], resp code [12295][0m
+[0;33mW (34807) rpc_rsp: Hosted RPC_Resp [0x226], uid [676], resp code [12295][0m
+[0;33mW (34867) rpc_rsp: Hosted RPC_Resp [0x226], uid [677], resp code [12295][0m
+[0;33mW (34927) rpc_rsp: Hosted RPC_Resp [0x226], uid [678], resp code [12295][0m
+[0;33mW (34977) rpc_rsp: Hosted RPC_Resp [0x226], uid [679], resp code [12295][0m
+[0;33mW (34997) rpc_rsp: Hosted RPC_Resp [0x226], uid [680], resp code [12295][0m
+[0;33mW (35057) rpc_rsp: Hosted RPC_Resp [0x226], uid [681], resp code [12295][0m
+[0;33mW (35117) rpc_rsp: Hosted RPC_Resp [0x226], uid [682], resp code [12295][0m
+[0;33mW (35167) rpc_rsp: Hosted RPC_Resp [0x226], uid [683], resp code [12295][0m
+[0;33mW (35187) rpc_rsp: Hosted RPC_Resp [0x226], uid [684], resp code [12295][0m
+[0;33mW (35207) rpc_rsp: Hosted RPC_Resp [0x226], uid [685], resp code [12295][0m
+[0;33mW (35247) rpc_rsp: Hosted RPC_Resp [0x226], uid [686], resp code [12295][0m
+[0;33mW (35307) rpc_rsp: Hosted RPC_Resp [0x226], uid [687], resp code [12295][0m
+[0;33mW (35367) rpc_rsp: Hosted RPC_Resp [0x226], uid [688], resp code [12295][0m
+[0;33mW (35407) rpc_rsp: Hosted RPC_Resp [0x226], uid [689], resp code [12295][0m
+[0;33mW (35427) rpc_rsp: Hosted RPC_Resp [0x226], uid [690], resp code [12295][0m
+[0;33mW (35487) rpc_rsp: Hosted RPC_Resp [0x226], uid [691], resp code [12295][0m
+[0;33mW (35547) rpc_rsp: Hosted RPC_Resp [0x226], uid [692], resp code [12295][0m
+[0;33mW (35607) rpc_rsp: Hosted RPC_Resp [0x226], uid [693], resp code [12295][0m
+[0;33mW (35627) rpc_rsp: Hosted RPC_Resp [0x226], uid [694], resp code [12295][0m
+[0;33mW (35667) rpc_rsp: Hosted RPC_Resp [0x226], uid [695], resp code [12295][0m
+[0;33mW (35727) rpc_rsp: Hosted RPC_Resp [0x226], uid [696], resp code [12295][0m
+[0;33mW (35787) rpc_rsp: Hosted RPC_Resp [0x226], uid [697], resp code [12295][0m
+[0;33mW (35817) rpc_rsp: Hosted RPC_Resp [0x226], uid [698], resp code [12295][0m
+[0;33mW (35837) rpc_rsp: Hosted RPC_Resp [0x226], uid [699], resp code [12295][0m
+[0;33mW (35857) rpc_rsp: Hosted RPC_Resp [0x226], uid [700], resp code [12295][0m
+[0;33mW (35917) rpc_rsp: Hosted RPC_Resp [0x226], uid [701], resp code [12295][0m
+[0;33mW (35977) rpc_rsp: Hosted RPC_Resp [0x226], uid [702], resp code [12295][0m
+[0;33mW (36037) rpc_rsp: Hosted RPC_Resp [0x226], uid [703], resp code [12295][0m
+[0;33mW (36057) rpc_rsp: Hosted RPC_Resp [0x226], uid [704], resp code [12295][0m
+[0;33mW (36097) rpc_rsp: Hosted RPC_Resp [0x226], uid [705], resp code [12295][0m
+[0;33mW (36157) rpc_rsp: Hosted RPC_Resp [0x226], uid [706], resp code [12295][0m
+[0;33mW (36217) rpc_rsp: Hosted RPC_Resp [0x226], uid [707], resp code [12295][0m
+[0;33mW (36247) rpc_rsp: Hosted RPC_Resp [0x226], uid [708], resp code [12295][0m
+[0;33mW (36277) rpc_rsp: Hosted RPC_Resp [0x226], uid [709], resp code [12295][0m
+[0;33mW (36337) rpc_rsp: Hosted RPC_Resp [0x226], uid [710], resp code [12295][0m
+[0;33mW (36397) rpc_rsp: Hosted RPC_Resp [0x226], uid [711], resp code [12295][0m
+[0;33mW (36447) rpc_rsp: Hosted RPC_Resp [0x226], uid [712], resp code [12295][0m
+[0;33mW (36457) rpc_rsp: Hosted RPC_Resp [0x226], uid [713], resp code [12295][0m
+[0;33mW (36477) rpc_rsp: Hosted RPC_Resp [0x226], uid [714], resp code [12295][0m
+[0;33mW (36517) rpc_rsp: Hosted RPC_Resp [0x226], uid [715], resp code [12295][0m
+[0;33mW (36577) rpc_rsp: Hosted RPC_Resp [0x226], uid [716], resp code [12295][0m
+[0;33mW (36637) rpc_rsp: Hosted RPC_Resp [0x226], uid [717], resp code [12295][0m
+[0;33mW (36687) rpc_rsp: Hosted RPC_Resp [0x226], uid [718], resp code [12295][0m
+[0;33mW (36707) rpc_rsp: Hosted RPC_Resp [0x226], uid [719], resp code [12295][0m
+[0;33mW (36767) rpc_rsp: Hosted RPC_Resp [0x226], uid [720], resp code [12295][0m
+[0;33mW (36827) rpc_rsp: Hosted RPC_Resp [0x226], uid [721], resp code [12295][0m
+[0;33mW (36877) rpc_rsp: Hosted RPC_Resp [0x226], uid [722], resp code [12295][0m
+[0;33mW (36897) rpc_rsp: Hosted RPC_Resp [0x226], uid [723], resp code [12295][0m
+[0;33mW (36957) rpc_rsp: Hosted RPC_Resp [0x226], uid [724], resp code [12295][0m
+[0;33mW (37017) rpc_rsp: Hosted RPC_Resp [0x226], uid [725], resp code [12295][0m
+[0;33mW (37067) rpc_rsp: Hosted RPC_Resp [0x226], uid [726], resp code [12295][0m
+[0;33mW (37087) rpc_rsp: Hosted RPC_Resp [0x226], uid [727], resp code [12295][0m
+[0;33mW (37107) rpc_rsp: Hosted RPC_Resp [0x226], uid [728], resp code [12295][0m
+[0;33mW (37147) rpc_rsp: Hosted RPC_Resp [0x226], uid [729], resp code [12295][0m
+[0;33mW (37207) rpc_rsp: Hosted RPC_Resp [0x226], uid [730], resp code [12295][0m
+[0;33mW (37267) rpc_rsp: Hosted RPC_Resp [0x226], uid [731], resp code [12295][0m
+[0;33mW (37307) rpc_rsp: Hosted RPC_Resp [0x226], uid [732], resp code [12295][0m
+[0;33mW (37327) rpc_rsp: Hosted RPC_Resp [0x226], uid [733], resp code [12295][0m
+[0;33mW (37387) rpc_rsp: Hosted RPC_Resp [0x226], uid [734], resp code [12295][0m
+[0;33mW (37447) rpc_rsp: Hosted RPC_Resp [0x226], uid [735], resp code [12295][0m
+[0;33mW (37507) rpc_rsp: Hosted RPC_Resp [0x226], uid [736], resp code [12295][0m
+[0;33mW (37527) rpc_rsp: Hosted RPC_Resp [0x226], uid [737], resp code [12295][0m
+[0;33mW (37567) rpc_rsp: Hosted RPC_Resp [0x226], uid [738], resp code [12295][0m
+[0;33mW (37627) rpc_rsp: Hosted RPC_Resp [0x226], uid [739], resp code [12295][0m
+[0;33mW (37687) rpc_rsp: Hosted RPC_Resp [0x226], uid [740], resp code [12295][0m
+[0;32mI (37687) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (37717) rpc_rsp: Hosted RPC_Resp [0x226], uid [741], resp code [12295][0m
+[0;33mW (37737) rpc_rsp: Hosted RPC_Resp [0x226], uid [742], resp code [12295][0m
+[0;33mW (37757) rpc_rsp: Hosted RPC_Resp [0x226], uid [743], resp code [12295][0m
+[0;33mW (37817) rpc_rsp: Hosted RPC_Resp [0x226], uid [744], resp code [12295][0m
+[0;33mW (37877) rpc_rsp: Hosted RPC_Resp [0x226], uid [745], resp code [12295][0m
+[0;33mW (37937) rpc_rsp: Hosted RPC_Resp [0x226], uid [746], resp code [12295][0m
+[0;33mW (37957) rpc_rsp: Hosted RPC_Resp [0x226], uid [747], resp code [12295][0m
+[0;33mW (37997) rpc_rsp: Hosted RPC_Resp [0x226], uid [748], resp code [12295][0m
+[0;33mW (38057) rpc_rsp: Hosted RPC_Resp [0x226], uid [749], resp code [12295][0m
+[0;33mW (38117) rpc_rsp: Hosted RPC_Resp [0x226], uid [750], resp code [12295][0m
+[0;33mW (38147) rpc_rsp: Hosted RPC_Resp [0x226], uid [751], resp code [12295][0m
+[0;33mW (38177) rpc_rsp: Hosted RPC_Resp [0x226], uid [752], resp code [12295][0m
+[0;33mW (38237) rpc_rsp: Hosted RPC_Resp [0x226], uid [753], resp code [12295][0m
+[0;33mW (38297) rpc_rsp: Hosted RPC_Resp [0x226], uid [754], resp code [12295][0m
+[0;33mW (38347) rpc_rsp: Hosted RPC_Resp [0x226], uid [755], resp code [12295][0m
+[0;33mW (38357) rpc_rsp: Hosted RPC_Resp [0x226], uid [756], resp code [12295][0m
+[0;33mW (38377) rpc_rsp: Hosted RPC_Resp [0x226], uid [757], resp code [12295][0m
+[0;33mW (38427) rpc_rsp: Hosted RPC_Resp [0x226], uid [758], resp code [12295][0m
+[0;33mW (38487) rpc_rsp: Hosted RPC_Resp [0x226], uid [759], resp code [12295][0m
+[0;33mW (38547) rpc_rsp: Hosted RPC_Resp [0x226], uid [760], resp code [12295][0m
+[0;33mW (38587) rpc_rsp: Hosted RPC_Resp [0x226], uid [761], resp code [12295][0m
+[0;33mW (38607) rpc_rsp: Hosted RPC_Resp [0x226], uid [762], resp code [12295][0m
+[0;33mW (38667) rpc_rsp: Hosted RPC_Resp [0x226], uid [763], resp code [12295][0m
+[0;33mW (38727) rpc_rsp: Hosted RPC_Resp [0x226], uid [764], resp code [12295][0m
+[0;33mW (38777) rpc_rsp: Hosted RPC_Resp [0x226], uid [765], resp code [12295][0m
+[0;33mW (38797) rpc_rsp: Hosted RPC_Resp [0x226], uid [766], resp code [12295][0m
+[0;33mW (38857) rpc_rsp: Hosted RPC_Resp [0x226], uid [767], resp code [12295][0m
+[0;33mW (38917) rpc_rsp: Hosted RPC_Resp [0x226], uid [768], resp code [12295][0m
+[0;33mW (38977) rpc_rsp: Hosted RPC_Resp [0x226], uid [769], resp code [12295][0m
+[0;33mW (38997) rpc_rsp: Hosted RPC_Resp [0x226], uid [770], resp code [12295][0m
+[0;33mW (39007) rpc_rsp: Hosted RPC_Resp [0x226], uid [771], resp code [12295][0m
+[0;33mW (39037) rpc_rsp: Hosted RPC_Resp [0x226], uid [772], resp code [12295][0m
+[0;33mW (39097) rpc_rsp: Hosted RPC_Resp [0x226], uid [773], resp code [12295][0m
+[0;33mW (39157) rpc_rsp: Hosted RPC_Resp [0x226], uid [774], resp code [12295][0m
+[0;33mW (39217) rpc_rsp: Hosted RPC_Resp [0x226], uid [775], resp code [12295][0m
+[0;33mW (39237) rpc_rsp: Hosted RPC_Resp [0x226], uid [776], resp code [12295][0m
+[0;33mW (39297) rpc_rsp: Hosted RPC_Resp [0x226], uid [777], resp code [12295][0m
+[0;33mW (39357) rpc_rsp: Hosted RPC_Resp [0x226], uid [778], resp code [12295][0m
+[0;33mW (39407) rpc_rsp: Hosted RPC_Resp [0x226], uid [779], resp code [12295][0m
+[0;33mW (39427) rpc_rsp: Hosted RPC_Resp [0x226], uid [780], resp code [12295][0m
+[0;33mW (39487) rpc_rsp: Hosted RPC_Resp [0x226], uid [781], resp code [12295][0m
+[0;33mW (39547) rpc_rsp: Hosted RPC_Resp [0x226], uid [782], resp code [12295][0m
+[0;33mW (39597) rpc_rsp: Hosted RPC_Resp [0x226], uid [783], resp code [12295][0m
+[0;33mW (39617) rpc_rsp: Hosted RPC_Resp [0x226], uid [784], resp code [12295][0m
+[0;33mW (39637) rpc_rsp: Hosted RPC_Resp [0x226], uid [785], resp code [12295][0m
+[0;33mW (39677) rpc_rsp: Hosted RPC_Resp [0x226], uid [786], resp code [12295][0m
+[0;33mW (39737) rpc_rsp: Hosted RPC_Resp [0x226], uid [787], resp code [12295][0m
+[0;33mW (39797) rpc_rsp: Hosted RPC_Resp [0x226], uid [788], resp code [12295][0m
+[0;33mW (39837) rpc_rsp: Hosted RPC_Resp [0x226], uid [789], resp code [12295][0m
+[0;33mW (39857) rpc_rsp: Hosted RPC_Resp [0x226], uid [790], resp code [12295][0m
+[0;33mW (39917) rpc_rsp: Hosted RPC_Resp [0x226], uid [791], resp code [12295][0m
+[0;33mW (39977) rpc_rsp: Hosted RPC_Resp [0x226], uid [792], resp code [12295][0m
+[0;33mW (40037) rpc_rsp: Hosted RPC_Resp [0x226], uid [793], resp code [12295][0m
+[0;33mW (40057) rpc_rsp: Hosted RPC_Resp [0x226], uid [794], resp code [12295][0m
+[0;33mW (40097) rpc_rsp: Hosted RPC_Resp [0x226], uid [795], resp code [12295][0m
+[0;33mW (40157) rpc_rsp: Hosted RPC_Resp [0x226], uid [796], resp code [12295][0m
+[0;33mW (40217) rpc_rsp: Hosted RPC_Resp [0x226], uid [797], resp code [12295][0m
+[0;33mW (40247) rpc_rsp: Hosted RPC_Resp [0x226], uid [798], resp code [12295][0m
+[0;33mW (40267) rpc_rsp: Hosted RPC_Resp [0x226], uid [799], resp code [12295][0m
+[0;33mW (40287) rpc_rsp: Hosted RPC_Resp [0x226], uid [800], resp code [12295][0m
+[0;33mW (40347) rpc_rsp: Hosted RPC_Resp [0x226], uid [801], resp code [12295][0m
+[0;33mW (40407) rpc_rsp: Hosted RPC_Resp [0x226], uid [802], resp code [12295][0m
+[0;33mW (40467) rpc_rsp: Hosted RPC_Resp [0x226], uid [803], resp code [12295][0m
+[0;33mW (40487) rpc_rsp: Hosted RPC_Resp [0x226], uid [804], resp code [12295][0m
+[0;33mW (40527) rpc_rsp: Hosted RPC_Resp [0x226], uid [805], resp code [12295][0m
+[0;33mW (40587) rpc_rsp: Hosted RPC_Resp [0x226], uid [806], resp code [12295][0m
+[0;33mW (40647) rpc_rsp: Hosted RPC_Resp [0x226], uid [807], resp code [12295][0m
+[0;33mW (40677) rpc_rsp: Hosted RPC_Resp [0x226], uid [808], resp code [12295][0m
+[0;33mW (40707) rpc_rsp: Hosted RPC_Resp [0x226], uid [809], resp code [12295][0m
+[0;33mW (40767) rpc_rsp: Hosted RPC_Resp [0x226], uid [810], resp code [12295][0m
+[0;33mW (40827) rpc_rsp: Hosted RPC_Resp [0x226], uid [811], resp code [12295][0m
+[0;33mW (40877) rpc_rsp: Hosted RPC_Resp [0x226], uid [812], resp code [12295][0m
+[0;33mW (40887) rpc_rsp: Hosted RPC_Resp [0x226], uid [813], resp code [12295][0m
+[0;33mW (40907) rpc_rsp: Hosted RPC_Resp [0x226], uid [814], resp code [12295][0m
+[0;33mW (40957) rpc_rsp: Hosted RPC_Resp [0x226], uid [815], resp code [12295][0m
+[0;33mW (41017) rpc_rsp: Hosted RPC_Resp [0x226], uid [816], resp code [12295][0m
+[0;33mW (41077) rpc_rsp: Hosted RPC_Resp [0x226], uid [817], resp code [12295][0m
+[0;33mW (41117) rpc_rsp: Hosted RPC_Resp [0x226], uid [818], resp code [12295][0m
+[0;33mW (41137) rpc_rsp: Hosted RPC_Resp [0x226], uid [819], resp code [12295][0m
+[0;33mW (41197) rpc_rsp: Hosted RPC_Resp [0x226], uid [820], resp code [12295][0m
+[0;33mW (41257) rpc_rsp: Hosted RPC_Resp [0x226], uid [821], resp code [12295][0m
+[0;33mW (41307) rpc_rsp: Hosted RPC_Resp [0x226], uid [822], resp code [12295][0m
+[0;33mW (41327) rpc_rsp: Hosted RPC_Resp [0x226], uid [823], resp code [12295][0m
+[0;33mW (41387) rpc_rsp: Hosted RPC_Resp [0x226], uid [824], resp code [12295][0m
+[0;33mW (41447) rpc_rsp: Hosted RPC_Resp [0x226], uid [825], resp code [12295][0m
+[0;33mW (41507) rpc_rsp: Hosted RPC_Resp [0x226], uid [826], resp code [12295][0m
+[0;33mW (41517) rpc_rsp: Hosted RPC_Resp [0x226], uid [827], resp code [12295][0m
+[0;33mW (41537) rpc_rsp: Hosted RPC_Resp [0x226], uid [828], resp code [12295][0m
+[0;33mW (41577) rpc_rsp: Hosted RPC_Resp [0x226], uid [829], resp code [12295][0m
+[0;33mW (41637) rpc_rsp: Hosted RPC_Resp [0x226], uid [830], resp code [12295][0m
+[0;33mW (41697) rpc_rsp: Hosted RPC_Resp [0x226], uid [831], resp code [12295][0m
+[0;33mW (41747) rpc_rsp: Hosted RPC_Resp [0x226], uid [832], resp code [12295][0m
+[0;33mW (41767) rpc_rsp: Hosted RPC_Resp [0x226], uid [833], resp code [12295][0m
+[0;33mW (41827) rpc_rsp: Hosted RPC_Resp [0x226], uid [834], resp code [12295][0m
+[0;33mW (41887) rpc_rsp: Hosted RPC_Resp [0x226], uid [835], resp code [12295][0m
+[0;33mW (41937) rpc_rsp: Hosted RPC_Resp [0x226], uid [836], resp code [12295][0m
+[0;33mW (41957) rpc_rsp: Hosted RPC_Resp [0x226], uid [837], resp code [12295][0m
+[0;33mW (42017) rpc_rsp: Hosted RPC_Resp [0x226], uid [838], resp code [12295][0m
+[0;33mW (42077) rpc_rsp: Hosted RPC_Resp [0x226], uid [839], resp code [12295][0m
+[0;33mW (42127) rpc_rsp: Hosted RPC_Resp [0x226], uid [840], resp code [12295][0m
+[0;33mW (42147) rpc_rsp: Hosted RPC_Resp [0x226], uid [841], resp code [12295][0m
+[0;33mW (42167) rpc_rsp: Hosted RPC_Resp [0x226], uid [842], resp code [12295][0m
+[0;33mW (42207) rpc_rsp: Hosted RPC_Resp [0x226], uid [843], resp code [12295][0m
+[0;33mW (42267) rpc_rsp: Hosted RPC_Resp [0x226], uid [844], resp code [12295][0m
+[0;33mW (42327) rpc_rsp: Hosted RPC_Resp [0x226], uid [845], resp code [12295][0m
+[0;33mW (42367) rpc_rsp: Hosted RPC_Resp [0x226], uid [846], resp code [12295][0m
+[0;33mW (42387) rpc_rsp: Hosted RPC_Resp [0x226], uid [847], resp code [12295][0m
+[0;33mW (42447) rpc_rsp: Hosted RPC_Resp [0x226], uid [848], resp code [12295][0m
+[0;33mW (42507) rpc_rsp: Hosted RPC_Resp [0x226], uid [849], resp code [12295][0m
+[0;33mW (42567) rpc_rsp: Hosted RPC_Resp [0x226], uid [850], resp code [12295][0m
+[0;33mW (42577) rpc_rsp: Hosted RPC_Resp [0x226], uid [851], resp code [12295][0m
+[0;33mW (42627) rpc_rsp: Hosted RPC_Resp [0x226], uid [852], resp code [12295][0m
+[0;33mW (42687) rpc_rsp: Hosted RPC_Resp [0x226], uid [853], resp code [12295][0m
+[0;33mW (42747) rpc_rsp: Hosted RPC_Resp [0x226], uid [854], resp code [12295][0m
+[0;32mI (42747) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (42777) rpc_rsp: Hosted RPC_Resp [0x226], uid [855], resp code [12295][0m
+[0;33mW (42797) rpc_rsp: Hosted RPC_Resp [0x226], uid [856], resp code [12295][0m
+[0;33mW (42817) rpc_rsp: Hosted RPC_Resp [0x226], uid [857], resp code [12295][0m
+[0;33mW (42877) rpc_rsp: Hosted RPC_Resp [0x226], uid [858], resp code [12295][0m
+[0;33mW (42937) rpc_rsp: Hosted RPC_Resp [0x226], uid [859], resp code [12295][0m
+[0;33mW (42997) rpc_rsp: Hosted RPC_Resp [0x226], uid [860], resp code [12295][0m
+[0;33mW (43017) rpc_rsp: Hosted RPC_Resp [0x226], uid [861], resp code [12295][0m
+[0;33mW (43057) rpc_rsp: Hosted RPC_Resp [0x226], uid [862], resp code [12295][0m
+[0;33mW (43117) rpc_rsp: Hosted RPC_Resp [0x226], uid [863], resp code [12295][0m
+[0;33mW (43177) rpc_rsp: Hosted RPC_Resp [0x226], uid [864], resp code [12295][0m
+[0;33mW (43207) rpc_rsp: Hosted RPC_Resp [0x226], uid [865], resp code [12295][0m
+[0;33mW (43237) rpc_rsp: Hosted RPC_Resp [0x226], uid [866], resp code [12295][0m
+[0;33mW (43297) rpc_rsp: Hosted RPC_Resp [0x226], uid [867], resp code [12295][0m
+[0;33mW (43357) rpc_rsp: Hosted RPC_Resp [0x226], uid [868], resp code [12295][0m
+[0;33mW (43407) rpc_rsp: Hosted RPC_Resp [0x226], uid [869], resp code [12295][0m
+[0;33mW (43427) rpc_rsp: Hosted RPC_Resp [0x226], uid [870], resp code [12295][0m
+[0;33mW (43437) rpc_rsp: Hosted RPC_Resp [0x226], uid [871], resp code [12295][0m
+[0;33mW (43487) rpc_rsp: Hosted RPC_Resp [0x226], uid [872], resp code [12295][0m
+[0;33mW (43547) rpc_rsp: Hosted RPC_Resp [0x226], uid [873], resp code [12295][0m
+[0;33mW (43607) rpc_rsp: Hosted RPC_Resp [0x226], uid [874], resp code [12295][0m
+[0;33mW (43647) rpc_rsp: Hosted RPC_Resp [0x226], uid [875], resp code [12295][0m
+[0;33mW (43667) rpc_rsp: Hosted RPC_Resp [0x226], uid [876], resp code [12295][0m
+[0;33mW (43727) rpc_rsp: Hosted RPC_Resp [0x226], uid [877], resp code [12295][0m
+[0;33mW (43787) rpc_rsp: Hosted RPC_Resp [0x226], uid [878], resp code [12295][0m
+[0;33mW (43837) rpc_rsp: Hosted RPC_Resp [0x226], uid [879], resp code [12295][0m
+[0;33mW (43857) rpc_rsp: Hosted RPC_Resp [0x226], uid [880], resp code [12295][0m
+[0;33mW (43917) rpc_rsp: Hosted RPC_Resp [0x226], uid [881], resp code [12295][0m
+[0;33mW (43977) rpc_rsp: Hosted RPC_Resp [0x226], uid [882], resp code [12295][0m
+[0;33mW (44037) rpc_rsp: Hosted RPC_Resp [0x226], uid [883], resp code [12295][0m
+[0;33mW (44057) rpc_rsp: Hosted RPC_Resp [0x226], uid [884], resp code [12295][0m
+[0;33mW (44067) rpc_rsp: Hosted RPC_Resp [0x226], uid [885], resp code [12295][0m
+[0;33mW (44097) rpc_rsp: Hosted RPC_Resp [0x226], uid [886], resp code [12295][0m
+[0;33mW (44157) rpc_rsp: Hosted RPC_Resp [0x226], uid [887], resp code [12295][0m
+[0;33mW (44217) rpc_rsp: Hosted RPC_Resp [0x226], uid [888], resp code [12295][0m
+[0;33mW (44277) rpc_rsp: Hosted RPC_Resp [0x226], uid [889], resp code [12295][0m
+[0;33mW (44287) rpc_rsp: Hosted RPC_Resp [0x226], uid [890], resp code [12295][0m
+[0;33mW (44337) rpc_rsp: Hosted RPC_Resp [0x226], uid [891], resp code [12295][0m
+[0;33mW (44397) rpc_rsp: Hosted RPC_Resp [0x226], uid [892], resp code [12295][0m
+[0;33mW (44457) rpc_rsp: Hosted RPC_Resp [0x226], uid [893], resp code [12295][0m
+[0;33mW (44487) rpc_rsp: Hosted RPC_Resp [0x226], uid [894], resp code [12295][0m
+[0;33mW (44517) rpc_rsp: Hosted RPC_Resp [0x226], uid [895], resp code [12295][0m
+[0;33mW (44577) rpc_rsp: Hosted RPC_Resp [0x226], uid [896], resp code [12295][0m
+[0;33mW (44637) rpc_rsp: Hosted RPC_Resp [0x226], uid [897], resp code [12295][0m
+[0;33mW (44687) rpc_rsp: Hosted RPC_Resp [0x226], uid [898], resp code [12295][0m
+[0;33mW (44697) rpc_rsp: Hosted RPC_Resp [0x226], uid [899], resp code [12295][0m
+[0;33mW (44717) rpc_rsp: Hosted RPC_Resp [0x226], uid [900], resp code [12295][0m
+[0;33mW (44767) rpc_rsp: Hosted RPC_Resp [0x226], uid [901], resp code [12295][0m
+[0;33mW (44827) rpc_rsp: Hosted RPC_Resp [0x226], uid [902], resp code [12295][0m
+[0;33mW (44887) rpc_rsp: Hosted RPC_Resp [0x226], uid [903], resp code [12295][0m
+[0;33mW (44927) rpc_rsp: Hosted RPC_Resp [0x226], uid [904], resp code [12295][0m
+[0;33mW (44947) rpc_rsp: Hosted RPC_Resp [0x226], uid [905], resp code [12295][0m
+[0;33mW (45007) rpc_rsp: Hosted RPC_Resp [0x226], uid [906], resp code [12295][0m
+[0;33mW (45067) rpc_rsp: Hosted RPC_Resp [0x226], uid [907], resp code [12295][0m
+[0;33mW (45117) rpc_rsp: Hosted RPC_Resp [0x226], uid [908], resp code [12295][0m
+[0;33mW (45137) rpc_rsp: Hosted RPC_Resp [0x226], uid [909], resp code [12295][0m
+[0;33mW (45197) rpc_rsp: Hosted RPC_Resp [0x226], uid [910], resp code [12295][0m
+[0;33mW (45257) rpc_rsp: Hosted RPC_Resp [0x226], uid [911], resp code [12295][0m
+[0;33mW (45307) rpc_rsp: Hosted RPC_Resp [0x226], uid [912], resp code [12295][0m
+[0;33mW (45327) rpc_rsp: Hosted RPC_Resp [0x226], uid [913], resp code [12295][0m
+[0;33mW (45347) rpc_rsp: Hosted RPC_Resp [0x226], uid [914], resp code [12295][0m
+[0;33mW (45387) rpc_rsp: Hosted RPC_Resp [0x226], uid [915], resp code [12295][0m
+[0;33mW (45447) rpc_rsp: Hosted RPC_Resp [0x226], uid [916], resp code [12295][0m
+[0;33mW (45507) rpc_rsp: Hosted RPC_Resp [0x226], uid [917], resp code [12295][0m
+[0;33mW (45547) rpc_rsp: Hosted RPC_Resp [0x226], uid [918], resp code [12295][0m
+[0;33mW (45567) rpc_rsp: Hosted RPC_Resp [0x226], uid [919], resp code [12295][0m
+[0;33mW (45627) rpc_rsp: Hosted RPC_Resp [0x226], uid [920], resp code [12295][0m
+[0;33mW (45687) rpc_rsp: Hosted RPC_Resp [0x226], uid [921], resp code [12295][0m
+[0;33mW (45747) rpc_rsp: Hosted RPC_Resp [0x226], uid [922], resp code [12295][0m
+[0;33mW (45767) rpc_rsp: Hosted RPC_Resp [0x226], uid [923], resp code [12295][0m
+[0;33mW (45807) rpc_rsp: Hosted RPC_Resp [0x226], uid [924], resp code [12295][0m
+[0;33mW (45867) rpc_rsp: Hosted RPC_Resp [0x226], uid [925], resp code [12295][0m
+[0;33mW (45927) rpc_rsp: Hosted RPC_Resp [0x226], uid [926], resp code [12295][0m
+[0;33mW (45957) rpc_rsp: Hosted RPC_Resp [0x226], uid [927], resp code [12295][0m
+[0;33mW (45977) rpc_rsp: Hosted RPC_Resp [0x226], uid [928], resp code [12295][0m
+[0;33mW (45997) rpc_rsp: Hosted RPC_Resp [0x226], uid [929], resp code [12295][0m
+[0;33mW (46057) rpc_rsp: Hosted RPC_Resp [0x226], uid [930], resp code [12295][0m
+[0;33mW (46117) rpc_rsp: Hosted RPC_Resp [0x226], uid [931], resp code [12295][0m
+[0;33mW (46177) rpc_rsp: Hosted RPC_Resp [0x226], uid [932], resp code [12295][0m
+[0;33mW (46197) rpc_rsp: Hosted RPC_Resp [0x226], uid [933], resp code [12295][0m
+[0;33mW (46237) rpc_rsp: Hosted RPC_Resp [0x226], uid [934], resp code [12295][0m
+[0;33mW (46297) rpc_rsp: Hosted RPC_Resp [0x226], uid [935], resp code [12295][0m
+[0;33mW (46357) rpc_rsp: Hosted RPC_Resp [0x226], uid [936], resp code [12295][0m
+[0;33mW (46387) rpc_rsp: Hosted RPC_Resp [0x226], uid [937], resp code [12295][0m
+[0;33mW (46417) rpc_rsp: Hosted RPC_Resp [0x226], uid [938], resp code [12295][0m
+[0;33mW (46477) rpc_rsp: Hosted RPC_Resp [0x226], uid [939], resp code [12295][0m
+[0;33mW (46537) rpc_rsp: Hosted RPC_Resp [0x226], uid [940], resp code [12295][0m
+[0;33mW (46587) rpc_rsp: Hosted RPC_Resp [0x226], uid [941], resp code [12295][0m
+[0;33mW (46597) rpc_rsp: Hosted RPC_Resp [0x226], uid [942], resp code [12295][0m
+[0;33mW (46617) rpc_rsp: Hosted RPC_Resp [0x226], uid [943], resp code [12295][0m
+[0;33mW (46667) rpc_rsp: Hosted RPC_Resp [0x226], uid [944], resp code [12295][0m
+[0;33mW (46727) rpc_rsp: Hosted RPC_Resp [0x226], uid [945], resp code [12295][0m
+[0;33mW (46787) rpc_rsp: Hosted RPC_Resp [0x226], uid [946], resp code [12295][0m
+[0;33mW (46827) rpc_rsp: Hosted RPC_Resp [0x226], uid [947], resp code [12295][0m
+[0;33mW (46847) rpc_rsp: Hosted RPC_Resp [0x226], uid [948], resp code [12295][0m
+[0;33mW (46907) rpc_rsp: Hosted RPC_Resp [0x226], uid [949], resp code [12295][0m
+[0;33mW (46967) rpc_rsp: Hosted RPC_Resp [0x226], uid [950], resp code [12295][0m
+[0;33mW (47017) rpc_rsp: Hosted RPC_Resp [0x226], uid [951], resp code [12295][0m
+[0;33mW (47037) rpc_rsp: Hosted RPC_Resp [0x226], uid [952], resp code [12295][0m
+[0;33mW (47097) rpc_rsp: Hosted RPC_Resp [0x226], uid [953], resp code [12295][0m
+[0;33mW (47157) rpc_rsp: Hosted RPC_Resp [0x226], uid [954], resp code [12295][0m
+[0;33mW (47207) rpc_rsp: Hosted RPC_Resp [0x226], uid [955], resp code [12295][0m
+[0;33mW (47227) rpc_rsp: Hosted RPC_Resp [0x226], uid [956], resp code [12295][0m
+[0;33mW (47247) rpc_rsp: Hosted RPC_Resp [0x226], uid [957], resp code [12295][0m
+[0;33mW (47287) rpc_rsp: Hosted RPC_Resp [0x226], uid [958], resp code [12295][0m
+[0;33mW (47347) rpc_rsp: Hosted RPC_Resp [0x226], uid [959], resp code [12295][0m
+[0;33mW (47407) rpc_rsp: Hosted RPC_Resp [0x226], uid [960], resp code [12295][0m
+[0;33mW (47447) rpc_rsp: Hosted RPC_Resp [0x226], uid [961], resp code [12295][0m
+[0;33mW (47467) rpc_rsp: Hosted RPC_Resp [0x226], uid [962], resp code [12295][0m
+[0;33mW (47527) rpc_rsp: Hosted RPC_Resp [0x226], uid [963], resp code [12295][0m
+[0;33mW (47587) rpc_rsp: Hosted RPC_Resp [0x226], uid [964], resp code [12295][0m
+[0;33mW (47647) rpc_rsp: Hosted RPC_Resp [0x226], uid [965], resp code [12295][0m
+[0;33mW (47667) rpc_rsp: Hosted RPC_Resp [0x226], uid [966], resp code [12295][0m
+[0;33mW (47707) rpc_rsp: Hosted RPC_Resp [0x226], uid [967], resp code [12295][0m
+[0;33mW (47767) rpc_rsp: Hosted RPC_Resp [0x226], uid [968], resp code [12295][0m
+[0;32mI (47767) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (47827) rpc_rsp: Hosted RPC_Resp [0x226], uid [969], resp code [12295][0m
+[0;33mW (47857) rpc_rsp: Hosted RPC_Resp [0x226], uid [970], resp code [12295][0m
+[0;33mW (47877) rpc_rsp: Hosted RPC_Resp [0x226], uid [971], resp code [12295][0m
+[0;33mW (47897) rpc_rsp: Hosted RPC_Resp [0x226], uid [972], resp code [12295][0m
+[0;33mW (47957) rpc_rsp: Hosted RPC_Resp [0x226], uid [973], resp code [12295][0m
+[0;33mW (48017) rpc_rsp: Hosted RPC_Resp [0x226], uid [974], resp code [12295][0m
+[0;33mW (48077) rpc_rsp: Hosted RPC_Resp [0x226], uid [975], resp code [12295][0m
+[0;33mW (48097) rpc_rsp: Hosted RPC_Resp [0x226], uid [976], resp code [12295][0m
+[0;33mW (48137) rpc_rsp: Hosted RPC_Resp [0x226], uid [977], resp code [12295][0m
+[0;33mW (48197) rpc_rsp: Hosted RPC_Resp [0x226], uid [978], resp code [12295][0m
+[0;33mW (48257) rpc_rsp: Hosted RPC_Resp [0x226], uid [979], resp code [12295][0m
+[0;33mW (48287) rpc_rsp: Hosted RPC_Resp [0x226], uid [980], resp code [12295][0m
+[0;33mW (48317) rpc_rsp: Hosted RPC_Resp [0x226], uid [981], resp code [12295][0m
+[0;33mW (48377) rpc_rsp: Hosted RPC_Resp [0x226], uid [982], resp code [12295][0m
+[0;33mW (48437) rpc_rsp: Hosted RPC_Resp [0x226], uid [983], resp code [12295][0m
+[0;33mW (48487) rpc_rsp: Hosted RPC_Resp [0x226], uid [984], resp code [12295][0m
+[0;33mW (48497) rpc_rsp: Hosted RPC_Resp [0x226], uid [985], resp code [12295][0m
+[0;33mW (48517) rpc_rsp: Hosted RPC_Resp [0x226], uid [986], resp code [12295][0m
+[0;33mW (48567) rpc_rsp: Hosted RPC_Resp [0x226], uid [987], resp code [12295][0m
+[0;33mW (48627) rpc_rsp: Hosted RPC_Resp [0x226], uid [988], resp code [12295][0m
+[0;33mW (48687) rpc_rsp: Hosted RPC_Resp [0x226], uid [989], resp code [12295][0m
+[0;33mW (48727) rpc_rsp: Hosted RPC_Resp [0x226], uid [990], resp code [12295][0m
+[0;33mW (48747) rpc_rsp: Hosted RPC_Resp [0x226], uid [991], resp code [12295][0m
+[0;33mW (48807) rpc_rsp: Hosted RPC_Resp [0x226], uid [992], resp code [12295][0m
+[0;33mW (48867) rpc_rsp: Hosted RPC_Resp [0x226], uid [993], resp code [12295][0m
+[0;33mW (48917) rpc_rsp: Hosted RPC_Resp [0x226], uid [994], resp code [12295][0m
+[0;33mW (48937) rpc_rsp: Hosted RPC_Resp [0x226], uid [995], resp code [12295][0m
+[0;33mW (48997) rpc_rsp: Hosted RPC_Resp [0x226], uid [996], resp code [12295][0m
+[0;33mW (49057) rpc_rsp: Hosted RPC_Resp [0x226], uid [997], resp code [12295][0m
+[0;33mW (49117) rpc_rsp: Hosted RPC_Resp [0x226], uid [998], resp code [12295][0m
+[0;33mW (49137) rpc_rsp: Hosted RPC_Resp [0x226], uid [999], resp code [12295][0m
+[0;33mW (49147) rpc_rsp: Hosted RPC_Resp [0x226], uid [1000], resp code [12295][0m
+[0;33mW (49177) rpc_rsp: Hosted RPC_Resp [0x226], uid [1001], resp code [12295][0m
+[0;33mW (49237) rpc_rsp: Hosted RPC_Resp [0x226], uid [1002], resp code [12295][0m
+[0;33mW (49297) rpc_rsp: Hosted RPC_Resp [0x226], uid [1003], resp code [12295][0m
+[0;33mW (49357) rpc_rsp: Hosted RPC_Resp [0x226], uid [1004], resp code [12295][0m
+[0;33mW (49377) rpc_rsp: Hosted RPC_Resp [0x226], uid [1005], resp code [12295][0m
+[0;33mW (49437) rpc_rsp: Hosted RPC_Resp [0x226], uid [1006], resp code [12295][0m
+[0;33mW (49497) rpc_rsp: Hosted RPC_Resp [0x226], uid [1007], resp code [12295][0m
+[0;33mW (49547) rpc_rsp: Hosted RPC_Resp [0x226], uid [1008], resp code [12295][0m
+[0;33mW (49567) rpc_rsp: Hosted RPC_Resp [0x226], uid [1009], resp code [12295][0m
+[0;33mW (49627) rpc_rsp: Hosted RPC_Resp [0x226], uid [1010], resp code [12295][0m
+[0;33mW (49687) rpc_rsp: Hosted RPC_Resp [0x226], uid [1011], resp code [12295][0m
+[0;33mW (49747) rpc_rsp: Hosted RPC_Resp [0x226], uid [1012], resp code [12295][0m
+[0;33mW (49757) rpc_rsp: Hosted RPC_Resp [0x226], uid [1013], resp code [12295][0m
+[0;33mW (49777) rpc_rsp: Hosted RPC_Resp [0x226], uid [1014], resp code [12295][0m
+[0;33mW (49817) rpc_rsp: Hosted RPC_Resp [0x226], uid [1015], resp code [12295][0m
+[0;33mW (49877) rpc_rsp: Hosted RPC_Resp [0x226], uid [1016], resp code [12295][0m
+[0;33mW (49937) rpc_rsp: Hosted RPC_Resp [0x226], uid [1017], resp code [12295][0m
+[0;33mW (49987) rpc_rsp: Hosted RPC_Resp [0x226], uid [1018], resp code [12295][0m
+[0;33mW (50007) rpc_rsp: Hosted RPC_Resp [0x226], uid [1019], resp code [12295][0m
+[0;32mI (50017) SERVER: captive_probe: uri=/hotspot-detect.html host=captive.apple.com ua=Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 method=1[0m
+[0;33mW (50067) rpc_rsp: Hosted RPC_Resp [0x226], uid [1020], resp code [12295][0m
+[0;33mW (50127) rpc_rsp: Hosted RPC_Resp [0x226], uid [1021], resp code [12295][0m
+[0;32mI (50167) SERVER: captive_probe: uri=/hotspot-detect.html host=captive.apple.com ua=CaptiveNetworkSupport-514.100.16 wispr method=1[0m
+[0;33mW (50187) rpc_rsp: Hosted RPC_Resp [0x226], uid [1022], resp code [12295][0m
+[0;33mW (50197) rpc_rsp: Hosted RPC_Resp [0x226], uid [1023], resp code [12295][0m
+[0;32mI (50217) SERVER: captive_probe: uri=/hotspot-detect.html host=captive.apple.com ua=CaptiveNetworkSupport-514.100.16 wispr method=1[0m
+[0;33mW (50267) rpc_rsp: Hosted RPC_Resp [0x226], uid [1024], resp code [12295][0m
+[0;32mI (50267) SERVER: index_handler called for URI: /[0m
+[0;32mI (50277) SERVER: Host header: 192.168.4.1[0m
+[0;33mW (50327) rpc_rsp: Hosted RPC_Resp [0x226], uid [1028], resp code [12295][0m
+[0;32mI (50347) SERVER: captive_probe: uri=/hotspot-detect.html host=captive.apple.com ua=CaptiveNetworkSupport-514.100.16 wispr method=1[0m
+[0;32mI (50377) SERVER: Starting async WiFi scan[0m
+[0;32mI (50377) WIFI_CONN: wifi_start_scan backend=esp_wifi mode=AP free_heap=30000976 free_internal=397451[0m
+[0;33mW (50397) rpc_rsp: Hosted RPC_Resp [0x226], uid [1030], resp code [12295][0m
+[0;32mI (50417) WIFI_CONN: WiFi mode switched AP -> APSTA for scan[0m
+[0;32mI (50417) WIFI_CONN: Starting WiFi Scan Task (stack=8192, free_heap=29992628, free_internal=389103)...[0m
+[0;32mI (50417) WIFI_CONN: WiFi scan task created[0m
+[0;32mI (50417) rpc_req: Scan start Req[0m
+
+[0;33mW (50437) rpc_rsp: Hosted RPC_Resp [0x226], uid [1032], resp code [12303][0m
+[0;32mI (50447) RPC_WRAP: ESP Event: wifi station started[0m
+[0;33mW (50477) rpc_rsp: Hosted RPC_Resp [0x21e], uid [1033], resp code [12294][0m
+[1;31mE (50477) WIFI_CONN: WiFi scan failed to start: ESP_ERR_WIFI_STATE[0m
+[0;32mI (50477) WIFI_CONN: WiFi Scan completed (stack_watermark=7468 words)[0m
+[0;33mW (50507) rpc_rsp: Hosted RPC_Resp [0x226], uid [1034], resp code [12303][0m
+[0;33mW (50527) rpc_rsp: Hosted RPC_Resp [0x226], uid [1035], resp code [12303][0m
+[0;32mI (50547) WIFI_CONN: wifi_is_scan_done=true (result_size=2)[0m
+[0;32mI (50557) SERVER: Sent scan results[0m
+[0;33mW (50587) rpc_rsp: Hosted RPC_Resp [0x226], uid [1036], resp code [12303][0m
+[0;33mW (50647) rpc_rsp: Hosted RPC_Resp [0x226], uid [1037], resp code [12303][0m
+[0;33mW (50707) rpc_rsp: Hosted RPC_Resp [0x226], uid [1038], resp code [12303][0m
+[0;33mW (50737) rpc_rsp: Hosted RPC_Resp [0x226], uid [1039], resp code [12303][0m
+[0;33mW (50767) rpc_rsp: Hosted RPC_Resp [0x226], uid [1040], resp code [12303][0m
+[0;33mW (50827) rpc_rsp: Hosted RPC_Resp [0x226], uid [1041], resp code [12303][0m
+[0;33mW (50887) rpc_rsp: Hosted RPC_Resp [0x226], uid [1042], resp code [12303][0m
+[0;33mW (50937) rpc_rsp: Hosted RPC_Resp [0x226], uid [1043], resp code [12303][0m
+[0;33mW (50957) rpc_rsp: Hosted RPC_Resp [0x226], uid [1044], resp code [12303][0m
+[0;33mW (51017) rpc_rsp: Hosted RPC_Resp [0x226], uid [1045], resp code [12303][0m
+[0;33mW (51077) rpc_rsp: Hosted RPC_Resp [0x226], uid [1046], resp code [12303][0m
+[0;33mW (51137) rpc_rsp: Hosted RPC_Resp [0x226], uid [1047], resp code [12303][0m
+[0;33mW (51157) rpc_rsp: Hosted RPC_Resp [0x226], uid [1048], resp code [12303][0m
+[0;33mW (51177) rpc_rsp: Hosted RPC_Resp [0x226], uid [1049], resp code [12303][0m
+[0;33mW (51217) rpc_rsp: Hosted RPC_Resp [0x226], uid [1050], resp code [12303][0m
+[0;33mW (51277) rpc_rsp: Hosted RPC_Resp [0x226], uid [1051], resp code [12303][0m
+[0;33mW (51337) rpc_rsp: Hosted RPC_Resp [0x226], uid [1052], resp code [12303][0m
+[0;33mW (51387) rpc_rsp: Hosted RPC_Resp [0x226], uid [1053], resp code [12303][0m
+[0;33mW (51417) rpc_rsp: Hosted RPC_Resp [0x226], uid [1054], resp code [12303][0m
+[0;33mW (51477) rpc_rsp: Hosted RPC_Resp [0x226], uid [1055], resp code [12303][0m
+[0;33mW (51537) rpc_rsp: Hosted RPC_Resp [0x226], uid [1056], resp code [12303][0m
+[0;33mW (51587) rpc_rsp: Hosted RPC_Resp [0x226], uid [1057], resp code [12303][0m
+[0;33mW (51617) rpc_rsp: Hosted RPC_Resp [0x226], uid [1058], resp code [12303][0m
+[0;33mW (51677) rpc_rsp: Hosted RPC_Resp [0x226], uid [1059], resp code [12303][0m
+[0;33mW (51737) rpc_rsp: Hosted RPC_Resp [0x226], uid [1060], resp code [12303][0m
+[0;33mW (51787) rpc_rsp: Hosted RPC_Resp [0x226], uid [1061], resp code [12303][0m
+[0;33mW (51817) rpc_rsp: Hosted RPC_Resp [0x226], uid [1062], resp code [12303][0m
+[0;33mW (51837) rpc_rsp: Hosted RPC_Resp [0x226], uid [1063], resp code [12303][0m
+[0;33mW (51877) rpc_rsp: Hosted RPC_Resp [0x226], uid [1064], resp code [12303][0m
+[0;33mW (51937) rpc_rsp: Hosted RPC_Resp [0x226], uid [1065], resp code [12303][0m
+[0;33mW (51997) rpc_rsp: Hosted RPC_Resp [0x226], uid [1066], resp code [12303][0m
+[0;33mW (52047) rpc_rsp: Hosted RPC_Resp [0x226], uid [1067], resp code [12303][0m
+[0;33mW (52067) rpc_rsp: Hosted RPC_Resp [0x226], uid [1068], resp code [12303][0m
+[0;33mW (52127) rpc_rsp: Hosted RPC_Resp [0x226], uid [1069], resp code [12303][0m
+[0;33mW (52187) rpc_rsp: Hosted RPC_Resp [0x226], uid [1070], resp code [12303][0m
+[0;33mW (52247) rpc_rsp: Hosted RPC_Resp [0x226], uid [1071], resp code [12303][0m
+[0;33mW (52267) rpc_rsp: Hosted RPC_Resp [0x226], uid [1072], resp code [12303][0m
+[0;33mW (52327) rpc_rsp: Hosted RPC_Resp [0x226], uid [1073], resp code [12303][0m
+[0;33mW (52387) rpc_rsp: Hosted RPC_Resp [0x226], uid [1074], resp code [12303][0m
+[0;33mW (52437) rpc_rsp: Hosted RPC_Resp [0x226], uid [1075], resp code [12303][0m
+[0;33mW (52467) rpc_rsp: Hosted RPC_Resp [0x226], uid [1076], resp code [12303][0m
+[0;33mW (52487) rpc_rsp: Hosted RPC_Resp [0x226], uid [1077], resp code [12303][0m
+[0;33mW (52527) rpc_rsp: Hosted RPC_Resp [0x226], uid [1078], resp code [12303][0m
+[0;33mW (52587) rpc_rsp: Hosted RPC_Resp [0x226], uid [1079], resp code [12303][0m
+[0;33mW (52647) rpc_rsp: Hosted RPC_Resp [0x226], uid [1080], resp code [12303][0m
+[0;33mW (52697) rpc_rsp: Hosted RPC_Resp [0x226], uid [1081], resp code [12303][0m
+[0;33mW (52727) rpc_rsp: Hosted RPC_Resp [0x226], uid [1082], resp code [12303][0m
+[0;33mW (52787) rpc_rsp: Hosted RPC_Resp [0x226], uid [1083], resp code [12303][0m
+[0;32mI (52787) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (52847) rpc_rsp: Hosted RPC_Resp [0x226], uid [1084], resp code [12303][0m
+[0;33mW (52897) rpc_rsp: Hosted RPC_Resp [0x226], uid [1085], resp code [12303][0m
+[0;33mW (52927) rpc_rsp: Hosted RPC_Resp [0x226], uid [1086], resp code [12303][0m
+[0;33mW (52987) rpc_rsp: Hosted RPC_Resp [0x226], uid [1087], resp code [12303][0m
+[0;33mW (53047) rpc_rsp: Hosted RPC_Resp [0x226], uid [1088], resp code [12303][0m
+[0;33mW (53097) rpc_rsp: Hosted RPC_Resp [0x226], uid [1089], resp code [12303][0m
+[0;33mW (53117) rpc_rsp: Hosted RPC_Resp [0x226], uid [1090], resp code [12303][0m
+[0;33mW (53147) rpc_rsp: Hosted RPC_Resp [0x226], uid [1091], resp code [12303][0m
+[0;33mW (53177) rpc_rsp: Hosted RPC_Resp [0x226], uid [1092], resp code [12303][0m
+[0;33mW (53237) rpc_rsp: Hosted RPC_Resp [0x226], uid [1093], resp code [12303][0m
+[0;33mW (53297) rpc_rsp: Hosted RPC_Resp [0x226], uid [1094], resp code [12303][0m
+[0;33mW (53347) rpc_rsp: Hosted RPC_Resp [0x226], uid [1095], resp code [12303][0m
+[0;33mW (53377) rpc_rsp: Hosted RPC_Resp [0x226], uid [1096], resp code [12303][0m
+[0;33mW (53437) rpc_rsp: Hosted RPC_Resp [0x226], uid [1097], resp code [12303][0m
+[0;33mW (53497) rpc_rsp: Hosted RPC_Resp [0x226], uid [1098], resp code [12303][0m
+[0;33mW (53547) rpc_rsp: Hosted RPC_Resp [0x226], uid [1099], resp code [12303][0m
+[0;33mW (53577) rpc_rsp: Hosted RPC_Resp [0x226], uid [1100], resp code [12303][0m
+[0;33mW (53637) rpc_rsp: Hosted RPC_Resp [0x226], uid [1101], resp code [12303][0m
+[0;32mI (53947) RPC_WRAP: ESP Event: Station mode: Connected[0m
+[0;32mI (57807) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (62837) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (67857) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (72877) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (77907) SRV_TASK: Stack watermark: 2896 words[0m
+[0;33mW (79617) httpd_txrx: httpd_sock_err: error in recv : 104[0m
+[0;32mI (82937) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (85037) RPC_WRAP: ESP Event: SoftAP mode: disconnected station[0m
+[0;33mW (85037) WIFI_CONN: station d6:e4:bc:f9:c5:99 leave, AID=1, reason=8[0m
+[0;32mI (87967) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (92987) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (98017) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (103047) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (108047) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (113057) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (118087) SRV_TASK: Stack watermark: 2896 words[0m
+[0;32mI (123087) SRV_TASK: Stack watermark: 2896 words[0m

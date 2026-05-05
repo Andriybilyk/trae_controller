@@ -1,9 +1,11 @@
 #include "ui/slint_bridge.h"
 
 #include "app/device_commands.h"
+#include "config/board_profile.h"
 #include "drivers/display_driver.h"
 #include "drivers/pzem004t_driver.h"
 #include "kiln_control/thermal_control.h"
+#include "kiln_hal_heater/heater_hal.h"
 #include "kiln_config/config_store.h"
 #include "drivers/rtc_ds3231.h"
 #include "net/wifi_connection.h"
@@ -13,9 +15,13 @@
 #include "esp_system.h"
 #include "esp_mac.h"
 #include "esp_app_desc.h"
+#include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "driver/temperature_sensor.h"
 #include "nvs.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "cJSON.h"
 
 #include <atomic>
@@ -23,11 +29,13 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <time.h>
 #include <sys/time.h>
 
 static std::atomic<uint64_t> s_ui_heartbeat_ms{0};
+static const char *TAG = "SLINT_BRIDGE";
 static constexpr const char *UI_PREF_NS = "ui_pref";
 static constexpr const char *UI_PREF_LANG_KEY = "lang";
 static constexpr const char *UI_PREF_TEMP_UNIT_KEY = "temp_unit";
@@ -43,6 +51,39 @@ static constexpr uint8_t DATE_FMT_MDY = 1;
 static constexpr uint8_t DATE_FMT_YMD = 2;
 static std::atomic<bool> s_fault_clear_inflight{false};
 static std::atomic<uint64_t> s_last_fault_clear_ms{0};
+static std::atomic<bool> s_wifi_scan_start_inflight{false};
+static std::atomic<uint64_t> s_last_start_cmd_ms{0};
+static std::atomic<uint64_t> s_last_stop_cmd_ms{0};
+static temperature_sensor_handle_t s_chip_temp_sensor = nullptr;
+static bool s_chip_temp_ready = false;
+static bool s_chip_temp_init_attempted = false;
+
+static bool notify_slint_command(const char *action,
+                                 const device_commands::CommandResult &res,
+                                 const char *ok_message);
+
+static bool ensure_chip_temp_sensor_ready() {
+    if (s_chip_temp_ready && s_chip_temp_sensor != nullptr) {
+        return true;
+    }
+    if (s_chip_temp_init_attempted) {
+        return false;
+    }
+    s_chip_temp_init_attempted = true;
+
+    temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 105);
+    if (temperature_sensor_install(&cfg, &s_chip_temp_sensor) != ESP_OK || s_chip_temp_sensor == nullptr) {
+        s_chip_temp_sensor = nullptr;
+        return false;
+    }
+    if (temperature_sensor_enable(s_chip_temp_sensor) != ESP_OK) {
+        (void)temperature_sensor_uninstall(s_chip_temp_sensor);
+        s_chip_temp_sensor = nullptr;
+        return false;
+    }
+    s_chip_temp_ready = true;
+    return true;
+}
 
 static bool copy_cstr_out(char *out, int32_t out_len, const char *src) {
     if (!out || out_len <= 0 || !src) return false;
@@ -51,6 +92,40 @@ static bool copy_cstr_out(char *out, int32_t out_len, const char *src) {
     out[n] = '\0';
     return true;
 }
+
+#if CONFIG_IDF_TARGET_ESP32P4
+struct UiPrefReq {
+    char key[16];
+    uint8_t val;
+};
+static QueueHandle_t s_ui_pref_queue = nullptr;
+static constexpr TickType_t kUiPrefDebounceTicks = pdMS_TO_TICKS(1200);
+
+static void ui_pref_save_worker(void *) {
+    UiPrefReq req;
+    while (xQueueReceive(s_ui_pref_queue, &req, portMAX_DELAY) == pdTRUE) {
+        UiPrefReq pending = req;
+        // Coalesce preference writes and commit once after a short quiet period.
+        while (xQueueReceive(s_ui_pref_queue, &req, kUiPrefDebounceTicks) == pdTRUE) {
+            pending = req;
+        }
+        nvs_handle_t h = 0;
+        if (nvs_open(UI_PREF_NS, NVS_READWRITE, &h) == ESP_OK) {
+            (void)nvs_set_u8(h, pending.key, pending.val);
+            (void)nvs_commit(h);
+            nvs_close(h);
+        }
+    }
+}
+
+static void ensure_ui_pref_worker() {
+    if (s_ui_pref_queue) return;
+    s_ui_pref_queue = xQueueCreate(16, sizeof(UiPrefReq));
+    if (s_ui_pref_queue) {
+        xTaskCreate(ui_pref_save_worker, "ui_pref_save", 3072, nullptr, 1, nullptr);
+    }
+}
+#endif
 
 static uint8_t ui_pref_get_u8(const char *key, uint8_t fallback) {
     nvs_handle_t h = 0;
@@ -65,11 +140,21 @@ static uint8_t ui_pref_get_u8(const char *key, uint8_t fallback) {
 }
 
 static void ui_pref_set_u8(const char *key, uint8_t value) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    ensure_ui_pref_worker();
+    if (s_ui_pref_queue) {
+        UiPrefReq req{};
+        strncpy(req.key, key ? key : "", sizeof(req.key) - 1);
+        req.val = value;
+        (void)xQueueSend(s_ui_pref_queue, &req, 0);
+    }
+#else
     nvs_handle_t h = 0;
     if (nvs_open(UI_PREF_NS, NVS_READWRITE, &h) != ESP_OK) return;
     (void)nvs_set_u8(h, key, value);
     (void)nvs_commit(h);
     nvs_close(h);
+#endif
 }
 
 static void restore_touch_from_backup_once() {
@@ -135,9 +220,18 @@ static void fault_clear_worker_task(void *) {
     vTaskDelete(nullptr);
 }
 
+static void wifi_scan_start_worker_task(void *) {
+    ESP_LOGI(TAG, "Wi-Fi scan start worker: begin");
+    wifi_start_scan();
+    ESP_LOGI(TAG, "Wi-Fi scan start worker: done");
+    s_wifi_scan_start_inflight.store(false, std::memory_order_release);
+    vTaskDelete(nullptr);
+}
+
 static bool notify_slint_command(const char *action,
                                  const device_commands::CommandResult &res,
                                  const char *ok_message) {
+    ESP_LOGI(TAG, "CMD action=%s result=%d ok=%d", action ? action : "?", (int)res.code, res.ok() ? 1 : 0);
     wifiServer.notifyCommandResult(action, res, ok_message, "slint");
     return res.ok();
 }
@@ -180,6 +274,10 @@ static double read_settings_number(const char *key, double fallback) {
 extern "C" void slint_bridge_display_init(void) {
     restore_touch_from_backup_once();
     display_driver_init();
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        // Enable relay GPIO control only after display stack finished initialization.
+        heater_hal_set_display_ready(true);
+    }
     pzem004t_init();
     s_ui_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
 }
@@ -217,6 +315,13 @@ extern "C" void slint_bridge_get_state(slint_kiln_state_t *out) {
 
 extern "C" bool slint_bridge_start_schedule_json(const char *json) {
     if (!json || !json[0]) return false;
+    const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    const uint64_t prev_start = s_last_start_cmd_ms.load(std::memory_order_acquire);
+    if (prev_start != 0 && (now_ms - prev_start) < 800ULL) {
+        ESP_LOGW(TAG, "START ignored: cooldown (%llu ms since previous)", (unsigned long long)(now_ms - prev_start));
+        return false;
+    }
+    s_last_start_cmd_ms.store(now_ms, std::memory_order_release);
     return notify_slint_command("start",
                                 device_commands::start_from_schedule_json(std::string(json)),
                                 "started");
@@ -230,6 +335,13 @@ extern "C" bool slint_bridge_load_schedule_json(const char *json) {
 }
 
 extern "C" void slint_bridge_stop(void) {
+    const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    const uint64_t prev_stop = s_last_stop_cmd_ms.load(std::memory_order_acquire);
+    if (prev_stop != 0 && (now_ms - prev_stop) < 800ULL) {
+        ESP_LOGW(TAG, "STOP ignored: cooldown (%llu ms since previous)", (unsigned long long)(now_ms - prev_stop));
+        return;
+    }
+    s_last_stop_cmd_ms.store(now_ms, std::memory_order_release);
     (void)notify_slint_command("stop", device_commands::stop("User Button"), "stopped");
 }
 
@@ -375,20 +487,32 @@ extern "C" bool slint_bridge_wifi_is_connected(void) {
 }
 
 extern "C" bool slint_bridge_wifi_connect(const char *ssid, const char *password) {
-    if (!wifi_connect_with_credentials(ssid, password)) return false;
-    vTaskDelay(pdMS_TO_TICKS(100));
-    esp_restart();
-    return true;
+    return wifi_connect_with_credentials(ssid, password);
 }
 
 extern "C" void slint_bridge_wifi_disconnect(void) {
     wifi_disconnect_and_forget();
-    vTaskDelay(pdMS_TO_TICKS(100));
-    esp_restart();
 }
 
 extern "C" void slint_bridge_wifi_scan_start(void) {
-    wifi_start_scan();
+    bool expected = false;
+    if (!s_wifi_scan_start_inflight.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+        ESP_LOGW(TAG, "Wi-Fi scan start ignored: worker already in-flight");
+        return;
+    }
+    ESP_LOGI(TAG, "Wi-Fi scan start requested from UI (async)");
+    const BaseType_t task_ok = xTaskCreate(
+        wifi_scan_start_worker_task,
+        "wifi_scan_start",
+        4096,
+        nullptr,
+        tskIDLE_PRIORITY + 1,
+        nullptr
+    );
+    if (task_ok != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create wifi_scan_start worker task");
+        s_wifi_scan_start_inflight.store(false, std::memory_order_release);
+    }
 }
 
 extern "C" bool slint_bridge_wifi_scan_ready(void) {
@@ -412,6 +536,19 @@ extern "C" bool slint_bridge_wifi_server_url_copy(char *out, int32_t out_len) {
     std::memcpy(out, url.data(), n);
     out[n] = '\0';
     return true;
+}
+
+extern "C" bool slint_bridge_wifi_ap_ssid_copy(char *out, int32_t out_len) {
+    if (!out || out_len <= 0) return false;
+    const std::string ssid = wifi_get_ap_ssid();
+    const size_t n = std::min((size_t)(out_len - 1), ssid.size());
+    std::memcpy(out, ssid.data(), n);
+    out[n] = '\0';
+    return true;
+}
+
+extern "C" uint64_t slint_bridge_wifi_last_got_ip_ms(void) {
+    return wifi_last_sta_got_ip_ms();
 }
 
 extern "C" uint32_t slint_bridge_get_schedules_revision(void) {
@@ -447,7 +584,6 @@ extern "C" void slint_bridge_notify_schedules_changed(void) {
 
 extern "C" void slint_bridge_ui_heartbeat(void) {
     s_ui_heartbeat_ms.store((uint64_t)(esp_timer_get_time() / 1000ULL), std::memory_order_relaxed);
-    (void)esp_task_wdt_reset();
 }
 
 extern "C" uint64_t slint_bridge_get_ui_heartbeat_ms(void) {
@@ -533,6 +669,47 @@ extern "C" uint32_t slint_bridge_get_free_heap_bytes(void) {
     return static_cast<uint32_t>(esp_get_free_heap_size());
 }
 
+extern "C" uint32_t slint_bridge_get_total_heap_bytes(void) {
+    return static_cast<uint32_t>(heap_caps_get_total_size(MALLOC_CAP_8BIT));
+}
+
+extern "C" uint32_t slint_bridge_get_free_psram_bytes(void) {
+    return static_cast<uint32_t>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+}
+
+extern "C" uint32_t slint_bridge_get_total_psram_bytes(void) {
+    return static_cast<uint32_t>(heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
+}
+
+extern "C" bool slint_bridge_get_chip_temp_c(float *out_c) {
+    if (!out_c) return false;
+    if (!ensure_chip_temp_sensor_ready()) return false;
+    float temp_c = 0.0f;
+    if (temperature_sensor_get_celsius(s_chip_temp_sensor, &temp_c) != ESP_OK) {
+        return false;
+    }
+    *out_c = temp_c;
+    return true;
+}
+
+extern "C" uint8_t slint_bridge_get_board_profile(void) {
+    switch (board_profile::current_board()) {
+        case board_profile::BoardId::NewP4:
+            return 1;
+        case board_profile::BoardId::LegacyS3:
+        default:
+            return 0;
+    }
+}
+
+extern "C" int32_t slint_bridge_get_display_width(void) {
+    return board_profile::display_width();
+}
+
+extern "C" int32_t slint_bridge_get_display_height(void) {
+    return board_profile::display_height();
+}
+
 static bool load_current_tm(struct tm *out_tm) {
     if (!out_tm) return false;
     time_t now = time(nullptr);
@@ -603,11 +780,7 @@ extern "C" bool slint_bridge_get_language_is_ua(void) {
 }
 
 extern "C" void slint_bridge_set_language_is_ua(bool is_ua) {
-    nvs_handle_t h = 0;
-    if (nvs_open(UI_PREF_NS, NVS_READWRITE, &h) != ESP_OK) return;
-    (void)nvs_set_u8(h, UI_PREF_LANG_KEY, is_ua ? 1 : 0);
-    (void)nvs_commit(h);
-    nvs_close(h);
+    ui_pref_set_u8(UI_PREF_LANG_KEY, is_ua ? 1 : 0);
 }
 
 extern "C" uint8_t slint_bridge_get_temp_unit(void) {
@@ -648,5 +821,6 @@ extern "C" uint8_t slint_bridge_get_display_brightness(void) {
 }
 
 extern "C" void slint_bridge_set_display_brightness(uint8_t percent) {
+    ESP_LOGI(TAG, "UI brightness set request: %u", (unsigned)percent);
     display_driver_set_backlight_percent(percent);
 }

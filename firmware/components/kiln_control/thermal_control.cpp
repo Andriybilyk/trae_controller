@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ctime>
 #include <cstdio>
 #include <cstring>
 #include <inttypes.h>
@@ -17,6 +18,7 @@
 #include "kiln_config/config.h"
 #include "kiln_config/config_store.h"
 #include "kiln_config/fs_utils.h"
+#include "net/wifi_connection.h"
 #include "kiln_hal_heater/heater_hal.h"
 #include "kiln_control/PID.h"
 #include "kiln_control/max31855.h"
@@ -28,11 +30,52 @@ static constexpr uint32_t SENSOR_VALID_RECOVERY_COUNT = 12;
 static constexpr uint32_t SENSOR_STUCK_LATCH_COUNT = 240; // ~60s at 250ms sample time
 static constexpr uint32_t SENSOR_SHORT_LATCH_COUNT = 20;  // ~5s
 static constexpr float SENSOR_STUCK_DELTA_C = 0.05f;
+static constexpr uint64_t SSR_STUCK_OFF_MIN_MS = 30000;   // heater commanded OFF for >=30s
+static constexpr float SSR_STUCK_RISE_DELTA_C = 12.0f;    // while OFF, temp rose >=12C
+static constexpr uint32_t SSR_STUCK_LATCH_COUNT = 3;      // consecutive confirmations
 static constexpr uint64_t SENSOR_READ_TIMEOUT_MS = 5000;
 static constexpr const char* RECOVERY_FILE = "/littlefs/recovery.json";
 static constexpr const char* EVENTS_LOG_FILE = "/littlefs/logs/events.log";
 static constexpr const char* EVENTS_LOG_PREV_FILE = "/littlefs/logs/events.log.1";
 static constexpr size_t EVENTS_LOG_MAX_BYTES = 64 * 1024;
+static constexpr uint64_t RECOVERY_MAX_AGE_MS_DEFAULT = 30ULL * 60ULL * 1000ULL; // 30 min
+static constexpr float RECOVERY_RESUME_TEMP_MIN_C = SENSOR_TEMP_MIN_C;
+static constexpr float RECOVERY_RESUME_TEMP_MAX_C = FAULT_CLEAR_MAX_TEMP_C;
+static constexpr std::time_t UNIX_TIME_VALID_AFTER = 1700000000; // 2023-11-14
+
+static inline void thermal_set_safety_relay(bool on) {
+    heater_hal_set_safety_relay(on);
+}
+
+static inline void thermal_set_ssr(bool on) {
+    heater_hal_set_ssr(on);
+}
+
+static uint64_t load_recovery_max_age_ms() {
+    uint64_t max_age_ms = RECOVERY_MAX_AGE_MS_DEFAULT;
+    const std::string cfg_raw = kiln_config_load_json_config();
+    if (cfg_raw.empty()) return max_age_ms;
+
+    cJSON *root = cJSON_Parse(cfg_raw.c_str());
+    if (!root || !cJSON_IsObject(root)) {
+        if (root) cJSON_Delete(root);
+        return max_age_ms;
+    }
+
+    const cJSON *flat_sec = cJSON_GetObjectItem(root, "recovery_max_age_sec");
+    if (cJSON_IsNumber(flat_sec) && flat_sec->valuedouble >= 0.0) {
+        max_age_ms = (uint64_t)(flat_sec->valuedouble * 1000.0);
+    } else {
+        const cJSON *recovery = cJSON_GetObjectItem(root, "recovery");
+        const cJSON *nested_sec = cJSON_IsObject(recovery) ? cJSON_GetObjectItem(recovery, "max_age_sec") : nullptr;
+        if (cJSON_IsNumber(nested_sec) && nested_sec->valuedouble >= 0.0) {
+            max_age_ms = (uint64_t)(nested_sec->valuedouble * 1000.0);
+        }
+    }
+
+    cJSON_Delete(root);
+    return max_age_ms;
+}
 
 static void rotate_event_log_if_needed() {
     const size_t size = kiln_fs_file_size(EVENTS_LOG_FILE);
@@ -55,9 +98,11 @@ static void append_event_log(const char *type, const char *msg) {
     if (!f) return;
     const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
     fprintf(f, "%llu %s %s\n", (unsigned long long)now_ms, type, msg);
+#if !CONFIG_TC_BOARD_NEW_P4
     fflush(f);
     const int fd = fileno(f);
     if (fd >= 0) (void)fsync(fd);
+#endif
     fclose(f);
 }
 
@@ -98,6 +143,7 @@ ThermalController::ThermalController() {
     historyActive = false;
     historyId.clear();
     historyStartMs = 0;
+    historyStartUnixMs = 0;
     historyPeakTemp = 0.0f;
     lastHistorySampleMs = 0;
     historyPoints.clear();
@@ -160,6 +206,7 @@ void ThermalController::begin() {
     historyActive = false;
     historyId.clear();
     historyStartMs = 0;
+    historyStartUnixMs = 0;
     historyPeakTemp = 0.0f;
     lastHistorySampleMs = 0;
     historyPoints.clear();
@@ -191,6 +238,9 @@ void ThermalController::tripFaultLocked(kiln_fault_code_t code, const char *reas
     if (!reason) reason = "";
     kiln_fault_set(code, reason);
     kiln_fault_update_reason(reason);
+    char event_msg[128];
+    std::snprintf(event_msg, sizeof(event_msg), "code=%d reason=%s", (int)code, reason);
+    append_event_log("FAULT", event_msg);
     applyFaultStateLocked();
 }
 
@@ -251,6 +301,9 @@ void ThermalController::loop() {
         const bool can_clear = is_recoverable_fault && sensorRecoveredForClearLocked(now_ms);
         if (is_recoverable_fault && can_clear) {
             ESP_LOGI(TAG, "Auto-clearing sensor fault after recovery.");
+            char event_msg[128];
+            std::snprintf(event_msg, sizeof(event_msg), "code=%d reason=%s", (int)f.code, f.reason);
+            append_event_log("FAULT_CLEAR", event_msg);
             kiln_fault_clear();
             state.isFiring = false;
             state.status = KILN_IDLE;
@@ -373,17 +426,30 @@ void ThermalController::updateTemperature() {
         lastSensorOk = false;
         lastTempValid = false;
         state.currentTemp = NAN;
+        const bool enforce_fault = state.isFiring || tune.active;
 
-        if (raw_comm_bad && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
-            tripFaultLocked(KILN_FAULT_SENSOR_NAN, "Sensor comm/no-data");
-        } else if (raw_open && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
-            tripFaultLocked(KILN_FAULT_SENSOR_OPEN, "Sensor open");
-        } else if (raw_short && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
-            tripFaultLocked(KILN_FAULT_SENSOR_SHORT, "Sensor short");
-        } else if (!finite && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
-            tripFaultLocked(KILN_FAULT_SENSOR_NAN, "Sensor NaN/open");
-        } else if (sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
-            tripFaultLocked(KILN_FAULT_SENSOR_OOR, "Sensor out of range");
+        const char *sensor_reason = "Sensor out of range";
+        kiln_fault_code_t sensor_code = KILN_FAULT_SENSOR_OOR;
+        if (raw_comm_bad) {
+            sensor_reason = "Sensor comm/no-data";
+            sensor_code = KILN_FAULT_SENSOR_NAN;
+        } else if (raw_open) {
+            sensor_reason = "Sensor open";
+            sensor_code = KILN_FAULT_SENSOR_OPEN;
+        } else if (raw_short) {
+            sensor_reason = "Sensor short";
+            sensor_code = KILN_FAULT_SENSOR_SHORT;
+        } else if (!finite) {
+            sensor_reason = "Sensor NaN/open";
+            sensor_code = KILN_FAULT_SENSOR_NAN;
+        }
+
+        if (!state.isFiring && !tune.active) {
+            state.errorMsg = sensor_reason;
+        }
+
+        if (enforce_fault && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
+            tripFaultLocked(sensor_code, sensor_reason);
         }
         return;
     }
@@ -437,6 +503,9 @@ void ThermalController::updateTemperature() {
     sensorValidStreak++;
     lastSensorOk = true;
     state.currentTemp = filtered;
+    if (!state.isFiring && !tune.active && !kiln_fault_is_active()) {
+        state.errorMsg = "";
+    }
 
     {
         static uint64_t last_ok_log_ms = 0;
@@ -467,6 +536,49 @@ void ThermalController::updateTemperature() {
     }
 
     sensorShortStreak = 0;
+
+    // SSR stuck-on detection:
+    // if heater is commanded OFF for a long continuous period and temperature still
+    // rises significantly, latch dedicated SSR fault.
+    {
+        static uint64_t off_since_ms = 0;
+        static float off_baseline_c = 0.0f;
+        static uint32_t off_rise_streak = 0;
+
+        uint64_t effective_window_start = windowStartTime;
+        while ((now_ms - effective_window_start) > PID_WINDOW_SIZE) {
+            effective_window_start += PID_WINDOW_SIZE;
+        }
+        const bool heater_commanded_on =
+            state.isFiring &&
+            !tune.active &&
+            std::isfinite(output) &&
+            output > (now_ms - effective_window_start);
+        const bool monitor_ssr = !heater_commanded_on && !tune.active && !kiln_fault_is_active();
+
+        if (!monitor_ssr) {
+            off_since_ms = 0;
+            off_rise_streak = 0;
+        } else {
+            if (off_since_ms == 0) {
+                off_since_ms = now_ms;
+                off_baseline_c = state.currentTemp;
+                off_rise_streak = 0;
+            }
+            const uint64_t off_ms = now_ms - off_since_ms;
+            const float off_rise_c = state.currentTemp - off_baseline_c;
+            if (off_ms >= SSR_STUCK_OFF_MIN_MS && off_rise_c >= SSR_STUCK_RISE_DELTA_C) {
+                off_rise_streak++;
+                if (off_rise_streak >= SSR_STUCK_LATCH_COUNT) {
+                    heater_hal_all_off();
+                    tripFaultLocked(KILN_FAULT_SSR, "SSR stuck-on suspected");
+                    return;
+                }
+            } else {
+                off_rise_streak = 0;
+            }
+        }
+    }
 
     // Stuck-value detection while heating demand is high.
     const bool demanding_heat = state.isFiring && std::isfinite(setpoint) && setpoint > state.currentTemp + 20.0f;
@@ -564,6 +676,9 @@ void ThermalController::persistRuntimeSettingsLocked() {
 }
 
 void ThermalController::saveRecoveryStateLocked() {
+#if CONFIG_TC_BOARD_NEW_P4
+    return;
+#endif
     if (!state.isFiring || activeSchedule.empty()) return;
 
     cJSON *root = cJSON_CreateObject();
@@ -587,6 +702,7 @@ void ThermalController::saveRecoveryStateLocked() {
     }
     cJSON_AddItemToObject(root, "steps", schedArr);
     cJSON_AddStringToObject(root, "name", loadedScheduleName.c_str());
+    cJSON_AddNumberToObject(root, "saved_unix_s", (double)std::time(nullptr));
     
     char *rendered = cJSON_PrintUnformatted(root);
     const std::string out = rendered ? rendered : "{}";
@@ -597,12 +713,19 @@ void ThermalController::saveRecoveryStateLocked() {
 }
 
 void ThermalController::loadRecoveryStateLocked() {
+#if CONFIG_TC_BOARD_NEW_P4
+    // NewP4: disable automatic kiln resume on reboot to avoid unintended auto-start.
+    // Keep boot deterministic: user must explicitly press Start after reboot.
+    clearRecoveryStateLocked();
+    return;
+#endif
     const std::string file = kiln_fs_read_text(RECOVERY_FILE);
     if (file.empty()) return;
 
     cJSON *root = cJSON_Parse(file.c_str());
     if (!root || !cJSON_IsObject(root)) {
         if (root) cJSON_Delete(root);
+        append_event_log("RECOVERY_ABORT", "invalid recovery json");
         return;
     }
 
@@ -643,6 +766,8 @@ void ThermalController::loadRecoveryStateLocked() {
 
     if (activeSchedule.empty()) {
         cJSON_Delete(root);
+        append_event_log("RECOVERY_ABORT", "recovery schedule is empty");
+        clearRecoveryStateLocked();
         return; // Nothing to recover
     }
 
@@ -660,18 +785,77 @@ void ThermalController::loadRecoveryStateLocked() {
     
     const cJSON *stepStartTempItem = cJSON_GetObjectItem(root, "stepStartTemp");
     if (cJSON_IsNumber(stepStartTempItem)) stepStartTemp = (float)stepStartTempItem->valuedouble;
+    const cJSON *savedUnixItem = cJSON_GetObjectItem(root, "saved_unix_s");
+    const std::time_t saved_unix_s = cJSON_IsNumber(savedUnixItem) ? (std::time_t)savedUnixItem->valuedouble : 0;
 
     cJSON_Delete(root);
 
-    // 3. Restart firing
+    // 3. Safety guard before automatic resume.
+    if (state.currentStep < 0 || state.currentStep >= state.totalSteps) {
+        state.isFiring = false;
+        state.status = KILN_IDLE;
+        state.errorMsg = "Recovery aborted: invalid step index";
+        append_event_log("RECOVERY_ABORT", "invalid step index");
+        clearRecoveryStateLocked();
+        return;
+    }
+
+    updateTemperature();
+    const bool sensor_ok = isSensorHealthy();
+    const bool fault_active = kiln_fault_is_active();
+    const bool temp_ok = std::isfinite(state.currentTemp) &&
+                         state.currentTemp >= RECOVERY_RESUME_TEMP_MIN_C &&
+                         state.currentTemp <= RECOVERY_RESUME_TEMP_MAX_C;
+    const uint64_t max_age_ms = load_recovery_max_age_ms();
+    bool age_ok = false;
+    uint64_t age_ms = UINT64_MAX;
+    const std::time_t now_unix_s = std::time(nullptr);
+    if (saved_unix_s >= UNIX_TIME_VALID_AFTER &&
+        now_unix_s >= UNIX_TIME_VALID_AFTER &&
+        now_unix_s >= saved_unix_s) {
+        age_ms = (uint64_t)(now_unix_s - saved_unix_s) * 1000ULL;
+        age_ok = age_ms <= max_age_ms;
+    }
+
+    if (!sensor_ok || fault_active || !temp_ok || !age_ok) {
+        char reason[192];
+        if (!age_ok && age_ms != UINT64_MAX) {
+            std::snprintf(reason, sizeof(reason),
+                          "safe_to_resume=false sensor=%d fault=%d temp_ok=%d age_ms=%llu max_age_ms=%llu",
+                          (int)sensor_ok, (int)fault_active, (int)temp_ok,
+                          (unsigned long long)age_ms, (unsigned long long)max_age_ms);
+        } else {
+            std::snprintf(reason, sizeof(reason),
+                          "safe_to_resume=false sensor=%d fault=%d temp_ok=%d age=unknown max_age_ms=%llu",
+                          (int)sensor_ok, (int)fault_active, (int)temp_ok,
+                          (unsigned long long)max_age_ms);
+        }
+        append_event_log("RECOVERY_ABORT", reason);
+        state.isFiring = false;
+        state.status = (fault_active || !sensor_ok || !temp_ok) ? KILN_FAULT : KILN_IDLE;
+        state.errorMsg = "Recovery blocked by safety policy";
+        output = 0;
+        setpoint = 0;
+        state.targetTemp = 0;
+        state.timeRemaining = -1;
+        heater_hal_all_off();
+        clearRecoveryStateLocked();
+        ESP_LOGW(TAG, "Recovery blocked: %s", reason);
+        return;
+    }
+
+    // 4. Restart firing
     state.isFiring = true;
     state.status = KILN_RUNNING;
     state.errorMsg = "Recovered from power loss";
     state.timeRemaining = -1;
     windowStartTime = esp_timer_get_time() / 1000;
     
-    heater_hal_set_safety_relay(true);
+    thermal_set_safety_relay(true);
     historyStartLocked((uint64_t)(esp_timer_get_time() / 1000ULL));
+    char event_msg[96];
+    std::snprintf(event_msg, sizeof(event_msg), "step=%d total=%d", state.currentStep, state.totalSteps);
+    append_event_log("RECOVERY_RESUME", event_msg);
     
     ESP_LOGW(TAG, "Kiln successfully recovered to step %d", state.currentStep);
 }
@@ -831,8 +1015,8 @@ bool ThermalController::startAutotune(float setpointC) {
     tune.lastHigh = state.currentTemp;
     tune.lastLow = state.currentTemp;
 
-    heater_hal_set_safety_relay(true);
-    heater_hal_set_ssr(true);
+    thermal_set_safety_relay(true);
+    thermal_set_ssr(true);
 
     state.isFiring = true;
     state.status = KILN_TUNING;
@@ -928,8 +1112,7 @@ void ThermalController::autotuneLoopLocked(uint64_t now_ms) {
         }
     }
 
-    heater_hal_set_safety_relay(true);
-    heater_hal_set_ssr(tune.heaterOn);
+    thermal_set_ssr(tune.heaterOn);
     output = tune.heaterOn ? PID_WINDOW_SIZE : 0;
 
     char msg[64];
@@ -1051,7 +1234,15 @@ void ThermalController::processSchedule() {
     uint64_t now = esp_timer_get_time() / 1000;
     uint64_t elapsed = (now - stepStartTime) / 1000; // seconds
     ScheduleStep step = activeSchedule[state.currentStep];
-    ESP_LOGI(TAG, "Processing Step %d of %d: Type %d, Value %.2f", state.currentStep + 1, state.totalSteps, step.type, step.value);
+    static uint32_t s_last_step_log_ms = 0;
+    static int s_last_logged_step = -1;
+    const uint32_t now_ms_u32 = (uint32_t)(now & 0xFFFFFFFFULL);
+    const bool step_changed = (s_last_logged_step != (int)state.currentStep);
+    if (step_changed || (now_ms_u32 - s_last_step_log_ms) >= 2000U) {
+        ESP_LOGI(TAG, "Step %d/%d type=%d target=%.2f", state.currentStep + 1, state.totalSteps, step.type, step.value);
+        s_last_step_log_ms = now_ms_u32;
+        s_last_logged_step = (int)state.currentStep;
+    }
 
     if (step.type == 0) { // RAMP
         const float target = std::min(step.value, userMaxTempC);
@@ -1120,14 +1311,16 @@ void ThermalController::driveSSR() {
     if (now - windowStartTime > PID_WINDOW_SIZE) {
         windowStartTime += PID_WINDOW_SIZE;
     }
-    
-    heater_hal_set_safety_relay(true);
-    heater_hal_set_ssr(output > (now - windowStartTime));
+    // Safety relay (contactor) is latched in start()/stop()/fault paths.
+    // Avoid toggling it in the fast PID loop to prevent relay chatter.
+    thermal_set_ssr(output > (now - windowStartTime));
 }
 
 void ThermalController::historyStartLocked(uint64_t now_ms) {
     historyActive = true;
     historyStartMs = now_ms;
+    const std::time_t now_unix = std::time(nullptr);
+    historyStartUnixMs = (now_unix >= UNIX_TIME_VALID_AFTER) ? ((uint64_t)now_unix * 1000ULL) : 0ULL;
     historyPeakTemp = state.currentTemp;
     lastHistorySampleMs = 0;
     historyPoints.clear();
@@ -1188,9 +1381,21 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     if (!historyActive) return;
 
     // Build summary
-    const uint64_t start_ms = historyStartMs;
-    const uint64_t end_ms = now_ms;
-    const uint64_t duration_s = (end_ms > start_ms) ? ((end_ms - start_ms) / 1000ULL) : 0ULL;
+    const uint64_t start_ms_mono = historyStartMs;
+    const uint64_t end_ms_mono = now_ms;
+    const uint64_t duration_s = (end_ms_mono > start_ms_mono) ? ((end_ms_mono - start_ms_mono) / 1000ULL) : 0ULL;
+
+    uint64_t start_ms = historyStartUnixMs;
+    uint64_t end_ms = 0ULL;
+    const std::time_t now_unix = std::time(nullptr);
+    if (now_unix >= UNIX_TIME_VALID_AFTER) {
+        end_ms = (uint64_t)now_unix * 1000ULL;
+        if (start_ms == 0ULL && end_ms >= duration_s * 1000ULL) {
+            start_ms = end_ms - duration_s * 1000ULL;
+        }
+    }
+    if (start_ms == 0ULL) start_ms = start_ms_mono;
+    if (end_ms == 0ULL) end_ms = end_ms_mono;
 
     const int totalSteps = state.totalSteps;
     const int completedSteps = std::max(0, std::min(state.currentStep, state.totalSteps));
@@ -1231,6 +1436,8 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     cJSON_AddStringToObject(summary, "scheduleName", loadedScheduleName.c_str());
     cJSON_AddNumberToObject(summary, "startTime", (double)start_ms);
     cJSON_AddNumberToObject(summary, "endTime", (double)end_ms);
+    cJSON_AddNumberToObject(summary, "startTs", (double)start_ms);
+    cJSON_AddNumberToObject(summary, "endTs", (double)end_ms);
     cJSON_AddNumberToObject(summary, "duration", (double)duration_s);
     cJSON_AddStringToObject(summary, "status", status ? status : "STOPPED");
     if (!std::isnan(historyPeakTemp)) cJSON_AddNumberToObject(summary, "peakTemp", (double)historyPeakTemp);
@@ -1309,17 +1516,18 @@ void ThermalController::historyFinalizeLocked(uint64_t now_ms, const char *statu
     (void)kiln_fs_write_text_atomic(path.c_str(), outDetail);
 
     historyActive = false;
+    historyStartUnixMs = 0;
     historyChanges.clear();
 }
 
 void ThermalController::startSchedule(const std::string& scheduleJson) {
-    loadSchedule(scheduleJson);
+    (void)loadSchedule(scheduleJson);
     // REMOVED: start(); - This was causing auto-start when using old API calls
     // Now startSchedule just loads. Explicit start() call needed.
 }
 
-void ThermalController::loadSchedule(const std::string& scheduleJson) {
-    if (!mutex) return;
+bool ThermalController::loadSchedule(const std::string& scheduleJson) {
+    if (!mutex) return false;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     
     ESP_LOGI(TAG, "Received schedule JSON: %s", scheduleJson.c_str());
@@ -1329,7 +1537,7 @@ void ThermalController::loadSchedule(const std::string& scheduleJson) {
         ESP_LOGE(TAG, "Failed to parse schedule JSON");
         state.errorMsg = "Invalid JSON";
         xSemaphoreGiveRecursive(mutex);
-        return;
+        return false;
     }
 
     // Best-effort schedule name for UI/history
@@ -1355,7 +1563,7 @@ void ThermalController::loadSchedule(const std::string& scheduleJson) {
         state.errorMsg = "Invalid Schedule";
         cJSON_Delete(root);
         xSemaphoreGiveRecursive(mutex);
-        return;
+        return false;
     }
 
     cJSON *step = NULL;
@@ -1385,7 +1593,7 @@ void ThermalController::loadSchedule(const std::string& scheduleJson) {
     if (activeSchedule.empty()) {
         state.errorMsg = "Empty Schedule";
         xSemaphoreGiveRecursive(mutex);
-        return;
+        return false;
     }
     
     // Just load, do not start
@@ -1402,11 +1610,17 @@ void ThermalController::loadSchedule(const std::string& scheduleJson) {
     ESP_LOGI(TAG, "Schedule Loaded with %d steps", state.totalSteps);
     
     xSemaphoreGiveRecursive(mutex);
+    return true;
 }
 
 void ThermalController::start() {
     if (!mutex) return;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+
+    if (state.isFiring) {
+        xSemaphoreGiveRecursive(mutex);
+        return;
+    }
     
     if (activeSchedule.empty()) {
         state.errorMsg = "No Schedule Loaded";
@@ -1433,8 +1647,9 @@ void ThermalController::start() {
     windowStartTime = esp_timer_get_time() / 1000;
     
     // Enable Safety Relay (SSR control happens in driveSSR)
-    heater_hal_set_safety_relay(true);
+    thermal_set_safety_relay(true);
     
+    wifi_set_firing_active(true);
     ESP_LOGI(TAG, "Schedule Started");
 
     historyStartLocked((uint64_t)(esp_timer_get_time() / 1000ULL));
@@ -1447,10 +1662,15 @@ void ThermalController::stop(const std::string& reason) {
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     tune.active = false;
+    if (!state.isFiring && state.status != KILN_TUNING) {
+        xSemaphoreGiveRecursive(mutex);
+        return;
+    }
     
     const bool wasFiring = state.isFiring;
     state.isFiring = false;
     state.status = KILN_IDLE;
+    wifi_set_firing_active(false);
     state.errorMsg = reason;
     state.duration = 0;
     state.timeRemaining = -1;
@@ -1467,7 +1687,15 @@ void ThermalController::stop(const std::string& reason) {
     if (wasFiring && historyActive) {
         const char *st = "STOPPED";
         if (state.status == KILN_COMPLETE || reason == "Schedule Complete") st = "COMPLETED";
+#if CONFIG_TC_BOARD_NEW_P4
+        // NewP4: avoid heavy synchronous LittleFS writes on Stop to prevent visible display flicker.
+        historyActive = false;
+        historyStartUnixMs = 0;
+        historyPoints.clear();
+        historyChanges.clear();
+#else
         historyFinalizeLocked((uint64_t)(esp_timer_get_time() / 1000ULL), st);
+#endif
     }
     
     xSemaphoreGiveRecursive(mutex);
@@ -1485,6 +1713,7 @@ void ThermalController::emergencyStop(const std::string& reason) {
 
     state.isFiring = false;
     state.status = KILN_FAULT;
+    wifi_set_firing_active(false);
     state.errorMsg = reason;
     state.duration = 0;
     state.timeRemaining = -1;
@@ -1499,7 +1728,16 @@ void ThermalController::emergencyStop(const std::string& reason) {
 
     ESP_LOGE(TAG, "EMERGENCY STOP: %s", reason.c_str());
 
-    if (historyActive) historyFinalizeLocked((uint64_t)(esp_timer_get_time() / 1000ULL), "ERROR");
+    if (historyActive) {
+#if CONFIG_TC_BOARD_NEW_P4
+        historyActive = false;
+        historyStartUnixMs = 0;
+        historyPoints.clear();
+        historyChanges.clear();
+#else
+        historyFinalizeLocked((uint64_t)(esp_timer_get_time() / 1000ULL), "ERROR");
+#endif
+    }
 
     xSemaphoreGiveRecursive(mutex);
 }
@@ -1535,6 +1773,11 @@ bool ThermalController::clearFault() {
     }
 
     kiln_fault_clear();
+    {
+        char event_msg[128];
+        std::snprintf(event_msg, sizeof(event_msg), "code=%d reason=%s", (int)f.code, f.reason);
+        append_event_log("FAULT_CLEAR", event_msg);
+    }
 
     state.isFiring = false;
     state.status = KILN_IDLE;
@@ -1550,11 +1793,14 @@ bool ThermalController::clearFault() {
     return true;
 }
 
-void ThermalController::skipCurrentStep() {
+bool ThermalController::skipCurrentStep() {
     // Ensure thread safety
+    if (!mutex) return false;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    bool applied = false;
 
     if (state.isFiring) {
+        applied = true;
         const int prev_step = state.currentStep;
         const float prev_target = state.targetTemp;
         ESP_LOGI(TAG, "Skipping current step. Current step: %d, Total steps: %d", state.currentStep + 1, state.totalSteps);
@@ -1583,10 +1829,13 @@ void ThermalController::skipCurrentStep() {
     }
 
     xSemaphoreGiveRecursive(mutex);
+    return applied;
 }
 
-void ThermalController::addTimeToHold(float minutesToAdd) {
+bool ThermalController::addTimeToHold(float minutesToAdd) {
+    if (!mutex) return false;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    bool applied = false;
 
     if (state.isFiring && state.status == KILN_HOLD && state.currentStep < activeSchedule.size()) {
         ScheduleStep currentStep = activeSchedule[state.currentStep];
@@ -1595,6 +1844,7 @@ void ThermalController::addTimeToHold(float minutesToAdd) {
             activeSchedule[state.currentStep].value += minutesToAdd;
             historyRecordChangeLocked("add_time", "hold_min", before_hold, activeSchedule[state.currentStep].value);
             ESP_LOGI(TAG, "Added %.2f minutes to current HOLD step. New hold time: %.2f min", minutesToAdd, activeSchedule[state.currentStep].value);
+            applied = true;
         } else {
             ESP_LOGW(TAG, "Attempted to add time, but current step is not a HOLD step.");
         }
@@ -1603,10 +1853,13 @@ void ThermalController::addTimeToHold(float minutesToAdd) {
     }
 
     xSemaphoreGiveRecursive(mutex);
+    return applied;
 }
 
-void ThermalController::addTemperatureToTarget(float tempToAdd) {
+bool ThermalController::addTemperatureToTarget(float tempToAdd) {
+    if (!mutex) return false;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    bool applied = false;
 
     if (state.isFiring) {
         const float before_target = state.targetTemp;
@@ -1614,21 +1867,26 @@ void ThermalController::addTemperatureToTarget(float tempToAdd) {
         setpoint = state.targetTemp; // Update PID setpoint immediately
         historyRecordChangeLocked("add_temp", "target", before_target, state.targetTemp);
         ESP_LOGI(TAG, "Added %.2f C to target. New target temp: %.2f C", tempToAdd, state.targetTemp);
+        applied = true;
     } else {
         ESP_LOGW(TAG, "Attempted to add temperature but kiln is not firing.");
     }
 
     xSemaphoreGiveRecursive(mutex);
+    return applied;
 }
 
-void ThermalController::setCurrentRampRate(float rateCPerMin) {
+bool ThermalController::setCurrentRampRate(float rateCPerMin) {
+    if (!mutex) return false;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    bool applied = false;
     if (state.isFiring && state.currentStep < activeSchedule.size()) {
         if (activeSchedule[state.currentStep].type == 0 && std::isfinite(rateCPerMin) && rateCPerMin > 0.0f) {
             const float before_rate = activeSchedule[state.currentStep].rate;
             activeSchedule[state.currentStep].rate = rateCPerMin;
             historyRecordChangeLocked("set_rate", "rate_c_per_min", before_rate, activeSchedule[state.currentStep].rate);
             ESP_LOGI(TAG, "Updated current RAMP rate to %.2f C/min", (double)rateCPerMin);
+            applied = true;
         } else {
             ESP_LOGW(TAG, "Attempted to set ramp rate but current step is not RAMP or payload invalid.");
         }
@@ -1636,6 +1894,7 @@ void ThermalController::setCurrentRampRate(float rateCPerMin) {
         ESP_LOGW(TAG, "Attempted to set ramp rate but kiln is not firing.");
     }
     xSemaphoreGiveRecursive(mutex);
+    return applied;
 }
 
 

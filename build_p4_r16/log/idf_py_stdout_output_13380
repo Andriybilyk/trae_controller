@@ -1,0 +1,126 @@
+Command: ninja all
+[0/1] Re-running CMake...
+-- Component directory C:/esp/.espressif/v6.0/esp-idf/components/mqtt does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/material-1.0 does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/src does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target_preview does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/ui does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/managed_components/lovyangfx does not contain a CMakeLists.txt file. No component will be added
+-- Minimal build - OFF
+-- ccache will be used for faster recompilation
+-- Building ESP-IDF components for target esp32p4
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch"(introduced by component "esp_lcd_touch_gt911")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch"(introduced by component "atanisoft/esp_lcd_touch_xpt2046")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cmake_utilities for dependency "espressif/cmake_utilities"(introduced by component "espressif/esp_lcd_st7701")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_hosted for dependency "espressif/esp_hosted"(introduced by component "espressif/esp_wifi_remote")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__wifi_remote_over_eppp for dependency "espressif/wifi_remote_over_eppp"(introduced by component "espressif/esp_wifi_remote")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch"(introduced by component "esp_lcd_touch_gt911")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\atanisoft__esp_lcd_touch_xpt2046 for dependency "atanisoft/esp_lcd_touch_xpt2046", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cjson for dependency "espressif/cjson", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_hosted for dependency "espressif/esp_hosted", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_st7701 for dependency "espressif/esp_lcd_st7701", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\components\esp_lcd_touch_gt911 for dependency "espressif/esp_lcd_touch_gt911", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_wifi_remote for dependency "espressif/esp_wifi_remote", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__mdns for dependency "espressif/mdns", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__mqtt for dependency "espressif/mqtt", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\joltwallet__littlefs for dependency "joltwallet/littlefs", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch"(introduced by component "atanisoft/esp_lcd_touch_xpt2046"), specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cmake_utilities for dependency "espressif/cmake_utilities"(introduced by component "espressif/esp_lcd_st7701"), specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch"(introduced by component "esp_lcd_touch_gt911"), specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_hosted for dependency "espressif/esp_hosted"(introduced by component "espressif/esp_wifi_remote"), specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__wifi_remote_over_eppp for dependency "espressif/wifi_remote_over_eppp"(introduced by component "espressif/esp_wifi_remote"), specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\components\esp_lcd_touch_gt911\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\atanisoft__esp_lcd_touch_xpt2046\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cmake_utilities for dependency "espressif/cmake_utilities", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_st7701\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_hosted for dependency "espressif/esp_hosted", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_wifi_remote\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__wifi_remote_over_eppp for dependency "espressif/wifi_remote_over_eppp", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_wifi_remote\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link"(introduced by component "espressif/wifi_remote_over_eppp"), specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_wifi_remote\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link")
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link for dependency "espressif/eppp_link", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__wifi_remote_over_eppp\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link for dependency "espressif/esp_serial_slave_link"(introduced by component "espressif/eppp_link"), specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__wifi_remote_over_eppp\idf_component.yml
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch for dependency "espressif/esp_lcd_touch", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\components\esp_lcd_touch_gt911\idf_component.yml
+NOTICE: Processing 14 dependencies:
+NOTICE: [1/14] atanisoft/esp_lcd_touch_xpt2046 (1.0.6) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\atanisoft__esp_lcd_touch_xpt2046)
+NOTICE: [2/14] espressif/cjson (1.7.19~2) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cjson)
+NOTICE: [3/14] espressif/cmake_utilities (0.5.3) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__cmake_utilities)
+NOTICE: [4/14] espressif/eppp_link (1.1.4) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__eppp_link)
+NOTICE: [5/14] espressif/esp_hosted (2.12.3) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_hosted)
+NOTICE: [6/14] espressif/esp_lcd_st7701 (2.0.2) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_st7701)
+NOTICE: [7/14] espressif/esp_lcd_touch (1.2.1) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_lcd_touch)
+NOTICE: [8/14] espressif/esp_serial_slave_link (1.1.2) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_serial_slave_link)
+NOTICE: [9/14] espressif/esp_wifi_remote (1.5.1) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__esp_wifi_remote)
+NOTICE: [10/14] espressif/mdns (1.11.0) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__mdns)
+NOTICE: [11/14] espressif/mqtt (1.0.0) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__mqtt)
+NOTICE: [12/14] espressif/wifi_remote_over_eppp (0.3.2) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\espressif__wifi_remote_over_eppp)
+NOTICE: [13/14] joltwallet/littlefs (1.20.4) (C:\Users\andri\Documents\GitHub\trae_controller\firmware\managed_components\joltwallet__littlefs)
+NOTICE: [14/14] idf (6.0.0)
+-- Using new driver components (IDF тЙе 5.0)
+-- ESP-TEE is currently supported only on the esp32c6;esp32h2;esp32c5;esp32c61 SoCs
+-- KCONFIG_REPORT_VERBOSITY not set, using default
+-- Project sdkconfig file C:/Users/andri/Documents/GitHub/trae_controller/firmware/sdkconfig
+Loading defaults file C:/Users/andri/Documents/GitHub/trae_controller/firmware/sdkconfig.defaults...
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/riscv/ld/rom.api.ld
+-- App "trae_controller" version: 3d6c312-dirty
+-- Setting up mbedtls configuration
+-- Linkage type is PUBLIC
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_hal_wdt/esp32p4/rom.wdt.ld
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_system/ld/esp32p4/memory.ld.in
+--   -> Preprocessing .in script: C:/esp/.espressif/v6.0/esp-idf/components/esp_system/ld/esp32p4/memory.ld.in
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_system/ld/esp32p4/sections.ld.in
+--   -> Preprocessing .in script: C:/esp/.espressif/v6.0/esp-idf/components/esp_system/ld/esp32p4/sections.ld.in
+--   -> Applying ldgen processing: C:/Users/andri/Documents/GitHub/trae_controller/build_p4_r16/esp-idf/esp_system/ld/sections.ld.in
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_rom/esp32p4/ld/esp32p4.rom.ld
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_rom/esp32p4/ld/esp32p4.rom.api.ld
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_rom/esp32p4/ld/esp32p4.rom.rvfp.ld
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_rom/esp32p4/ld/esp32p4.rom.systimer.ld
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_rom/esp32p4/ld/esp32p4.rom.version.ld
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/esp_rom/esp32p4/ld/esp32p4.rom.libc.ld
+-- Adding linker script C:/esp/.espressif/v6.0/esp-idf/components/soc/esp32p4/ld/esp32p4.peripherals.ld
+-- Using Hosted Wi-Fi
+-- Using new driver components (IDF ≥ 5.0)

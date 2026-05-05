@@ -8,6 +8,8 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <algorithm>
+#include <cctype>
 #include <string>
 
 static bool get_number_like_local(const cJSON *obj, const char *key, double &out) {
@@ -26,6 +28,19 @@ static bool get_number_like_local(const cJSON *obj, const char *key, double &out
         }
     }
     return false;
+}
+
+static std::string to_lower_ascii_local(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return s;
+}
+
+static bool default_require_touch_for_mode_local(const std::string &mode_raw) {
+    const std::string mode = to_lower_ascii_local(mode_raw);
+    if (mode == "headless" || mode == "remote") return false;
+    return true;
 }
 
 esp_err_t WiFiServerManager::api_settings_get_handler(httpd_req_t *req) {
@@ -73,6 +88,20 @@ esp_err_t WiFiServerManager::api_settings_get_handler(httpd_req_t *req) {
     cJSON_AddNumberToObject(root, "autotune_target_c", (double)thermalCtrl.getAutotuneTargetC());
     cJSON_DeleteItemFromObject(root, "autotuneTargetC");
     cJSON_AddNumberToObject(root, "autotuneTargetC", (double)thermalCtrl.getAutotuneTargetC());
+
+    std::string deployment_mode = "panel";
+    const cJSON *mode = cJSON_GetObjectItem(root, "deployment_mode");
+    if (cJSON_IsString(mode) && mode->valuestring && mode->valuestring[0]) {
+        deployment_mode = mode->valuestring;
+    } else {
+        cJSON_DeleteItemFromObject(root, "deployment_mode");
+        cJSON_AddStringToObject(root, "deployment_mode", deployment_mode.c_str());
+    }
+    const cJSON *touch_policy = cJSON_GetObjectItem(root, "require_touch_calibration_for_start");
+    if (!cJSON_IsBool(touch_policy)) {
+        cJSON_DeleteItemFromObject(root, "require_touch_calibration_for_start");
+        cJSON_AddBoolToObject(root, "require_touch_calibration_for_start", default_require_touch_for_mode_local(deployment_mode));
+    }
 
     char *rendered = cJSON_PrintUnformatted(root);
     std::string output = rendered ? rendered : "{}";
@@ -157,6 +186,37 @@ esp_err_t WiFiServerManager::api_settings_set_handler(httpd_req_t *req) {
         if (get_number_like_local(incoming, "zones", v)) {
             cJSON_DeleteItemFromObject(root, "zones");
             cJSON_AddNumberToObject(root, "zones", v);
+        }
+    }
+
+    std::string deployment_mode = "panel";
+    {
+        const cJSON *mode_item = cJSON_GetObjectItem(incoming, "deployment_mode");
+        if (cJSON_IsString(mode_item) && mode_item->valuestring && mode_item->valuestring[0]) {
+            deployment_mode = mode_item->valuestring;
+            cJSON_DeleteItemFromObject(root, "deployment_mode");
+            cJSON_AddStringToObject(root, "deployment_mode", deployment_mode.c_str());
+        } else {
+            const cJSON *existing_mode = cJSON_GetObjectItem(root, "deployment_mode");
+            if (cJSON_IsString(existing_mode) && existing_mode->valuestring && existing_mode->valuestring[0]) {
+                deployment_mode = existing_mode->valuestring;
+            } else {
+                cJSON_DeleteItemFromObject(root, "deployment_mode");
+                cJSON_AddStringToObject(root, "deployment_mode", deployment_mode.c_str());
+            }
+        }
+    }
+    {
+        const cJSON *policy_item = cJSON_GetObjectItem(incoming, "require_touch_calibration_for_start");
+        if (cJSON_IsBool(policy_item)) {
+            cJSON_DeleteItemFromObject(root, "require_touch_calibration_for_start");
+            cJSON_AddBoolToObject(root, "require_touch_calibration_for_start", cJSON_IsTrue(policy_item));
+        } else {
+            const cJSON *existing_policy = cJSON_GetObjectItem(root, "require_touch_calibration_for_start");
+            if (!cJSON_IsBool(existing_policy)) {
+                cJSON_DeleteItemFromObject(root, "require_touch_calibration_for_start");
+                cJSON_AddBoolToObject(root, "require_touch_calibration_for_start", default_require_touch_for_mode_local(deployment_mode));
+            }
         }
     }
 

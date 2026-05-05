@@ -1,18 +1,84 @@
 #include "kiln_config/config_store.h"
-
 #include "kiln_config/config.h"
 
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "cJSON.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
+#include <cstring>
+#include <string>
 
+static const char *TAG = "CFG_STORE";
 static SemaphoreHandle_t s_fs_mutex = xSemaphoreCreateRecursiveMutex();
+static QueueHandle_t s_async_save_queue = nullptr;
+static constexpr TickType_t kP4SaveDebounceTicks = pdMS_TO_TICKS(1800);
+
+static bool write_string_to_file_locked(const char *path, const std::string &data);
+static bool nvs_save_string(const std::string &s);
+static std::string migrate_config_json_schema(const std::string &json, bool *changed_out);
+
+struct AsyncSaveReq {
+    char *json;
+};
+
+static void config_save_worker_task(void *pv) {
+    AsyncSaveReq req;
+    while (xQueueReceive(s_async_save_queue, &req, portMAX_DELAY)) {
+        if (req.json) {
+            // Debounce + coalescing:
+            // wait for a short quiet window and keep only the latest payload.
+            AsyncSaveReq latest_req;
+            while (xQueueReceive(s_async_save_queue, &latest_req, kP4SaveDebounceTicks)) {
+                free(req.json);
+                req = latest_req;
+            }
+
+            const std::string migrated = migrate_config_json_schema(req.json, nullptr);
+            free(req.json);
+
+            ESP_LOGI(TAG, "Starting debounced async config save to NVS and LittleFS...");
+            (void)nvs_save_string(migrated);
+            
+            SemaphoreHandle_t m = kiln_config_fs_mutex();
+            if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
+            (void)write_string_to_file_locked(CONFIG_FILE, migrated);
+            if (m) xSemaphoreGiveRecursive(m);
+            ESP_LOGI(TAG, "Debounced async config save complete");
+        }
+    }
+}
+
+static void ensure_async_worker() {
+    if (s_async_save_queue == nullptr) {
+        s_async_save_queue = xQueueCreate(8, sizeof(AsyncSaveReq));
+        xTaskCreate(config_save_worker_task, "cfg_save", 4096, nullptr, 1, nullptr);
+    }
+}
 
 static constexpr const char *NVS_NS = "kiln";
 static constexpr const char *NVS_KEY = "config_json";
-static constexpr int CONFIG_SCHEMA_VERSION = 2;
+static constexpr int CONFIG_SCHEMA_VERSION = 3;
+
+static std::string to_lower_ascii(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return s;
+}
+
+static bool mode_requires_touch_calibration(const char *mode_raw) {
+    std::string mode = mode_raw ? mode_raw : "";
+    mode = to_lower_ascii(mode);
+    if (mode == "headless" || mode == "remote") return false;
+    return true; // panel/default
+}
 
 SemaphoreHandle_t kiln_config_fs_mutex() {
     return s_fs_mutex;
@@ -119,6 +185,28 @@ static std::string migrate_config_json_schema(const std::string &json, bool *cha
         changed = true;
     }
 
+    if (ver < 3) {
+        const cJSON *mode_item = cJSON_GetObjectItem(root, "deployment_mode");
+        const char *mode = (cJSON_IsString(mode_item) && mode_item->valuestring && mode_item->valuestring[0])
+            ? mode_item->valuestring
+            : "panel";
+        if (!(cJSON_IsString(mode_item) && mode_item->valuestring && mode_item->valuestring[0])) {
+            cJSON_DeleteItemFromObject(root, "deployment_mode");
+            cJSON_AddStringToObject(root, "deployment_mode", mode);
+            changed = true;
+        }
+
+        const cJSON *req_touch = cJSON_GetObjectItem(root, "require_touch_calibration_for_start");
+        if (!cJSON_IsBool(req_touch)) {
+            cJSON_DeleteItemFromObject(root, "require_touch_calibration_for_start");
+            cJSON_AddBoolToObject(root, "require_touch_calibration_for_start", mode_requires_touch_calibration(mode));
+            changed = true;
+        }
+
+        ver = 3;
+        changed = true;
+    }
+
     cJSON_DeleteItemFromObject(root, "schema_version");
     cJSON_AddNumberToObject(root, "schema_version", (double)CONFIG_SCHEMA_VERSION);
 
@@ -150,6 +238,18 @@ std::string kiln_config_load_json_config() {
 }
 
 bool kiln_config_save_json_config(const std::string &json) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    // On ESP32-P4, synchronous flash writes cause visible display flicker.
+    // We defer the save to a background task.
+    ensure_async_worker();
+    AsyncSaveReq req;
+    req.json = strdup(json.c_str());
+    if (xQueueSend(s_async_save_queue, &req, 0) != pdTRUE) {
+        free(req.json);
+        return false;
+    }
+    return true;
+#else
     const std::string migrated = migrate_config_json_schema(json, nullptr);
     (void)nvs_save_string(migrated);
     SemaphoreHandle_t m = kiln_config_fs_mutex();
@@ -157,6 +257,7 @@ bool kiln_config_save_json_config(const std::string &json) {
     const bool ok = write_string_to_file_locked(CONFIG_FILE, migrated);
     if (m) xSemaphoreGiveRecursive(m);
     return ok;
+#endif
 }
 
 void kiln_config_restore_json_config_file() {

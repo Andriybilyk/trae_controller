@@ -1,0 +1,10 @@
+Command: C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:\esp\.espressif\v6.0\esp-idf\tools/idf_monitor.py -p COM11 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\trae_controller.elf C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\bootloader\bootloader.elf --force-color -m 'C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe' 'C:\esp\.espressif\v6.0\esp-idf\tools\idf.py' '-C' 'firmware' '-B' 'build_p4_r16' '-p' 'COM11'
+[0;33m--- Warning: GDB cannot open serial ports accessed as COMx[0m
+[0;33m--- Using \\.\COM11 instead...[0m
+[0;33m--- esp-idf-monitor 1.9.0 on \\.\COM11 115200[0m
+[0;33m--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H[0m
+[0m--- 0x4ff07116: [0;33mesp_cpu_wait_for_intr[0m[0m at [0;32mC:/esp/.espressif/v6.0/esp-idf/components/esp_hw_support/cpu.c[0m[0m:[1;31m57[0m
+[0m--- 0x4ff09b5a: [0;33mmemcpy[0m[0m at [0;32mC:/esp/.espressif/v6.0/esp-idf/components/esp_libc/src/port/riscv/memcpy.c[0m[0m:[1;31m89[0m
+[0m--- 0x4ff29ed0: [0;33mesp_bootloader_get_description[0m[0m at [0;32mC:/esp/.espressif/v6.0/esp-idf/components/esp_bootloader_format/esp_bootloader_desc.c[0m[0m:[1;31m40[0m
+[0m--- 0x4ff2cbd0: [0;33mesp_flash_encryption_enabled[0m[0m at [0;32mC:/esp/.espressif/v6.0/esp-idf/components/bootloader_support/src/flash_encrypt.c[0m[0m:[1;31m93[0m
+[0m--- 0x4ff29eda: [0;33mcall_start_cpu0[0m[0m at [0;32mC:/esp/.espressif/v6.0/esp-idf/components/bootloader/subproject/main/bootloader_start.c[0m[0m:[1;31m27[0m

@@ -1,0 +1,50 @@
+Command: cmake -G Ninja -B C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16 -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe -DESP_PLATFORM=1 -DCCACHE_ENABLE=True C:\Users\andri\Documents\GitHub\trae_controller\firmware
+-- IDF_TARGET is not set, guessed 'esp32p4' from sdkconfig 'C:/Users/andri/Documents/GitHub/trae_controller/firmware/sdkconfig'
+-- Found Git: C:/Program Files/Git/cmd/git.exe (found version "2.53.0.windows.1")
+-- Component directory C:/esp/.espressif/v6.0/esp-idf/components/mqtt does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/material-1.0 does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/src does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target_preview does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/ui does not contain a CMakeLists.txt file. No component will be added
+-- Component directory C:/Users/andri/Documents/GitHub/trae_controller/firmware/managed_components/lovyangfx does not contain a CMakeLists.txt file. No component will be added
+-- Minimal build - OFF
+-- ccache will be used for faster recompilation
+-- The C compiler identification is GNU 15.2.0
+-- The CXX compiler identification is GNU 15.2.0
+-- The ASM compiler identification is GNU
+-- Found assembler: C:/Users/andri/.espressif/tools/riscv32-esp-elf/esp-15.2.0_20251204/riscv32-esp-elf/bin/riscv32-esp-elf-gcc.exe
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: C:/Users/andri/.espressif/tools/riscv32-esp-elf/esp-15.2.0_20251204/riscv32-esp-elf/bin/riscv32-esp-elf-gcc.exe - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Users/andri/.espressif/tools/riscv32-esp-elf/esp-15.2.0_20251204/riscv32-esp-elf/bin/riscv32-esp-elf-g++.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Building ESP-IDF components for target esp32p4
+NOTICE: Manifest files have changed, solving dependencies.
+NOTICE: Using component placed at C:\Users\andri\Documents\GitHub\trae_controller\firmware\components\esp_lcd_touch_gt911 for dependency "espressif/esp_lcd_touch_gt911", specified in C:\Users\andri\Documents\GitHub\trae_controller\firmware\main\idf_component.yml
+...........................NOTICE: Updating lock file at C:\Users\andri\Documents\GitHub\trae_controller\firmware\dependencies.lock
+NOTICE: Processing 14 dependencies:
+NOTICE: [1/14] atanisoft/esp_lcd_touch_xpt2046 (1.0.6)
+NOTICE: [2/14] espressif/cjson (1.7.19~2)
+NOTICE: [3/14] espressif/cmake_utilities (0.5.3)
+NOTICE: [4/14] espressif/eppp_link (1.1.4)
+NOTICE: [5/14] espressif/esp_hosted (2.12.3)
+NOTICE: [6/14] espressif/esp_lcd_st7701 (2.0.2)
+NOTICE: [7/14] espressif/esp_lcd_touch (1.2.1)
+NOTICE: [8/14] espressif/esp_serial_slave_link (1.1.2)
+NOTICE: [9/14] espressif/esp_wifi_remote (1.5.1)
+NOTICE: [10/14] espressif/mdns (1.11.0)
+NOTICE: [11/14] espressif/mqtt (1.0.0)
+NOTICE: [12/14] espressif/wifi_remote_over_eppp (0.3.2)
+NOTICE: [13/14] joltwallet/littlefs (1.20.4)
+NOTICE: [14/14] idf (6.0.0)
+-- Using new driver components (IDF тЙе 5.0)
+-- ESP-TEE is currently supported only on the esp32c6;esp32h2;esp32c5;esp32c61 SoCs
+-- KCONFIG_REPORT_VERBOSITY not set, using default
+-- Project sdkconfig file C:/Users/andri/Documents/GitHub/trae_controller/firmware/sdkconfig
+-- Configuring incomplete, errors occurred!

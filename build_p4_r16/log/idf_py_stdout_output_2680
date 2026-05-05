@@ -1,0 +1,1285 @@
+Command: C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:\esp\.espressif\v6.0\esp-idf\tools/idf_monitor.py -p COM11 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\trae_controller.elf C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\bootloader\bootloader.elf --force-color -m 'C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe' 'C:\esp\.espressif\v6.0\esp-idf\tools\idf.py' '-C' 'firmware' '-B' 'build_p4_r16' '-p' 'COM11'
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff07116
+Core1 Saved PC:0x4ff09b5a
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x1738
+load:0x4ff29ed0,len:0xf7c
+load:0x4ff2cbd0,len:0x368c
+entry 0x4ff29eda
+[0;32mI (27) boot: ESP-IDF v6.0 2nd stage bootloader[0m
+[0;32mI (28) boot: compile time Apr 15 2026 21:06:55[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (30) boot: chip revision: v1.3[0m
+[0;32mI (30) boot: efuse block revision: v0.3[0m
+[0;32mI (34) qio_mode: Enabling default flash chip QIO[0m
+[0;32mI (38) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (42) boot.esp32p4: SPI Mode       : QIO[0m
+[0;32mI (46) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (50) boot: Enabling RNG early entropy source...[0m
+[0;32mI (54) boot: Partition Table:[0m
+[0;32mI (57) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (63) boot:  0 nvs              WiFi data        01 02 00009000 00005000[0m
+[0;32mI (70) boot:  1 otadata          OTA data         01 00 0000e000 00002000[0m
+[0;32mI (76) boot:  2 factory          factory app      00 00 00010000 00ca0000[0m
+[0;32mI (83) boot:  3 storage          Unknown data     01 83 00cb0000 00350000[0m
+[0;32mI (90) boot: End of partition table[0m
+[0;32mI (93) boot: Defaulting to factory image[0m
+[0;32mI (96) esp_image: segment 0: paddr=00010020 vaddr=403d0020 size=1a0ac4h (1706692) map[0m
+[0;32mI (324) esp_image: segment 1: paddr=001b0aec vaddr=30100000 size=00068h (   104) load[0m
+[0;32mI (326) esp_image: segment 2: paddr=001b0b5c vaddr=4ff00000 size=0f4bch ( 62652) load[0m
+[0;32mI (338) esp_image: segment 3: paddr=001c0020 vaddr=40000020 size=3cab60h (3976032) map[0m
+[0;32mI (853) esp_image: segment 4: paddr=0058ab88 vaddr=4ff0f4bc size=01c08h (  7176) load[0m
+[0;32mI (855) esp_image: segment 5: paddr=0058c798 vaddr=4ff11100 size=042c0h ( 17088) load[0m
+[0;32mI (860) esp_image: segment 6: paddr=00590a60 vaddr=50108080 size=00024h (    36) load[0m
+[0;32mI (869) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (869) boot: Disabling RNG early entropy source...[0m
+[0;32mI (887) hex_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (887) hex_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (888) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
+[0;32mI (889) hex_psram: dev id       : 0x03 (generation 4)[0m
+[0;32mI (893) hex_psram: density      : 0x07 (256 Mbit)[0m
+[0;32mI (897) hex_psram: good-die     : 0x06 (Pass)[0m
+[0;32mI (901) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
+[0;32mI (906) hex_psram: BurstType    : 0x00 ( Wrap)[0m
+[0;32mI (910) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
+[0;32mI (915) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
+[0;32mI (919) hex_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
+[0;32mI (924) hex_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (928) MSPI Timing: Enter psram timing tuning[0m
+[0;32mI (1104) esp_psram: Found 32MB PSRAM device[0m
+[0;32mI (1104) esp_psram: Speed: 80MHz[0m
+[0;32mI (1107) hex_psram: psram CS IO is dedicated[0m
+[0;32mI (1108) cpu_start: Multicore app[0m
+[0;32mI (2386) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (2396) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (2396) cpu_start: Pro cpu start user code[0m
+[0;32mI (2396) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (2398) app_init: Application information:[0m
+[0;32mI (2402) app_init: Project name:     trae_controller[0m
+[0;32mI (2407) app_init: App version:      3d6c312-dirty[0m
+[0;32mI (2411) app_init: Compile time:     Apr 15 2026 21:05:38[0m
+[0;32mI (2417) app_init: ELF file SHA256:  b02c2a625...[0m
+[0;32mI (2421) app_init: ESP-IDF:          v6.0[0m
+[0;32mI (2425) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (2429) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (2433) efuse_init: Chip rev:         v1.3[0m
+[0;32mI (2437) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (2443) heap_init: At 4FF19790 len 00021830 (134 KiB): RETENT_RAM[0m
+[0;32mI (2449) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (2454) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (2460) heap_init: At 501080A4 len 00007F5C (31 KiB): RTCRAM[0m
+[0;32mI (2465) heap_init: At 30100068 len 00001F98 (7 KiB): TCM[0m
+[0;32mI (2470) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;33mW (2477) spi_flash: Detected boya flash chip but using generic driver. For optimal functionality, enable `SPI_FLASH_SUPPORT_BOYA_CHIP` in menuconfig[0m
+[0;32mI (2490) spi_flash: detected chip: generic[0m
+[0;32mI (2493) spi_flash: flash io: qio[0m
+[0;32mI (2515) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (2520) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (2527) H_SDIO_DRV: sdio_data_to_rx_buf_task started[0m
+[0;32mI (2527) main_task: Started on CPU0[0m
+[0;32mI (2537) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (2547) main_task: Calling app_main()[0m
+[1;31mE (2547) esp_ota_ops: Running firmware is factory[0m
+[0;32mI (2547) MAIN: Reset reason: 11 (USB), free_heap=34041632, min_free_heap=34041552[0m
+[1;31mE (2557) task_wdt: esp_task_wdt_init(517): TWDT already initialized[0m
+[0;32mI (2577) MAIN: TRAE KILN CONTROLLER STARTING...[0m
+[0;32mI (2577) temperature_sensor: Range [-10°C ~ 80°C], error < 1°C[0m
+[0;32mI (2577) MAIN: Board temp sensor enabled[0m
+[0;32mI (2587) MAIN: Skip DS3231 init for NewP4 profile[0m
+[0;32mI (2587) MAIN: Skip fan+buzzer init for NewP4 profile[0m
+[0;32mI (2597) MAIN: LittleFS Mounted[0m
+[0;33mW (2617) MAIN: Skip thermal control init for NewP4 profile (display-only mode)[0m
+[1;31mE (2617) MAIN: mDNS init failed: -1[0m
+[0;32mI (2617) MAIN: Setup Complete.[0m
+[0;32mI (2617) MAIN: Starting tasks...[0m
+[0;32mI (2627) CTRL_TASK: Starting control task[0m
+[0;32mI (2627) SRV_TASK: Starting server task[0m
+[0;33mW (2627) CTRL_TASK: NewP4 bring-up: thermal control disabled (display-only mode)[0m
+[0;32mI (2627) UI_TASK: Starting UI task[0m
+[1;31mE (2627) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (2647) DISPLAY: P4 backlight PWM ready (timer=1 ch=2 target=20000Hz actual=20000Hz)[0m
+[0;32mI (2647) transport: Attempt connection with slave: retry[0][0m
+[0;33mW (2657) H_SDIO_DRV: Reset slave using GPIO[54][0m
+[0;32mI (2667) os_wrapper_esp: GPIO [54] configured[0m
+[0;32mI (2627) MAIN: Main task done; deleting main task to avoid stack overflow.[0m
+[0;32mI (2857) st7701: version: 2.0.2[0m
+[0;32mI (3107) st7701_mipi: LCD ID: FF FF FF[0m
+[0;32mI (3107) st7701_mipi:  st7701->madctl_val: 0x0, st7701->colmod_val: 0x55[0m
+[0;32mI (3357) DISPLAY: P4 MIPI panel ready (physical): 480x800[0m
+[0;32mI (3357) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (3357) GT911: TouchPad_ID:0x39,0x31,0x31[0m
+[0;32mI (3367) GT911: TouchPad_Config_Version:250[0m
+[0;32mI (3367) DISPLAY: Touch initialized (GT911, I2C addr=0x5D, SDA=7 SCL=8)[0m
+[0;32mI (3437) DISPLAY: P4 BL req=100[0m
+[0;32mI (3437) DISPLAY: Display initialized successfully (P4)[0m
+[1;31mE (3487) temperature_sensor: temperature_sensor_install(136): Already installed[0m
+[1;31mE (3487) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (3707) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (3877) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4037) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4037) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4047) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (4217) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4377) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4547) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4547) H_API: ESP-Hosted link not yet up[0m
+[1;31mE (4557) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (4687) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz][0m
+[0;32mI (4687) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54][0m
+[0;32mI (4687) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1][0m
+[1;31mE (4717) H_API: ESP-Hosted link not yet up[0m
+[0;32mI (4727) sdio_wrapper: Function 0 Blocksize: 512[0m
+[0;32mI (4727) sdio_wrapper: Function 1 Blocksize: 512[0m
+[0;32mI (4827) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE[0m
+[0;32mI (4827) transport: set_transport_state: 1[0m
+[0;32mI (4827) transport: Waiting for esp_hosted slave to be ready[0m
+[1;31mE (4877) H_API: ESP-Hosted link not yet up[0m
+[0;32mI (4927) H_SDIO_DRV: SDIO Host operating in STREAMING MODE[0m
+[0;32mI (4927) H_SDIO_DRV: Open data path at slave[0m
+[0;32mI (4927) H_SDIO_DRV: Starting SDIO process rx task[0m
+[0;32mI (4947) H_SDIO_DRV: Received ESP_PRIV_IF type message[0m
+[0;32mI (4947) transport: Received INIT event from ESP32 peripheral[0m
+[0;32mI (4957) transport: EVENT: 12[0m
+[0;32mI (4957) transport: Identified slave [esp32c6][0m
+[0;32mI (4957) transport: EVENT: 11[0m
+[0;32mI (4957) transport: capabilities: 0xd[0m
+[0;32mI (4967) transport: Features supported are:[0m
+[0;32mI (4967) transport: 	 * WLAN[0m
+[0;32mI (4967) transport: 	   - HCI over SDIO[0m
+[0;32mI (4977) transport: 	   - BLE only[0m
+[0;32mI (4977) transport: EVENT: 13[0m
+[0;33mW (4977) transport: Version mismatch: Host [2.12.0] > Co-proc [2.3.0] ==> Upgrade co-proc to avoid RPC timeouts[0m
+[0;32mI (4987) transport: ESP board type is : 13 [0m
+
+[0;32mI (4997) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE[0m
+[0;32mI (4997) H_API: Transport active[0m
+[0;32mI (5007) transport: Slave chip Id[12][0m
+[0;32mI (5007) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80][0m
+[0;32mI (5007) transport: transport_delayed_init[0m
+[0;32mI (5017) hci_stub_drv: Host BT Support: Disabled[0m
+[0;32mI (5017) H_SDIO_DRV: Received INIT event[0m
+[0;32mI (5027) H_SDIO_DRV: Event type: 0x22[0m
+[0;32mI (5027) H_SDIO_DRV: Write thread started[0m
+[0;33mW (5677) rpc_rsp: Hosted RPC_Resp [0x226], uid [2], resp code [12295][0m
+[0;33mW (5707) rpc_rsp: Hosted RPC_Resp [0x226], uid [4], resp code [12295][0m
+[1;31mE (5717) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (5797) WIFI_CONN: AP netif enforced: 192.168.4.1/24[0m
+[0;32mI (5797) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (5807) WIFI_CONN: CAPPORT URI set: http://192.168.4.1/[0m
+[0;32mI (5807) WIFI_CONN: wifi_init_softap finished. SSID:TRAE_KILN_SETUP[0m
+[0;32mI (5807) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (5817) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (5837) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[1;31mE (5837) system_api: 0 mac type is incorrect (not found)[0m
+[0;32mI (5837) WIFI_CONN: SoftAP started -> starting DNS captive responder[0m
+[0;32mI (5837) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (5857) REMOTE: Remote access initialized (enabled=1, uri=mqtts://kilnpro:8888, device=000000000000)[0m
+[0;32mI (5867) DNS_SERVER: DNS server listening on port 53[0m
+[0;33mW (5997) rpc_rsp: Hosted RPC_Resp [0x226], uid [8], resp code [12303][0m
+[0;33mW (6027) rpc_rsp: Hosted RPC_Resp [0x226], uid [9], resp code [12303][0m
+[0;33mW (6097) rpc_rsp: Hosted RPC_Resp [0x226], uid [10], resp code [12303][0m
+[0;33mW (6157) rpc_rsp: Hosted RPC_Resp [0x226], uid [11], resp code [12303][0m
+[0;33mW (6187) rpc_rsp: Hosted RPC_Resp [0x226], uid [12], resp code [12303][0m
+[0;33mW (6207) rpc_rsp: Hosted RPC_Resp [0x226], uid [13], resp code [12303][0m
+[1;31mE (6217) system_api: 1 mac type is incorrect (not found)[0m
+[0;33mW (6237) rpc_rsp: Hosted RPC_Resp [0x226], uid [14], resp code [12303][0m
+[0;33mW (6297) rpc_rsp: Hosted RPC_Resp [0x226], uid [15], resp code [12303][0m
+[0;33mW (6357) rpc_rsp: Hosted RPC_Resp [0x226], uid [16], resp code [12303][0m
+[0;33mW (6397) rpc_rsp: Hosted RPC_Resp [0x226], uid [17], resp code [12303][0m
+[0;33mW (6417) rpc_rsp: Hosted RPC_Resp [0x226], uid [18], resp code [12303][0m
+[0;33mW (6477) rpc_rsp: Hosted RPC_Resp [0x226], uid [19], resp code [12303][0m
+[0;33mW (6537) rpc_rsp: Hosted RPC_Resp [0x226], uid [20], resp code [12303][0m
+[0;33mW (6567) rpc_rsp: Hosted RPC_Resp [0x226], uid [21], resp code [12303][0m
+[0;33mW (6597) rpc_rsp: Hosted RPC_Resp [0x226], uid [22], resp code [12303][0m
+[0;33mW (6657) rpc_rsp: Hosted RPC_Resp [0x226], uid [23], resp code [12303][0m
+[0;33mW (6717) rpc_rsp: Hosted RPC_Resp [0x226], uid [24], resp code [12303][0m
+[0;33mW (6747) rpc_rsp: Hosted RPC_Resp [0x226], uid [25], resp code [12303][0m
+[0;33mW (6777) rpc_rsp: Hosted RPC_Resp [0x226], uid [26], resp code [12303][0m
+[1;31mE (6777) system_api: 1 mac type is incorrect (not found)[0m
+[0;33mW (6797) rpc_rsp: Hosted RPC_Resp [0x226], uid [27], resp code [12303][0m
+[0;33mW (6857) rpc_rsp: Hosted RPC_Resp [0x226], uid [28], resp code [12303][0m
+[0;33mW (6917) rpc_rsp: Hosted RPC_Resp [0x226], uid [29], resp code [12303][0m
+[0;33mW (6957) rpc_rsp: Hosted RPC_Resp [0x226], uid [30], resp code [12303][0m
+[0;33mW (6977) rpc_rsp: Hosted RPC_Resp [0x226], uid [31], resp code [12303][0m
+[0;33mW (7037) rpc_rsp: Hosted RPC_Resp [0x226], uid [32], resp code [12303][0m
+[0;33mW (7097) rpc_rsp: Hosted RPC_Resp [0x226], uid [33], resp code [12303][0m
+[0;33mW (7137) rpc_rsp: Hosted RPC_Resp [0x226], uid [34], resp code [12303][0m
+[0;33mW (7157) rpc_rsp: Hosted RPC_Resp [0x226], uid [35], resp code [12303][0m
+[0;33mW (7217) rpc_rsp: Hosted RPC_Resp [0x226], uid [36], resp code [12303][0m
+[0;33mW (7277) rpc_rsp: Hosted RPC_Resp [0x226], uid [37], resp code [12303][0m
+[0;33mW (7317) rpc_rsp: Hosted RPC_Resp [0x226], uid [38], resp code [12303][0m
+[0;33mW (7337) rpc_rsp: Hosted RPC_Resp [0x226], uid [39], resp code [12303][0m
+[1;31mE (7347) system_api: 1 mac type is incorrect (not found)[0m
+[0;33mW (7367) rpc_rsp: Hosted RPC_Resp [0x226], uid [40], resp code [12303][0m
+[0;33mW (7427) rpc_rsp: Hosted RPC_Resp [0x226], uid [41], resp code [12303][0m
+[0;33mW (7487) rpc_rsp: Hosted RPC_Resp [0x226], uid [42], resp code [12303][0m
+[0;32mI (7487) SRV_TASK: Stack watermark: 2944 words[0m
+[0;33mW (7517) rpc_rsp: Hosted RPC_Resp [0x226], uid [43], resp code [12303][0m
+[0;33mW (7547) rpc_rsp: Hosted RPC_Resp [0x226], uid [44], resp code [12303][0m
+[0;33mW (7607) rpc_rsp: Hosted RPC_Resp [0x226], uid [45], resp code [12303][0m
+[0;33mW (7667) rpc_rsp: Hosted RPC_Resp [0x226], uid [46], resp code [12303][0m
+[0;33mW (7697) rpc_rsp: Hosted RPC_Resp [0x226], uid [47], resp code [12303][0m
+[0;33mW (7727) rpc_rsp: Hosted RPC_Resp [0x226], uid [48], resp code [12303][0m
+[0;33mW (7787) rpc_rsp: Hosted RPC_Resp [0x226], uid [49], resp code [12303][0m
+[0;33mW (7847) rpc_rsp: Hosted RPC_Resp [0x226], uid [50], resp code [12303][0m
+[0;33mW (7877) rpc_rsp: Hosted RPC_Resp [0x226], uid [51], resp code [12303][0m
+[0;33mW (7897) rpc_rsp: Hosted RPC_Resp [0x226], uid [52], resp code [12303][0m
+[1;31mE (7907) system_api: 1 mac type is incorrect (not found)[0m
+[0;33mW (7927) rpc_rsp: Hosted RPC_Resp [0x226], uid [53], resp code [12303][0m
+[0;33mW (7987) rpc_rsp: Hosted RPC_Resp [0x226], uid [54], resp code [12303][0m
+[0;33mW (8047) rpc_rsp: Hosted RPC_Resp [0x226], uid [55], resp code [12303][0m
+[0;33mW (8087) rpc_rsp: Hosted RPC_Resp [0x226], uid [56], resp code [12303][0m
+[0;33mW (8107) rpc_rsp: Hosted RPC_Resp [0x226], uid [57], resp code [12303][0m
+[0;33mW (8167) rpc_rsp: Hosted RPC_Resp [0x226], uid [58], resp code [12303][0m
+[0;33mW (8227) rpc_rsp: Hosted RPC_Resp [0x226], uid [59], resp code [12303][0m
+[0;33mW (8267) rpc_rsp: Hosted RPC_Resp [0x226], uid [60], resp code [12303][0m
+[0;33mW (8287) rpc_rsp: Hosted RPC_Resp [0x226], uid [61], resp code [12303][0m
+[0;33mW (8347) rpc_rsp: Hosted RPC_Resp [0x226], uid [62], resp code [12303][0m
+[0;33mW (8407) rpc_rsp: Hosted RPC_Resp [0x226], uid [63], resp code [12303][0m
+[0;33mW (8437) rpc_rsp: Hosted RPC_Resp [0x226], uid [64], resp code [12303][0m
+[0;33mW (8467) rpc_rsp: Hosted RPC_Resp [0x226], uid [65], resp code [12303][0m
+[1;31mE (8477) system_api: 1 mac type is incorrect (not found)[0m
+[0;33mW (8487) rpc_rsp: Hosted RPC_Resp [0x226], uid [66], resp code [12303][0m
+[0;33mW (8547) rpc_rsp: Hosted RPC_Resp [0x226], uid [67], resp code [12303][0m
+[0;33mW (8607) rpc_rsp: Hosted RPC_Resp [0x226], uid [68], resp code [12303][0m
+[0;32mI (8937) RPC_WRAP: ESP Event: Station mode: Connected[0m
+[1;31mE (9107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (9617) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (10127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (10637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (11137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (11647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (12167) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (12497) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (12677) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (13187) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (13707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (14207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (14717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (15217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (15727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (16237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (16737) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (17257) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (17537) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (17767) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (18287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (18807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (19317) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (19817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (20327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (20837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (21337) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (21847) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (22357) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (22557) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (22857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (23367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (23887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (24407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (24917) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (25427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (25927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (26437) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (26957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (27467) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (27587) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (27977) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (28477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (29007) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (29507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (30017) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (30517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (31027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (31537) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (32037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (32547) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (32597) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (33057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (33557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (34077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (34597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (35107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (35607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (36117) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (36637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (37137) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (37617) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (37787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (38437) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (39097) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (39747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (40297) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (40887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (41467) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (42047) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (42627) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (42647) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (43207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (43787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (44377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (44957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (45537) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (46127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (46707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (47287) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (47657) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (47867) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (48447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (49027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (49627) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (50197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (50777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (51357) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (51937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (52517) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (52697) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (53097) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (53677) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (54277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (54857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (55437) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (56017) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (56597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (57177) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (57737) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (57757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (58337) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (58917) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (59507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (60087) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (60667) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (61247) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (61827) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (62407) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (62767) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (62987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (63567) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (64147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (64747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (65327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (65907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (66497) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (67077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (67647) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (67777) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (68227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (68807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (69397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (69977) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (70557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (71137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (71717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (72297) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (72787) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (72877) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (73457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (74037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (74627) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (75217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (75797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (76377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (76957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (77527) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (77807) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (78127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (78707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (79277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (79877) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (80457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (81047) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (81627) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (82207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (82787) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (82837) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (83367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (83937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (84527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (85107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (85687) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (86267) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (86847) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (87437) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (87867) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (88017) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (88587) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (89167) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (89757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (90347) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (90927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (91507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (92087) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (92657) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (92887) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (93237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (93817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (94397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (94997) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (95577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (96157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (96737) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (97317) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (97897) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (97927) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (98477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (99057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (99647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (100227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (100807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (101387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (101967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (102547) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (102967) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (103137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (103717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (104287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (104887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (105477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (106057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (106627) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (107207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (107787) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (107997) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (108367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (108947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (109527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (110127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (110707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (111287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (111867) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (112447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (113027) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (113037) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (113607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (114187) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (114777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (115367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (115947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (116527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (117107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (117687) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (118067) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (118257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (118837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (119417) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (120007) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (120597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (121177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (121757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (122327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (122907) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (123087) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (123487) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (124067) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (124657) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (125257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (125837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (126417) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (126997) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (127577) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (128127) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (128157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (128727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (129307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (129897) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (130477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (131057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (131637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (132217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (132797) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (133127) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (133377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (133957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (134557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (135157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (135737) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (136317) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (136907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (137487) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (138057) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (138137) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (138637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (139217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (139797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (140397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (140977) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (141557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (142137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (142717) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (143177) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (143297) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (143877) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (144457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (145047) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (145627) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (146207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (146787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (147367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (147947) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (148177) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (148527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (149107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (149687) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (150277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (150867) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (151447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (152037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (152617) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (153197) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (153217) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (153777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (154357) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (154947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (155547) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (156127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (156707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (157277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (157857) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (158237) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (158447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (159027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (159607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (160197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (160777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (161357) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (161937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (162517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (163097) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (163277) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (163677) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (164257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (164847) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (165437) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (166017) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (166597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (167177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (167757) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (168317) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (168337) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (168917) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (169497) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (170077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (170667) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (171257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (171837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (172427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (173007) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (173357) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (173587) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (174167) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (174747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (175327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (175907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (176487) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (177067) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (177647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (178227) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (178357) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (178807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (179387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (179967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (180557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (181147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (181727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (182307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (182897) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (183377) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (183477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (184057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (184637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (185217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (185807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (186387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (186977) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (187557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (188137) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (188407) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (188727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (189307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (189887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (190477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (191057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (191637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (192217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (192797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (193377) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (193437) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (193957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (194537) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (195117) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (195717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (196297) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (196887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (197467) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (198047) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (198467) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (198637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (199217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (199797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (200387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (200987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (201567) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (202147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (202737) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (203317) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (203467) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (203897) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (204477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (205057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (205647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (206227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (206807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (207387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (207967) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (208507) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (208547) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (209127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (209727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (210307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (210897) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (211477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (212067) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (212647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (213237) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (213517) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (213817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (214397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (214987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (215567) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (216157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (216747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (217327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (217907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (218497) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (218527) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (219077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (219657) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (220257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (220897) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (221517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (222147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (222767) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (223377) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (223537) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (224007) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (224617) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (225237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (225867) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (226497) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (227127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (227747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (228357) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (228567) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (228987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (229607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (230227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (230837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (231467) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (232087) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (232717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (233337) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (233597) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (233947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (234577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (235197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (235817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (236447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (237067) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (237697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (238307) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (238627) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (238927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (239557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (240177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (240787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (241407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (242037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (242657) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (243277) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (243687) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (243887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (244517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (245137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (245757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (246367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (246997) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (247617) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (248247) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (248727) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (248867) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (249477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (250107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (250727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (251347) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (251977) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (252597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (253227) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (253757) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (253847) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (254457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (255087) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (255707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (256327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (256937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (257567) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (258187) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (258797) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (258817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (259427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (260047) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (260667) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (261287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (261897) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (262527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (263147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (263777) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (263807) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (264397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (265007) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (265637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (266257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (266877) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (267507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (268127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (268757) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (268837) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (269377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (269987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (270607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (271227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (271837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (272457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (273087) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (273697) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (273857) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (274327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (274947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (275567) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (276187) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (276807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (277427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (278057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (278677) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (278887) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (279307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (279927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (280547) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (281167) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (281787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (282407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (283037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (283647) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (283907) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (284277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (284897) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (285517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (286127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (286757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (287367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (287997) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (288617) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (288947) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (289237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (289867) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (290487) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (291107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (291717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (292347) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (292967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (293597) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (293977) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (294217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (294837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (295457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (296067) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (296697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (297317) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (297937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (298567) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (298997) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (299187) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (299817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (300427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (301057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (301677) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (302297) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (302917) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (303527) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (304037) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (304157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (304777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (305407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (306027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (306637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (307267) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (307887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (308507) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (309057) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (309137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (309747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (310377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (310997) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (311617) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (312227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (312857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (313477) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (314087) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (314107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (314727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (315347) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (315957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (316577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (317197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (317817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (318447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (319067) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (319127) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (319697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (320317) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (320937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (321557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (322167) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (322797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (323417) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (324037) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (324137) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (324667) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (325287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (325917) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (326537) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (327147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (327777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (328397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (329017) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (329167) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (329647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (330267) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (330897) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (331517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (332127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (332757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (333377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (333997) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (334197) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (334607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (335237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (335857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (336487) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (337107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (337727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (338347) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (338967) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (339227) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (339587) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (340217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (340837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (341467) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (342077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (342697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (343327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (343947) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (344257) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (344567) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (345197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (345817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (346447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (347067) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (347687) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (348307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (348927) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (349297) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (349547) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (350157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (350787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (351407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (352037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (352647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (353277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (353887) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (354297) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (354517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (355127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (355767) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (356387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (357017) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (357637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (358257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (358867) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (359327) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (359497) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (360117) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (360747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (361367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (361987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (362607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (363217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (363847) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (364327) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (364467) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (365087) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (365697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (366327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (366947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (367577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (368197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (368817) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (369367) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (369437) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (370057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (370677) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (371307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (371927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (372557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (373177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (373787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (374407) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (374407) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (375027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (375637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (376267) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (376887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (377517) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (378127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (378747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (379367) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (379417) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (379987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (380597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (381227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (381857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (382477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (383097) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (383727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (384347) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (384457) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (384967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (385577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (386207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (386837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (387457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (388077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (388707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (389327) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (389487) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (389957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (390577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (391197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (391827) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (392447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (393077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (393697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (394317) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (394527) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (394937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (395547) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (396167) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (396787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (397417) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (398037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (398657) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (399287) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (399567) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (399907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (400527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (401137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (401767) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (402397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (403017) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (403637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (404267) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (404597) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (404887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (405507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (406117) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (406747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (407377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (407987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (408617) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (409237) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (409597) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (409857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (410477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (411097) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (411717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (412337) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (412967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (413577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (414207) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (414637) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (414827) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (415447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (416057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (416687) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (417307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (417937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (418557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (419187) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (419667) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (419807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (420427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (421037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (421657) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (422277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (422907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (423527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (424157) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (424687) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (424777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (425387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (426017) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (426637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (427257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (427867) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (428497) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (429117) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (429727) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (429747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (430367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (430987) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (431597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (432227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (432847) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (433477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (434097) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (434727) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (434757) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (435347) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (435967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (436587) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (437207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (437827) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (438457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (439077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (439707) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (439797) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (440327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (440947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (441557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (442177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (442807) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (443427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (444057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (444677) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (444837) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (445307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (445927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (446547) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (447157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (447787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (448407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (449037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (449657) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (449867) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (450287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (450907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (451527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (452147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (452767) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (453387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (454027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (454647) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (454907) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (455267) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (455877) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (456507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (457127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (457747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (458367) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (458977) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (459617) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (459937) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (460227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (460857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (461477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (462097) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (462717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (463337) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (463957) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (464587) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (464967) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (465207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (465837) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (466457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (467077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (467697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (468317) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (468937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (469567) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (469997) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (470187) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (470817) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (471427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (472047) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (472677) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (473297) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (473927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (474547) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (475007) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (475177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (475797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (476427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (477037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (477667) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (478277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (478907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (479527) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (480037) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (480157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (480777) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (481407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (482027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (482647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (483257) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (483887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (484507) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (485067) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (485137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (485757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (486377) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (486997) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (487607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (488237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (488857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (489477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (490087) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (490097) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (490717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (491337) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (491967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (492587) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (493197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (493827) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (494447) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (495067) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (495117) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (495697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (496307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (496937) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (497557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (498177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (498787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (499407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (500037) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (500117) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (500667) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (501287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (501907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (502537) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (503157) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (503767) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (504397) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (505017) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (505127) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (505637) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (506267) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (506887) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (507507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (508127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (508747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (509357) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (509987) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (510167) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (510607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (511237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (511857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (512477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (513097) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (513707) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (514337) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (514957) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (515217) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (515577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (516217) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (516827) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (517457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (518077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (518697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (519307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (519937) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (520217) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (520557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (521177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (521797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (522417) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (523047) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (523667) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (524287) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (524897) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (525257) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (525527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (526147) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (526787) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (527407) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (528027) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (528647) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (529267) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (529887) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (530297) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (530507) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (531127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (531757) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (532387) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (533007) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (533627) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (534237) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (534867) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (535297) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (535487) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (536107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (536717) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (537347) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (537967) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (538597) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (539207) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (539837) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (540337) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (540457) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (541077) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (541697) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (542327) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (542947) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (543577) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (544197) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (544817) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (545377) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (545427) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (546057) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (546677) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (547307) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (547927) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (548557) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (549177) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (549797) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (550407) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (550417) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (551037) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (551657) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (552277) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (552907) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (553527) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (554137) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (554767) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (555387) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (555447) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (555997) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (556627) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (557247) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (557877) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (558497) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (559127) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (559747) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (560367) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (560467) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (560977) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (561607) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (562227) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (562857) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (563477) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (564107) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (564727) system_api: 1 mac type is incorrect (not found)[0m
+[1;31mE (565347) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (565497) SRV_TASK: Stack watermark: 2944 words[0m
+[1;31mE (565957) system_api: 1 mac type is incorrect (not found)[0m

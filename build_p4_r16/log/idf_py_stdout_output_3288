@@ -1,0 +1,140 @@
+Command: ninja all
+[1/8] Performing build step for 'bootloader'
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\bootloader && C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:/esp/.espressif/v6.0/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 C:/Users/andri/Documents/GitHub/trae_controller/build_p4_r16/bootloader/bootloader.bin"
+Bootloader binary size 0x5da0 bytes. 0x260 bytes (2%) free.
+[2/8] No install step for 'bootloader'
+[3/8] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16 && C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\littlefs_py_venv\Scripts\littlefs-python.exe create C:/Users/andri/Documents/GitHub/trae_controller/firmware/data C:/Users/andri/Documents/GitHub/trae_controller/build_p4_r16/storage.bin -v --fs-size=0x350000 --name-max=64 --block-size=4096"
+LittleFS Configuration:
+  Block Size:       4096  /  0x1000
+  Image Size:    3473408  /  0x350000
+  Block Count:       848
+  Name Max:           64
+  Image:       C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\storage.bin
+Adding Directory: assets
+Adding Directory: fonts
+Adding File:      history.html
+Adding File:      index.html
+Adding File:      manifest.json
+Adding File:      mqtt_gateway.html
+Adding File:      touch_calibration.html
+Adding File:      wifi_setup.html
+Adding File:      assets\index-1e2b07f5.js
+Adding File:      assets\index-1e2b07f5.js.gz
+Adding File:      assets\index-f001c656.css
+Adding File:      assets\index-f001c656.css.gz
+Adding File:      assets\vendor-562bd106.js
+Adding File:      assets\vendor-562bd106.js.gz
+Adding File:      assets\vendor-charts-d47e8fd5.js
+Adding File:      assets\vendor-charts-d47e8fd5.js.gz
+Adding File:      assets\vendor-react-69cc1413.js
+Adding File:      assets\vendor-react-69cc1413.js.gz
+Adding File:      fonts\README.md
+Adding Directory: fonts\sketch_260307b
+Adding Directory: fonts\sketch_260307b\data
+Adding Directory: fonts\sketch_260307b\FontFiles
+Adding File:      fonts\sketch_260307b\sketch_260307b.pde
+Adding Directory: fonts\sketch_260307b\sketch_260308c
+Adding File:      fonts\sketch_260307b\data\Final-Frontier.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-Bold.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-BoldItalic.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-Italic.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-Regular.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\System_Font_List.txt
+Adding File:      fonts\sketch_260307b\sketch_260308c\sketch_260308c.pde
+[4/8] Completed 'bootloader'
+[5/8] Generating C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target/riscv32imafc-esp-espidf/release/libslint_ui.a
+FAILED: C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target/riscv32imafc-esp-espidf/release/libslint_ui.a 
+C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui && C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -NoProfile -Command "& C:\Users\andri/export-esp.ps1; $env:RUSTUP_TOOLCHAIN='esp'; $env:RUSTFLAGS='-Cdebuginfo=0 -Clink-arg=/PDB:NONE'; $env:CARGO_PROFILE_RELEASE_DEBUG='0'; $env:CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG='0'; & C:\Users\andri/.cargo/bin/cargo.exe build --release --target riscv32imafc-esp-espidf -Z build-std=core,alloc,std,panic_abort""
+   Compiling slint_ui v0.1.0 (C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui)
+memory allocation of 2097152 bytes failed
+stack backtrace:
+   0:     0x7ffae52fe0fb - <unknown>
+   1:     0x7ffae530bc77 - <unknown>
+   2:     0x7ffae5350a01 - <unknown>
+   3:     0x7ffae5305744 - <unknown>
+   4:     0x7ffae530034f - <unknown>
+   5:     0x7ffae530955c - <unknown>
+   6:     0x7ffae530905f - <unknown>
+   7:     0x7ffae530040b - <unknown>
+   8:     0x7ffae52ff058 - <unknown>
+   9:     0x7ffae8376f77 - <unknown>
+  10:     0x7ffae83771d5 - <unknown>
+  11:     0x7ffae8216f59 - <unknown>
+  12:     0x7ffae2a479d0 - <unknown>
+  13:     0x7ffae2b19b2b - <unknown>
+  14:     0x7ffae2ae3393 - <unknown>
+  15:     0x7ffae2a40a87 - <unknown>
+  16:     0x7ffae2a46ba7 - <unknown>
+  17:     0x7ffae2a4a34b - <unknown>
+  18:     0x7ffae3ac5956 - <unknown>
+  19:     0x7ffae3a78011 - <unknown>
+  20:     0x7ffae3c5e92f - <unknown>
+  21:     0x7ffae3dadaaf - <unknown>
+  22:     0x7ffae2a3608a - <unknown>
+  23:     0x7ffae3abdf60 - <unknown>
+  24:     0x7ffae3a458fc - <unknown>
+  25:     0x7ffae3c63aa6 - <unknown>
+  26:     0x7ffae3d71632 - <unknown>
+  27:     0x7ffae2ab2f3a - <unknown>
+  28:     0x7ffae27a08b5 - <unknown>
+  29:     0x7ffae3ac5810 - <unknown>
+  30:     0x7ffae3a779cc - <unknown>
+  31:     0x7ffae3c59a96 - <unknown>
+  32:     0x7ffae3dad10f - <unknown>
+  33:     0x7ffae279d7c6 - <unknown>
+  34:     0x7ffae3ac0444 - <unknown>
+  35:     0x7ffae3a54a31 - <unknown>
+  36:     0x7ffae3babb62 - <unknown>
+  37:     0x7ffae3d82c93 - <unknown>
+  38:     0x7ffae279c188 - <unknown>
+  39:     0x7ffae3abe696 - <unknown>
+  40:     0x7ffae3a49121 - <unknown>
+  41:     0x7ffae3c5e92f - <unknown>
+  42:     0x7ffae3d7569f - <unknown>
+  43:     0x7ffae2b9fb6d - <unknown>
+  44:     0x7ffae3abe610 - <unknown>
+  45:     0x7ffae3a48b7c - <unknown>
+  46:     0x7ffae3c59a96 - <unknown>
+  47:     0x7ffae3d7503f - <unknown>
+  48:     0x7ffae279f307 - <unknown>
+  49:     0x7ffae3ac4c80 - <unknown>
+  50:     0x7ffae3a7281c - <unknown>
+  51:     0x7ffae3c59a96 - <unknown>
+  52:     0x7ffae3da716f - <unknown>
+  53:     0x7ffae279ba06 - <unknown>
+  54:     0x7ffae3abe654 - <unknown>
+  55:     0x7ffae3a48d61 - <unknown>
+  56:     0x7ffae3bae4a5 - <unknown>
+  57:     0x7ffae3d75373 - <unknown>
+  58:     0x7ffae30e309b - <unknown>
+  59:     0x7ffae3058e13 - <unknown>
+  60:     0x7ffae30839ad - <unknown>
+  61:     0x7ffae3ac2f5d - <unknown>
+  62:     0x7ffae3a65cd6 - <unknown>
+  63:     0x7ffae3b96b33 - <unknown>
+  64:     0x7ffae3d97803 - <unknown>
+  65:     0x7ffae25e86bc - <unknown>
+  66:     0x7ffae25c76b1 - <unknown>
+  67:     0x7ffae2417a76 - <unknown>
+  68:     0x7ffae1dcc5d2 - <unknown>
+  69:     0x7ffae3ac541d - <unknown>
+  70:     0x7ffae3a75eb8 - <unknown>
+  71:     0x7ffae3bb3240 - <unknown>
+  72:     0x7ffae3dab0a0 - <unknown>
+  73:     0x7ffae1c4015d - <unknown>
+  74:     0x7ffae1c7a243 - <unknown>
+  75:     0x7ffae1c7805e - <unknown>
+  76:     0x7ffae1c71728 - <unknown>
+  77:     0x7ffae1bf5e33 - <unknown>
+  78:     0x7ffae1be6961 - <unknown>
+  79:     0x7ffae1c3f2c5 - <unknown>
+  80:     0x7ffae1bc8504 - <unknown>
+  81:     0x7ffae1bf781d - <unknown>
+  82:     0x7ffae52fce8d - <unknown>
+  83:     0x7ffbc15d7374 - BaseThreadInitThunk
+  84:     0x7ffbc171cc91 - RtlUserThreadStart
+error: could not compile `slint_ui` (lib)
+
+Caused by:
+  process didn't exit successfully: `C:\Users\andri\.rustup\toolchains\esp\bin\rustc.exe --crate-name slint_ui --edition=2021 src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type staticlib --emit=dep-info,link -C opt-level=3 -C panic=abort -C embed-bitcode=no --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values(\"chrono\", \"preview\"))" -C metadata=b047591b126b0e7e -C extra-filename=-a8d9233833726d47 --out-dir C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps --target riscv32imafc-esp-espidf -C strip=debuginfo -L dependency=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps -L dependency=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\release\deps --extern noprelude:alloc=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\liballoc-8fdffdda2aa1e655.rlib --extern noprelude:compiler_builtins=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libcompiler_builtins-b9f657875a71e5f7.rlib --extern noprelude:core=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libcore-06563870f69d163d.rlib --extern encoding_rs=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libencoding_rs-6916dfb127ebce5b.rlib --extern num_traits=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libnum_traits-8d5e18bc51d49994.rlib --extern noprelude:panic_abort=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libpanic_abort-c0da24757c251a0f.rlib --extern noprelude:panic_unwind=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libpanic_unwind-4ec40a432db877e3.rlib --extern noprelude:proc_macro=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libproc_macro-75fba7661a62c012.rlib --extern qrcodegen=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libqrcodegen-0a1d431455a674b2.rlib --extern serde=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libserde-b124e874dad80d89.rlib --extern serde_json=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libserde_json-f7a00718112b96bc.rlib --extern slint=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libslint-25a0d892d10d2bb7.rlib --extern noprelude:std=C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui\target\riscv32imafc-esp-espidf\release\deps\libstd-e251169f99e91de7.rlib -Z unstable-options -Cdebuginfo=0 -Clink-arg=/PDB:NONE` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)
+ninja: build stopped: subcommand failed.

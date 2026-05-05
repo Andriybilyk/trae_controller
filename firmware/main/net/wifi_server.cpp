@@ -14,6 +14,7 @@
 #include "kiln_config/config.h"
 #include "kiln_config/config_store.h"
 #include "kiln_config/fs_utils.h"
+#include "esp_netif.h"
 #include "cJSON.h"
 #include <string>
 #include <cctype>
@@ -22,6 +23,7 @@
 #include <cstring> // For strlen, strstr
 #include <cstdio>  // For FILE, fopen, snprintf
 #include <cstdlib>
+#include <vector>
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -35,10 +37,73 @@ static constexpr uint32_t TUNE_RATE_LIMIT_MS = 150;
 static constexpr const char *AUDIT_LOG_FILE = "/littlefs/logs/audit.log";
 static constexpr const char *AUDIT_LOG_PREV_FILE = "/littlefs/logs/audit.log.1";
 static constexpr size_t AUDIT_LOG_MAX_BYTES = 128 * 1024;
+static constexpr const char *EVENTS_LOG_FILE = "/littlefs/logs/events.log";
+static constexpr const char *EVENTS_LOG_PREV_FILE = "/littlefs/logs/events.log.1";
+
+struct EventLogRow {
+    uint64_t ts_ms = 0;
+    std::string type;
+    std::string message;
+    bool fault_like = false;
+};
 
 static const char *result_code_to_str(device_commands::ResultCode code);
 static const char *result_message(device_commands::ResultCode code);
 static std::string normalize_schedule_storage_name(const char *name);
+static std::string render_json_and_delete(cJSON *doc);
+static bool event_or_message_contains_fault(const std::string &value) {
+    std::string lower = value;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return lower.find("fault") != std::string::npos || lower.find("sensor") != std::string::npos;
+}
+
+static bool event_row_is_fault_like(const std::string &type, const std::string &message) {
+    const std::string upper = [] (const std::string &v) {
+        std::string out = v;
+        std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
+            return static_cast<char>(std::toupper(c));
+        });
+        return out;
+    }(type);
+    return upper == "FAULT" ||
+           upper == "FAULT_CLEAR" ||
+           upper == "RECOVERY_RESUME" ||
+           upper == "RECOVERY_ABORT" ||
+           upper.find("FAULT") != std::string::npos ||
+           event_or_message_contains_fault(message);
+}
+
+static void append_event_rows_from_file(std::vector<EventLogRow> &rows, const char *path) {
+    const std::string content = kiln_fs_read_text(path);
+    if (content.empty()) return;
+
+    size_t offset = 0;
+    while (offset < content.size()) {
+        const size_t line_end = content.find('\n', offset);
+        std::string line = line_end == std::string::npos
+            ? content.substr(offset)
+            : content.substr(offset, line_end - offset);
+        offset = line_end == std::string::npos ? content.size() : line_end + 1;
+        if (line.empty()) continue;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+
+        const size_t first_space = line.find(' ');
+        if (first_space == std::string::npos) continue;
+        const size_t second_space = line.find(' ', first_space + 1);
+
+        EventLogRow row{};
+        row.ts_ms = static_cast<uint64_t>(strtoull(line.substr(0, first_space).c_str(), nullptr, 10));
+        row.type = second_space == std::string::npos
+            ? line.substr(first_space + 1)
+            : line.substr(first_space + 1, second_space - first_space - 1);
+        row.message = second_space == std::string::npos ? "" : line.substr(second_space + 1);
+        row.fault_like = event_row_is_fault_like(row.type, row.message);
+        rows.push_back(std::move(row));
+    }
+}
 static void copy_text_field(char *dst, size_t dst_len, const char *src) {
     if (!dst || dst_len == 0) return;
     dst[0] = '\0';
@@ -154,6 +219,137 @@ static std::string uri_path_only(const char *uri) {
     const char *q = strchr(uri, '?');
     if (!q) return uri;
     return std::string(uri, (size_t)(q - uri));
+}
+
+static std::string ap_portal_url() {
+    esp_netif_t *ap = esp_netif_get_handle_from_ifkey("WIFI_AP_DEF");
+    if (ap) {
+        esp_netif_ip_info_t ip_info = {};
+        if (esp_netif_get_ip_info(ap, &ip_info) == ESP_OK && ip_info.ip.addr != 0) {
+            char url[64] = {0};
+            std::snprintf(url, sizeof(url), "http://" IPSTR "/", IP2STR(&ip_info.ip));
+            return std::string(url);
+        }
+    }
+    return std::string("http://192.168.4.1/");
+}
+
+static bool host_matches_ap_url(const char *host) {
+    if (!host || !host[0]) return false;
+    const std::string ap_url = ap_portal_url();
+    const size_t proto = ap_url.find("://");
+    std::string ap_host = (proto == std::string::npos) ? ap_url : ap_url.substr(proto + 3);
+    const size_t slash = ap_host.find('/');
+    if (slash != std::string::npos) ap_host.resize(slash);
+    if (ap_host.empty()) return false;
+    return strstr(host, ap_host.c_str()) != NULL;
+}
+
+static bool host_is_ip_literal(const char *host) {
+    if (!host || !host[0]) return false;
+    // Host header can be "ip" or "ip:port"
+    for (const char *p = host; *p; ++p) {
+        const char c = *p;
+        if (c == ':') break;
+        if (c != '.' && (c < '0' || c > '9')) return false;
+    }
+    return true;
+}
+
+static bool host_is_connectivity_check(const char *host) {
+    if (!host || !host[0]) return false;
+    std::string h(host);
+    const size_t colon = h.find(':');
+    if (colon != std::string::npos) h.resize(colon);
+    std::transform(h.begin(), h.end(), h.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+
+    return h.find("captive.apple.com") != std::string::npos ||
+           h.find("www.apple.com") != std::string::npos ||
+           h.find("connectivitycheck.gstatic.com") != std::string::npos ||
+           h.find("clients3.google.com") != std::string::npos ||
+           h.find("connect.rom.miui.com") != std::string::npos ||
+           h.find("msftconnecttest.com") != std::string::npos ||
+           h.find("msftncsi.com") != std::string::npos ||
+           h.find("detectportal.firefox.com") != std::string::npos;
+}
+
+static bool is_captive_probe_uri(const std::string &uri_path) {
+    return uri_path == "/generate_204" ||
+           uri_path == "/generate204" ||
+           uri_path == "/gen_204" ||
+           uri_path == "/hotspot-detect.html" ||
+           uri_path == "/hotspotdetect.html" ||
+           uri_path == "/ncsi.txt" ||
+           uri_path == "/connecttest.txt" ||
+           uri_path == "/wpad.dat" ||
+           uri_path == "/fwlink" ||
+           uri_path == "/success.html" ||
+           uri_path == "/success.txt" ||
+           uri_path == "/canonical.html" ||
+           uri_path == "/library/test/success.html" ||
+           uri_path.rfind("/browsernetworktime/", 0) == 0;
+}
+
+// Mirrors Arduino WebServer captivePortal() behavior:
+// if Host is not an IP literal, force 302 redirect to AP IP.
+static bool captive_portal_redirect_if_needed(httpd_req_t *req) {
+    if (!req) return false;
+    if (!wifi_ap_active()) return false;
+
+    char host_str[96] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Host", host_str, sizeof(host_str)) != ESP_OK) {
+        return false;
+    }
+    const std::string uriPath = uri_path_only(req->uri);
+    const bool probe_uri = is_captive_probe_uri(uriPath);
+    const bool connectivity_host = host_is_connectivity_check(host_str);
+
+    // Do not hijack regular app traffic. Redirect only OS captive probes.
+    if (!probe_uri) {
+        return false;
+    }
+    if (host_is_ip_literal(host_str) && !probe_uri) {
+        return false;
+    }
+
+    const std::string target = ap_portal_url();
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", target.c_str());
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_send(req, "", 0);
+
+    const int sockfd = httpd_req_to_sockfd(req);
+    if (sockfd >= 0) {
+        httpd_sess_trigger_close(req->handle, sockfd);
+    }
+    return true;
+}
+
+static esp_err_t captive_portal_api_handler(httpd_req_t *req) {
+    const std::string portal = ap_portal_url();
+    cJSON *doc = cJSON_CreateObject();
+    cJSON_AddBoolToObject(doc, "captive", true);
+    cJSON_AddStringToObject(doc, "user-portal-url", portal.c_str());
+    cJSON_AddStringToObject(doc, "venue-info-url", portal.c_str());
+    cJSON_AddBoolToObject(doc, "can-extend-session", false);
+    cJSON_AddNumberToObject(doc, "seconds-remaining", 0);
+    char *body = cJSON_PrintUnformatted(doc);
+    cJSON_Delete(doc);
+    if (!body) {
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_send(req, NULL, 0);
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/captive+json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_send(req, body, HTTPD_RESP_USE_STRLEN);
+    free(body);
+    return ESP_OK;
 }
 
 static bool read_query_string(httpd_req_t *req, std::string &out) {
@@ -484,36 +680,171 @@ static cJSON *build_normalized_schedule_copy(cJSON *source) {
 }
 
 esp_err_t static_asset_handler(httpd_req_t *req);
+esp_err_t redirect_handler(httpd_req_t *req);
+static esp_err_t captive_probe_handler(httpd_req_t *req);
+static esp_err_t send_captive_bootstrap(httpd_req_t *req);
+static esp_err_t wifi_setup_page_handler(httpd_req_t *req);
+static esp_err_t send_wifi_setup_file(httpd_req_t *req);
+static esp_err_t send_captive_plain_page(httpd_req_t *req);
+static esp_err_t send_captive_probe_page(httpd_req_t *req);
+static esp_err_t catch_all_post_handler(httpd_req_t *req);
+
+static esp_err_t send_captive_plain_page(httpd_req_t *req) {
+    const std::string target = ap_portal_url();
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    const std::string body =
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Wi-Fi Sign In</title></head><body>"
+        "<h3>TRAE Wi-Fi Setup</h3>"
+        "<p>This network requires setup.</p>"
+        "<a href='" + target + "'>Open Wi-Fi Manager</a>"
+        "</body></html>";
+    httpd_resp_send(req, body.c_str(), body.size());
+    return ESP_OK;
+}
+
+static esp_err_t wifi_setup_page_handler(httpd_req_t *req) {
+    if (captive_portal_redirect_if_needed(req)) {
+        return ESP_OK;
+    }
+    return send_wifi_setup_file(req);
+}
+
+static esp_err_t send_wifi_setup_file(httpd_req_t *req) {
+    const char *path = "/littlefs/wifi_setup.html";
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        return redirect_handler(req);
+    }
+
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+
+    if (req->method == HTTP_HEAD) {
+        fclose(f);
+        httpd_resp_send(req, NULL, 0);
+        return ESP_OK;
+    }
+
+    char chunk[512];
+    size_t chunksize = 0;
+    while ((chunksize = fread(chunk, 1, sizeof(chunk), f)) > 0) {
+        if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+            fclose(f);
+            return ESP_FAIL;
+        }
+    }
+    fclose(f);
+    httpd_resp_send_chunk(req, NULL, 0);
+    return ESP_OK;
+}
+
+static esp_err_t send_captive_bootstrap(httpd_req_t *req) {
+    const std::string portal_url = ap_portal_url();
+    const std::string target = portal_url;
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    const std::string body =
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>TRAE Wi-Fi Setup</title>"
+        "<meta http-equiv='refresh' content='0; url=" + target + "'>"
+        "</head><body>"
+        "<p>Opening Wi-Fi setup...</p>"
+        "<script>location.replace('" + target + "');</script>"
+        "<a href='" + target + "'>Open Wi-Fi setup</a>"
+        "</body></html>";
+    httpd_resp_send(req, body.c_str(), body.size());
+    return ESP_OK;
+}
+
+static esp_err_t send_captive_probe_page(httpd_req_t *req) {
+    const std::string target = ap_portal_url();
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_hdr(req, "Connection", "close");
+
+    const std::string body =
+        "<!doctype html><html><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Wi-Fi Sign In</title>"
+        "<meta http-equiv='refresh' content='0; url=" + target + "'>"
+        "</head><body>"
+        "<script>location.replace('" + target + "');</script>"
+        "<a href='" + target + "'>Open Wi-Fi setup</a>"
+        "</body></html>";
+    httpd_resp_send(req, body.c_str(), body.size());
+    return ESP_OK;
+}
 
 esp_err_t WiFiServerManager::index_handler(httpd_req_t *req) {
     ESP_LOGI(TAG, "index_handler called for URI: %s", req->uri);
 
-    const std::string uriPath = uri_path_only(req->uri);
-    if (uriPath.find('.') != std::string::npos) {
-        return static_asset_handler(req);
+    if (captive_portal_redirect_if_needed(req)) {
+        return ESP_OK;
     }
-    
+
+    const std::string uriPath = uri_path_only(req->uri);
     if (strncmp(req->uri, "/api/", 5) == 0 || strncmp(req->uri, "/assets/", 8) == 0) {
         ESP_LOGW(TAG, "index_handler rejecting /api/ or /assets/ request: %s", req->uri);
         httpd_resp_send_404(req);
         return ESP_FAIL;
     }
 
-    char host_str[64];
-    if (httpd_req_get_hdr_value_str(req, "Host", host_str, sizeof(host_str)) == ESP_OK) {
+    char host_str[64] = {0};
+    const bool has_host = (httpd_req_get_hdr_value_str(req, "Host", host_str, sizeof(host_str)) == ESP_OK);
+    if (has_host) {
         ESP_LOGI(TAG, "Host header: %s", host_str);
-        if (wifiServer.isAPMode && strstr(host_str, "192.168.4.1") == NULL) {
-            ESP_LOGI(TAG, "Redirecting Captive Portal request from %s to 192.168.4.1", host_str);
-            httpd_resp_set_status(req, "302 Found");
-            httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
-            httpd_resp_send(req, NULL, 0);
-            return ESP_OK;
+    }
+    const bool ap_active = wifi_ap_active();
+    const bool captive_probe = is_captive_probe_uri(uriPath);
+    const bool ap_host = has_host && host_matches_ap_url(host_str);
+    const bool ip_literal_host = has_host && host_is_ip_literal(host_str);
+    const bool connectivity_host = has_host && host_is_connectivity_check(host_str);
+    const bool ap_provision_mode = wifiServer.isAPMode;
+    const bool host_missing_on_ap = ap_provision_mode && ap_active && !has_host;
+    // If request explicitly targets AP host (192.168.4.1), always serve Wi-Fi setup page.
+    // This guarantees manual open of http://192.168.4.1 works even if higher-level state flags drift.
+    if (ap_active && ap_host) {
+        return wifi_setup_page_handler(req);
+    }
+    // iOS/Android connectivity checks often hit "/" with a special Host.
+    // Explicit 302 redirect to AP URL is the most deterministic captive trigger for CNA.
+    if (ap_provision_mode && ap_active && connectivity_host) {
+        return redirect_handler(req);
+    }
+
+    const bool serve_portal = ap_provision_mode && (captive_probe || ap_host || host_missing_on_ap || connectivity_host);
+    if (serve_portal) {
+        if (connectivity_host) {
+            return wifi_setup_page_handler(req);
         }
+        // Closer to Arduino captive examples:
+        // non-IP foreign hosts should get an explicit redirect to AP portal.
+        if (ap_provision_mode && ap_active && has_host && !ip_literal_host && !ap_host) {
+            return redirect_handler(req);
+        }
+        // Root requests in portal context should render setup page directly.
+        if (uriPath == "/" || uriPath.empty() || uriPath == "/index.html") {
+            return wifi_setup_page_handler(req);
+        }
+        return send_captive_bootstrap(req);
+    }
+
+    if (uriPath.find('.') != std::string::npos) {
+        return static_asset_handler(req);
     }
 
     const char* path = "/littlefs/index.html";
-    if (wifiServer.isAPMode) {
-        path = "/littlefs/wifi_setup.html";
+    if (ap_provision_mode && ap_active && has_host && !ap_host) {
+        ESP_LOGI(TAG, "AP host mismatch in index: host=%s -> redirect", host_str);
+        return redirect_handler(req);
     }
 
     ESP_LOGI(TAG, "Serving file: %s", path);
@@ -542,7 +873,13 @@ esp_err_t WiFiServerManager::index_handler(httpd_req_t *req) {
 }
 
 esp_err_t static_asset_handler(httpd_req_t *req) {
+    if (captive_portal_redirect_if_needed(req)) {
+        return ESP_OK;
+    }
     const std::string uriPath = uri_path_only(req->uri);
+    if (wifiServer.isAPMode && wifi_ap_active() && (uriPath == "/index.html" || uriPath == "/")) {
+        return wifi_setup_page_handler(req);
+    }
 
     if (strstr(uriPath.c_str(), ".js")) httpd_resp_set_type(req, "application/javascript");
     else if (strstr(uriPath.c_str(), ".css")) httpd_resp_set_type(req, "text/css");
@@ -557,20 +894,25 @@ esp_err_t static_asset_handler(httpd_req_t *req) {
     char filepath[600];
     snprintf(filepath, sizeof(filepath), "/littlefs%s", uriPath.c_str());
 
-    FILE* f = fopen(filepath, "r");
+    FILE* f = fopen(filepath, "rb");
     if (f == NULL) {
         char gz_filepath[604];
         snprintf(gz_filepath, sizeof(gz_filepath), "%s.gz", filepath);
-        f = fopen(gz_filepath, "r");
+        f = fopen(gz_filepath, "rb");
         if (f) {
             httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
         }
     }
 
     if (f == NULL) {
-        ESP_LOGE(TAG, "Failed to open asset: %s", filepath);
+        const bool ap_portal_mode = wifi_ap_active() && wifiServer.isAPMode;
+        ESP_LOGW(TAG, "Asset not found: uri=%s file=%s portal=%d", req->uri, filepath, (int)ap_portal_mode);
+        if (ap_portal_mode && (req->method == HTTP_GET || req->method == HTTP_HEAD)) {
+            return redirect_handler(req);
+        }
         httpd_resp_set_status(req, "404 Not Found");
-        httpd_resp_send(req, NULL, 0);
+        httpd_resp_set_type(req, "text/plain; charset=utf-8");
+        httpd_resp_send(req, "Asset not found", HTTPD_RESP_USE_STRLEN);
         return ESP_OK;
     }
 
@@ -593,9 +935,73 @@ esp_err_t static_asset_handler(httpd_req_t *req) {
 esp_err_t redirect_handler(httpd_req_t *req) {
     ESP_LOGI(TAG, "redirect_handler called for URI: %s", req->uri);
     httpd_resp_set_status(req, "302 Found");
-    httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
-    httpd_resp_send(req, NULL, 0);
+    const std::string portal_url = ap_portal_url();
+    const std::string target = portal_url;
+    httpd_resp_set_hdr(req, "Location", target.c_str());
+    httpd_resp_set_hdr(req, "Connection", "close");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    if (req->method == HTTP_HEAD) {
+        httpd_resp_send(req, NULL, 0);
+    } else {
+        const std::string body = "<html><body><a href='" + target + "'>Redirect</a></body></html>";
+        httpd_resp_set_type(req, "text/html; charset=utf-8");
+        httpd_resp_send(req, body.c_str(), body.size());
+    }
     return ESP_OK;
+}
+
+static esp_err_t captive_probe_handler(httpd_req_t *req) {
+    const std::string uriPath = uri_path_only(req->uri);
+    char host_str[96] = {0};
+    char ua_str[128] = {0};
+    const bool has_host = (httpd_req_get_hdr_value_str(req, "Host", host_str, sizeof(host_str)) == ESP_OK);
+    const bool has_ua = (httpd_req_get_hdr_value_str(req, "User-Agent", ua_str, sizeof(ua_str)) == ESP_OK);
+    ESP_LOGI(TAG, "captive_probe: uri=%s host=%s ua=%s method=%d",
+             uriPath.c_str(),
+             has_host ? host_str : "-",
+             has_ua ? ua_str : "-",
+             (int)req->method);
+
+    // iOS CNA is sensitive to hotspot-detect/success responses.
+    // For these URIs return a small non-success HTML page (not "Success"),
+    // and auto-open AP root. For others keep explicit redirect.
+    const bool ios_probe_html =
+        (uriPath == "/hotspot-detect.html") ||
+        (uriPath == "/hotspotdetect.html") ||
+        (uriPath == "/success.html") ||
+        (uriPath == "/library/test/success.html");
+
+    const std::string target = ap_portal_url();
+    if (ios_probe_html) {
+        // Serve portal HTML directly for iOS probes (without additional redirects).
+        // This is more reliable for opening Captive Network Assistant.
+        (void)target;
+        return send_wifi_setup_file(req);
+    } else {
+        httpd_resp_set_status(req, "302 Found");
+        httpd_resp_set_hdr(req, "Location", target.c_str());
+        httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+        httpd_resp_set_hdr(req, "Pragma", "no-cache");
+        httpd_resp_set_hdr(req, "Connection", "close");
+        if (req->method == HTTP_HEAD) {
+            httpd_resp_send(req, NULL, 0);
+        } else {
+            httpd_resp_set_type(req, "text/html; charset=utf-8");
+            const std::string body = "<html><body><a href='" + target + "'>Open Wi-Fi setup</a></body></html>";
+            httpd_resp_send(req, body.c_str(), body.size());
+        }
+    }
+    const int sockfd = httpd_req_to_sockfd(req);
+    if (sockfd >= 0) {
+        httpd_sess_trigger_close(req->handle, sockfd);
+    }
+    return ESP_OK;
+}
+
+static esp_err_t catch_all_post_handler(httpd_req_t *req) {
+    (void)req;
+    return redirect_handler(req);
 }
 
 static esp_err_t vite_handler(httpd_req_t *req) {
@@ -604,6 +1010,13 @@ static esp_err_t vite_handler(httpd_req_t *req) {
 }
 
 esp_err_t WiFiServerManager::scan_wifi_handler(httpd_req_t *req) {
+    if (!wifi_backend_available()) {
+        ESP_LOGW(TAG, "WiFi scan requested, but backend is unavailable");
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"wifi_backend_unavailable\"}");
+        return ESP_OK;
+    }
     ESP_LOGI(TAG, "Starting async WiFi scan");
     wifi_start_scan();
     httpd_resp_set_type(req, "application/json");
@@ -612,57 +1025,91 @@ esp_err_t WiFiServerManager::scan_wifi_handler(httpd_req_t *req) {
 }
 
 esp_err_t WiFiServerManager::scan_results_handler(httpd_req_t *req) {
+    if (!wifi_backend_available()) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"wifi_backend_unavailable\"}");
+        return ESP_OK;
+    }
     if (wifi_is_scan_done()) {
         std::string json = wifi_get_scanned_networks();
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, json.c_str());
         ESP_LOGI(TAG, "Sent scan results");
     } else {
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_sendstr(req, "{\"status\":\"scanning\"}");
+        std::string cached = wifi_get_scanned_networks();
+        if (!cached.empty() && cached != "[]") {
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, cached.c_str());
+        } else {
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, "{\"status\":\"scanning\"}");
+        }
     }
     return ESP_OK;
 }
 
 esp_err_t WiFiServerManager::save_wifi_handler(httpd_req_t *req) {
-    char buf[200];
-    int ret, remaining = req->content_len;
-
-    if (remaining >= sizeof(buf)) {
-        httpd_resp_send_500(req);
-        return ESP_FAIL;
+    if (req->content_len <= 0 || req->content_len > 1024) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"invalid_payload\"}");
+        return ESP_OK;
     }
 
-    ret = httpd_req_recv(req, buf, remaining);
-    if (ret <= 0) { /* Handle error */ return ESP_FAIL; }
-    buf[ret] = '\0';
-
-    char ssid[33] = {0}, password[65] = {0};
-    char *ssid_ptr = strstr(buf, "ssid=");
-    if (ssid_ptr) {
-        ssid_ptr += 5;
-        char *amp = strchr(ssid_ptr, '&');
-        if (amp) {
-            *amp = '\0';
-            url_decode(ssid, ssid_ptr);
-            char *pass_ptr = strstr(amp + 1, "password=");
-            if (pass_ptr) {
-                pass_ptr += 9;
-                url_decode(password, pass_ptr);
-            }
-        } else {
-             url_decode(ssid, ssid_ptr);
+    std::string body;
+    body.resize((size_t)req->content_len);
+    int off = 0;
+    int remaining = req->content_len;
+    while (remaining > 0) {
+        const int ret = httpd_req_recv(req, body.data() + off, remaining);
+        if (ret <= 0) {
+            httpd_resp_set_status(req, "400 Bad Request");
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"recv_failed\"}");
+            return ESP_OK;
         }
+        off += ret;
+        remaining -= ret;
+    }
+    body.resize((size_t)off);
+
+    auto parse_form_field = [&](const char *key, char *out, size_t out_len) {
+        (void)out_len;
+        if (!key || !out || out_len == 0) return;
+        std::string pattern = std::string(key) + "=";
+        const size_t begin = body.find(pattern);
+        if (begin == std::string::npos) return;
+        const size_t value_begin = begin + pattern.size();
+        const size_t value_end = body.find('&', value_begin);
+        const std::string encoded = body.substr(value_begin,
+                                                value_end == std::string::npos ? std::string::npos : (value_end - value_begin));
+        if (encoded.empty()) return;
+        std::vector<char> tmp(encoded.begin(), encoded.end());
+        tmp.push_back('\0');
+        url_decode(out, tmp.data());
+    };
+
+    char ssid[33] = {0};
+    char password[65] = {0};
+    parse_form_field("ssid", ssid, sizeof(ssid));
+    parse_form_field("password", password, sizeof(password));
+
+    if (!ssid[0]) {
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"missing_ssid\"}");
+        return ESP_OK;
     }
 
-    ESP_LOGI(TAG, "Saving WiFi: SSID='%s'", ssid);
-    wifi_save_creds(ssid, password);
-
-    httpd_resp_sendstr(req, "WiFi Saved. Rebooting...");
-    
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    esp_restart();
-
+    ESP_LOGI(TAG, "save_wifi: connect requested for SSID='%s'", ssid);
+    const bool started = wifi_connect_with_credentials(ssid, password);
+    httpd_resp_set_type(req, "application/json");
+    if (started) {
+        httpd_resp_sendstr(req, "{\"status\":\"connecting\"}");
+    } else {
+        httpd_resp_sendstr(req, "{\"status\":\"error\",\"error\":\"connect_start_failed\"}");
+    }
     return ESP_OK;
 }
 
@@ -717,30 +1164,58 @@ esp_err_t WiFiServerManager::ws_handler(httpd_req_t *req) {
 
 void WiFiServerManager::begin() {
     if (wifi_is_configured()) {
-        if (wifi_init_sta()) isAPMode = false;
+        if (wifi_init_sta()) {
+            isAPMode = false;
+        }
         else {
             wifi_init_softap();
-            start_dns_server();
             isAPMode = true;
         }
     } else {
         wifi_init_softap();
-        start_dns_server();
         isAPMode = true;
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.stack_size = 8192;
     config.lru_purge_enable = true;
-    config.max_uri_handlers = 64;
+    // We register many GET/HEAD pairs + API routes + captive endpoints.
+    // Keep enough slots to avoid silent route drops ("no slots left").
+    config.max_uri_handlers = 320;
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     if (httpd_start(&server, &config) == ESP_OK) {
         setupRoutes();
+    } else {
+        ESP_LOGE(TAG, "httpd_start failed");
     }
 }
 
 void WiFiServerManager::setupRoutes() {
+    httpd_uri_t capport_api_get = make_uri("/captive-portal/api", HTTP_GET, captive_portal_api_handler);
+    httpd_register_uri_handler(server, &capport_api_get);
+    httpd_uri_t capport_api_head = make_uri("/captive-portal/api", HTTP_HEAD, captive_portal_api_handler);
+    httpd_register_uri_handler(server, &capport_api_head);
+    // RFC 8908 well-known alias used by some captive portal clients.
+    httpd_uri_t capport_wk_get = make_uri("/.well-known/captive-portal", HTTP_GET, captive_portal_api_handler);
+    httpd_register_uri_handler(server, &capport_wk_get);
+    httpd_uri_t capport_wk_head = make_uri("/.well-known/captive-portal", HTTP_HEAD, captive_portal_api_handler);
+    httpd_register_uri_handler(server, &capport_wk_head);
+
+    httpd_uri_t portal_get = make_uri("/portal", HTTP_GET, redirect_handler);
+    httpd_register_uri_handler(server, &portal_get);
+    httpd_uri_t portal_head = make_uri("/portal", HTTP_HEAD, redirect_handler);
+    httpd_register_uri_handler(server, &portal_head);
+
+    httpd_uri_t wifi_setup_html_get = make_uri("/wifi_setup.html", HTTP_GET, wifi_setup_page_handler);
+    httpd_register_uri_handler(server, &wifi_setup_html_get);
+    httpd_uri_t wifi_setup_html_head = make_uri("/wifi_setup.html", HTTP_HEAD, wifi_setup_page_handler);
+    httpd_register_uri_handler(server, &wifi_setup_html_head);
+    httpd_uri_t wifi_setup_get = make_uri("/wifi_setup", HTTP_GET, wifi_setup_page_handler);
+    httpd_register_uri_handler(server, &wifi_setup_get);
+    httpd_uri_t wifi_setup_head = make_uri("/wifi_setup", HTTP_HEAD, wifi_setup_page_handler);
+    httpd_register_uri_handler(server, &wifi_setup_head);
+
     httpd_uri_t save_wifi_uri = make_uri("/save_wifi", HTTP_POST, save_wifi_handler);
     httpd_register_uri_handler(server, &save_wifi_uri);
 
@@ -806,6 +1281,9 @@ void WiFiServerManager::setupRoutes() {
 
     httpd_uri_t api_fault_get_uri = make_uri("/api/fault", HTTP_GET, api_fault_get_handler);
     httpd_register_uri_handler(server, &api_fault_get_uri);
+
+    httpd_uri_t api_events_uri = make_uri("/api/events", HTTP_GET, api_events_handler);
+    httpd_register_uri_handler(server, &api_events_uri);
 
     httpd_uri_t api_display_get_uri = make_uri("/api/display", HTTP_GET, api_display_get_handler);
     httpd_register_uri_handler(server, &api_display_get_uri);
@@ -917,26 +1395,114 @@ void WiFiServerManager::setupRoutes() {
     
     httpd_uri_t assets_uri = make_uri("/assets/*", HTTP_GET, static_asset_handler);
     httpd_register_uri_handler(server, &assets_uri);
+    httpd_uri_t assets_uri_head = make_uri("/assets/*", HTTP_HEAD, static_asset_handler);
+    httpd_register_uri_handler(server, &assets_uri_head);
 
     if (isAPMode) {
-        httpd_uri_t generate_204 = make_uri("/generate_204", HTTP_GET, redirect_handler);
+        httpd_uri_t generate_204 = make_uri("/generate_204", HTTP_GET, captive_probe_handler);
         httpd_register_uri_handler(server, &generate_204);
-        httpd_uri_t gen_204 = make_uri("/gen_204", HTTP_GET, redirect_handler);
+        httpd_uri_t generate_204_head = make_uri("/generate_204", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &generate_204_head);
+
+        httpd_uri_t gen_204 = make_uri("/gen_204", HTTP_GET, captive_probe_handler);
         httpd_register_uri_handler(server, &gen_204);
-        httpd_uri_t hotspot_detect = make_uri("/hotspot-detect.html", HTTP_GET, redirect_handler);
+        httpd_uri_t gen_204_head = make_uri("/gen_204", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &gen_204_head);
+
+        httpd_uri_t generate204 = make_uri("/generate204", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &generate204);
+        httpd_uri_t generate204_head = make_uri("/generate204", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &generate204_head);
+
+        httpd_uri_t hotspot_detect = make_uri("/hotspot-detect.html", HTTP_GET, captive_probe_handler);
         httpd_register_uri_handler(server, &hotspot_detect);
-        httpd_uri_t hotspotdetect = make_uri("/hotspotdetect.html", HTTP_GET, redirect_handler);
+        httpd_uri_t hotspot_detect_head = make_uri("/hotspot-detect.html", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &hotspot_detect_head);
+
+        httpd_uri_t hotspotdetect = make_uri("/hotspotdetect.html", HTTP_GET, captive_probe_handler);
         httpd_register_uri_handler(server, &hotspotdetect);
-        httpd_uri_t ncsi = make_uri("/ncsi.txt", HTTP_GET, redirect_handler);
+        httpd_uri_t hotspotdetect_head = make_uri("/hotspotdetect.html", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &hotspotdetect_head);
+
+        httpd_uri_t ncsi = make_uri("/ncsi.txt", HTTP_GET, captive_probe_handler);
         httpd_register_uri_handler(server, &ncsi);
-        httpd_uri_t connecttest = make_uri("/connecttest.txt", HTTP_GET, redirect_handler);
+        httpd_uri_t ncsi_head = make_uri("/ncsi.txt", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &ncsi_head);
+
+        httpd_uri_t connecttest = make_uri("/connecttest.txt", HTTP_GET, captive_probe_handler);
         httpd_register_uri_handler(server, &connecttest);
-        httpd_uri_t fwlink = make_uri("/fwlink", HTTP_GET, redirect_handler);
+        httpd_uri_t connecttest_head = make_uri("/connecttest.txt", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &connecttest_head);
+
+        httpd_uri_t wpad = make_uri("/wpad.dat", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &wpad);
+        httpd_uri_t wpad_head = make_uri("/wpad.dat", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &wpad_head);
+
+        httpd_uri_t browsernetworktime = make_uri("/browsernetworktime/*", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &browsernetworktime);
+        httpd_uri_t browsernetworktime_head = make_uri("/browsernetworktime/*", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &browsernetworktime_head);
+
+        httpd_uri_t connectivity_check = make_uri("/connectivity-check.html", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &connectivity_check);
+        httpd_uri_t connectivity_check_head = make_uri("/connectivity-check.html", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &connectivity_check_head);
+
+        httpd_uri_t check_network_status = make_uri("/check_network_status.txt", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &check_network_status);
+        httpd_uri_t check_network_status_head = make_uri("/check_network_status.txt", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &check_network_status_head);
+
+        httpd_uri_t mobile_status = make_uri("/mobile/status.php", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &mobile_status);
+        httpd_uri_t mobile_status_head = make_uri("/mobile/status.php", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &mobile_status_head);
+
+        httpd_uri_t kindle_stub = make_uri("/kindle-wifi/wifistub.html", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &kindle_stub);
+        httpd_uri_t kindle_stub_head = make_uri("/kindle-wifi/wifistub.html", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &kindle_stub_head);
+
+        httpd_uri_t fwlink = make_uri("/fwlink", HTTP_GET, captive_probe_handler);
         httpd_register_uri_handler(server, &fwlink);
+        httpd_uri_t fwlink_head = make_uri("/fwlink", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &fwlink_head);
+
+        httpd_uri_t redirect_get = make_uri("/redirect", HTTP_GET, redirect_handler);
+        httpd_register_uri_handler(server, &redirect_get);
+        httpd_uri_t redirect_head = make_uri("/redirect", HTTP_HEAD, redirect_handler);
+        httpd_register_uri_handler(server, &redirect_head);
+
+        httpd_uri_t success_txt = make_uri("/success.txt", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &success_txt);
+        httpd_uri_t success_txt_head = make_uri("/success.txt", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &success_txt_head);
+
+        httpd_uri_t canonical = make_uri("/canonical.html", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &canonical);
+        httpd_uri_t canonical_head = make_uri("/canonical.html", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &canonical_head);
+
+        httpd_uri_t apple_success = make_uri("/library/test/success.html", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &apple_success);
+        httpd_uri_t apple_success_head = make_uri("/library/test/success.html", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &apple_success_head);
+        httpd_uri_t success_html = make_uri("/success.html", HTTP_GET, captive_probe_handler);
+        httpd_register_uri_handler(server, &success_html);
+        httpd_uri_t success_html_head = make_uri("/success.html", HTTP_HEAD, captive_probe_handler);
+        httpd_register_uri_handler(server, &success_html_head);
+
+        // Mirror esp-idf-wifi-provisioner behavior:
+        // Unknown methods/paths in AP mode are redirected to AP root.
+        httpd_uri_t catch_all_post = make_uri("/*", HTTP_POST, catch_all_post_handler);
+        httpd_register_uri_handler(server, &catch_all_post);
     }
 
     httpd_uri_t index_uri = make_uri("/*", HTTP_GET, index_handler);
     httpd_register_uri_handler(server, &index_uri);
+    httpd_uri_t index_uri_head = make_uri("/*", HTTP_HEAD, index_handler);
+    httpd_register_uri_handler(server, &index_uri_head);
 }
 
 esp_err_t WiFiServerManager::api_fault_clear_handler(httpd_req_t *req) {
@@ -978,6 +1544,46 @@ esp_err_t WiFiServerManager::api_fault_get_handler(httpd_req_t *req) {
     if (rendered) free(rendered);
     cJSON_Delete(doc);
 
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "Pragma", "no-cache");
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr(req, output.c_str());
+    return ESP_OK;
+}
+
+esp_err_t WiFiServerManager::api_events_handler(httpd_req_t *req) {
+    std::vector<EventLogRow> rows;
+    append_event_rows_from_file(rows, EVENTS_LOG_PREV_FILE);
+    append_event_rows_from_file(rows, EVENTS_LOG_FILE);
+
+    std::sort(rows.begin(), rows.end(), [](const EventLogRow &a, const EventLogRow &b) {
+        return a.ts_ms > b.ts_ms;
+    });
+
+    int limit = 200;
+    std::string limit_q;
+    if (query_value(req, "limit", limit_q) && !limit_q.empty()) {
+        const int parsed = atoi(limit_q.c_str());
+        if (parsed > 0) limit = std::min(parsed, 1000);
+    }
+
+    cJSON *doc = cJSON_CreateObject();
+    cJSON *items = cJSON_CreateArray();
+    const size_t take = std::min(rows.size(), static_cast<size_t>(limit));
+    for (size_t i = 0; i < take; ++i) {
+        const EventLogRow &row = rows[i];
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddNumberToObject(item, "ts_ms", (double)row.ts_ms);
+        cJSON_AddStringToObject(item, "type", row.type.c_str());
+        cJSON_AddStringToObject(item, "message", row.message.c_str());
+        cJSON_AddBoolToObject(item, "fault_like", row.fault_like);
+        cJSON_AddItemToArray(items, item);
+    }
+    cJSON_AddItemToObject(doc, "items", items);
+    cJSON_AddNumberToObject(doc, "count", (double)take);
+    cJSON_AddNumberToObject(doc, "total", (double)rows.size());
+
+    std::string output = render_json_and_delete(doc);
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "Pragma", "no-cache");
     httpd_resp_set_type(req, "application/json");
@@ -1771,6 +2377,7 @@ static const char *result_code_to_str(device_commands::ResultCode code) {
         case device_commands::ResultCode::Ok: return "ok";
         case device_commands::ResultCode::InvalidPayload: return "invalid_payload";
         case device_commands::ResultCode::InvalidSchedule: return "invalid_schedule";
+        case device_commands::ResultCode::InvalidState: return "invalid_state";
         case device_commands::ResultCode::NoSchedule: return "no_schedule";
         case device_commands::ResultCode::SensorInvalid: return "sensor_invalid";
         case device_commands::ResultCode::TouchNotCalibrated: return "touch_not_calibrated";
@@ -1787,6 +2394,7 @@ static const char *result_message(device_commands::ResultCode code) {
         case device_commands::ResultCode::Ok: return "ok";
         case device_commands::ResultCode::InvalidPayload: return "Invalid payload";
         case device_commands::ResultCode::InvalidSchedule: return "Invalid schedule";
+        case device_commands::ResultCode::InvalidState: return "Command not allowed in current state";
         case device_commands::ResultCode::NoSchedule: return "No schedule loaded";
         case device_commands::ResultCode::SensorInvalid: return "Sensor invalid";
         case device_commands::ResultCode::TouchNotCalibrated: return "Touch not calibrated";
@@ -1841,6 +2449,9 @@ static void send_command_result(httpd_req_t *req,
             break;
         case device_commands::ResultCode::InvalidSchedule:
             send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "400 Bad Request");
+            break;
+        case device_commands::ResultCode::InvalidState:
+            send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
             break;
         case device_commands::ResultCode::NoSchedule:
             send_command_envelope(req, false, result_code_to_str(result.code), result_message(result.code), "409 Conflict");
@@ -1996,7 +2607,7 @@ esp_err_t WiFiServerManager::api_add_time_handler(httpd_req_t *req) {
 }
 
 esp_err_t WiFiServerManager::api_set_rate_handler(httpd_req_t *req) {
-    if (!check_rate_limit(wifiServer.lastAddTimeCommandMs, TUNE_RATE_LIMIT_MS, req)) {
+    if (!check_rate_limit(wifiServer.lastSetRateCommandMs, TUNE_RATE_LIMIT_MS, req)) {
         return ESP_OK;
     }
     std::string body;

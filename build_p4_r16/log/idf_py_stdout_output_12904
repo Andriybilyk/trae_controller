@@ -1,0 +1,83 @@
+Command: ninja all
+[1/16] Performing build step for 'bootloader'
+[1/1] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\bootloader && C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:/esp/.espressif/v6.0/esp-idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 C:/Users/andri/Documents/GitHub/trae_controller/build_p4_r16/bootloader/bootloader.bin"
+Bootloader binary size 0x5da0 bytes. 0x260 bytes (2%) free.
+[2/16] No install step for 'bootloader'
+[3/16] C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16 && C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\littlefs_py_venv\Scripts\littlefs-python.exe create C:/Users/andri/Documents/GitHub/trae_controller/firmware/data C:/Users/andri/Documents/GitHub/trae_controller/build_p4_r16/storage.bin -v --fs-size=0x350000 --name-max=64 --block-size=4096"
+LittleFS Configuration:
+  Block Size:       4096  /  0x1000
+  Image Size:    3473408  /  0x350000
+  Block Count:       848
+  Name Max:           64
+  Image:       C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\storage.bin
+Adding Directory: assets
+Adding Directory: fonts
+Adding File:      history.html
+Adding File:      index.html
+Adding File:      manifest.json
+Adding File:      mqtt_gateway.html
+Adding File:      touch_calibration.html
+Adding File:      wifi_setup.html
+Adding File:      assets\index-1e2b07f5.js
+Adding File:      assets\index-1e2b07f5.js.gz
+Adding File:      assets\index-f001c656.css
+Adding File:      assets\index-f001c656.css.gz
+Adding File:      assets\vendor-562bd106.js
+Adding File:      assets\vendor-562bd106.js.gz
+Adding File:      assets\vendor-charts-d47e8fd5.js
+Adding File:      assets\vendor-charts-d47e8fd5.js.gz
+Adding File:      assets\vendor-react-69cc1413.js
+Adding File:      assets\vendor-react-69cc1413.js.gz
+Adding File:      fonts\README.md
+Adding Directory: fonts\sketch_260307b
+Adding Directory: fonts\sketch_260307b\data
+Adding Directory: fonts\sketch_260307b\FontFiles
+Adding File:      fonts\sketch_260307b\sketch_260307b.pde
+Adding Directory: fonts\sketch_260307b\sketch_260308c
+Adding File:      fonts\sketch_260307b\data\Final-Frontier.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-Bold.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-BoldItalic.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-Italic.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\PTSans-Regular.ttf
+Adding File:      fonts\sketch_260307b\FontFiles\System_Font_List.txt
+Adding File:      fonts\sketch_260307b\sketch_260308c\sketch_260308c.pde
+[4/16] Completed 'bootloader'
+[5/16] Generating C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target/riscv32imafc-esp-espidf/release/libslint_ui.a
+FAILED: C:/Users/andri/Documents/GitHub/trae_controller/firmware/slint_ui/target/riscv32imafc-esp-espidf/release/libslint_ui.a 
+C:\WINDOWS\system32\cmd.exe /C "cd /D C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui && C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -NoProfile -Command "& C:\Users\andri/export-esp.ps1; $env:RUSTUP_TOOLCHAIN='esp'; $env:RUSTFLAGS='-Cdebuginfo=0 -Clink-arg=/PDB:NONE'; $env:CARGO_PROFILE_RELEASE_DEBUG='0'; $env:CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG='0'; & C:\Users\andri/.cargo/bin/cargo.exe build --release --target riscv32imafc-esp-espidf -Z build-std=core,alloc,std,panic_abort""
+   Compiling slint_ui v0.1.0 (C:\Users\andri\Documents\GitHub\trae_controller\firmware\slint_ui)
+error[E0308]: mismatched types
+    --> src\lib.rs:4981:70
+     |
+4981 |             let ap_ssid = if unsafe { slint_bridge_wifi_ap_ssid_copy(raw_ap_ssid.as_mut_ptr(), raw_ap_ssid.len() as i32) } {
+     |                                       ------------------------------ ^^^^^^^^^^^^^^^^^^^^^^^^ expected `*mut u8`, found `*mut i8`
+     |                                       |
+     |                                       arguments to this function are incorrect
+     |
+     = note: expected raw pointer `*mut u8`
+                found raw pointer `*mut i8`
+note: function defined here
+    --> src\lib.rs:124:8
+     |
+ 124 |     fn slint_bridge_wifi_ap_ssid_copy(out: *mut c_char, out_len: i32) -> bool;
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ---
+
+error[E0308]: mismatched types
+    --> src\lib.rs:4982:41
+     |
+4982 |                 unsafe { CStr::from_ptr(raw_ap_ssid.as_ptr()) }
+     |                          -------------- ^^^^^^^^^^^^^^^^^^^^ expected `*const u8`, found `*const i8`
+     |                          |
+     |                          arguments to this function are incorrect
+     |
+     = note: expected raw pointer `*const u8`
+                found raw pointer `*const i8`
+note: associated function defined here
+    --> C:\Users\andri\.rustup\toolchains\esp\lib\rustlib\src\rust\library\core\src\ffi\c_str.rs:253:25
+     |
+ 253 |     pub const unsafe fn from_ptr<'a>(ptr: *const c_char) -> &'a CStr {
+     |                         ^^^^^^^^
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `slint_ui` (lib) due to 2 previous errors
+ninja: build stopped: subcommand failed.

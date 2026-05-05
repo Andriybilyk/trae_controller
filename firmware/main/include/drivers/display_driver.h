@@ -10,6 +10,11 @@ extern "C" {
 void display_driver_init(void);
 
 bool display_driver_blit_rgb565(int x, int y, int w, int h, const uint16_t *data);
+bool display_driver_wait_vsync(uint32_t timeout_ms);
+bool display_driver_p4_begin_frame(uint16_t **out_fb, int *out_w, int *out_h);
+bool display_driver_p4_present_frame(void);
+bool display_driver_p4_present_frame_region(int x, int y, int w, int h);
+void display_driver_p4_cancel_frame(void);
 
 // Backlight control (0..100%).
 uint8_t display_driver_get_backlight_percent(void);

@@ -1,5 +1,6 @@
 #include "net/wifi_server.h"
 
+#include "config/board_profile.h"
 #include "drivers/display_driver.h"
 #include "cJSON.h"
 #include "esp_system.h"
@@ -820,7 +821,12 @@ esp_err_t WiFiServerManager::api_touch_pins_set_handler(httpd_req_t *req) {
 
 esp_err_t WiFiServerManager::api_touch_probe_handler(httpd_req_t *req) {
     uint16_t rx = 0, ry = 0, z1 = 0;
-    const bool pressed = display_driver_touch_probe(&rx, &ry, &z1);
+    bool pressed = false;
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        display_driver_get_touch_debug(&rx, &ry, &z1, &pressed);
+    } else {
+        pressed = display_driver_touch_probe(&rx, &ry, &z1);
+    }
 
     uint8_t bz1[3] = {0}, bx[3] = {0}, by[3] = {0};
     display_driver_get_touch_last_bytes(bz1, bx, by);
@@ -850,7 +856,12 @@ esp_err_t WiFiServerManager::api_touch_probe_handler(httpd_req_t *req) {
 
 esp_err_t WiFiServerManager::api_touch_raw_handler(httpd_req_t *req) {
     uint16_t rx = 0, ry = 0, z1 = 0;
-    const bool pressed = display_driver_touch_probe_raw(&rx, &ry, &z1);
+    bool pressed = false;
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        display_driver_get_touch_debug(&rx, &ry, &z1, &pressed);
+    } else {
+        pressed = display_driver_touch_probe_raw(&rx, &ry, &z1);
+    }
 
     cJSON *doc = cJSON_CreateObject();
     cJSON_AddBoolToObject(doc, "pressed", pressed);

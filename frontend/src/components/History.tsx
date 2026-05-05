@@ -111,21 +111,16 @@ interface FiringDataPoint {
     target: number;
 }
 
+interface FiringCurvePoint {
+    t: number;
+    temp: number;
+}
+
 interface FiringDetail {
     summary: FiringSummary;
     data: FiringDataPoint[];
-}
-
-interface ScheduleStepLike {
-    type?: string;
-    target?: number;
-    rate?: number;
-    holdTime?: number;
-}
-
-interface ScheduleLike {
-    name?: string;
-    steps?: ScheduleStepLike[];
+    planned?: FiringCurvePoint[];
+    actual?: FiringCurvePoint[];
 }
 
 const formatTemp = (t: number | null | undefined) => {
@@ -146,7 +141,6 @@ const History = () => {
     const [error, setError] = useState<string | null>(null);
     
     const [selectedFiring, setSelectedFiring] = useState<FiringDetail | null>(null);
-    const [selectedPlan, setSelectedPlan] = useState<{ x: number; y: number }[] | null>(null);
     const [zoomX, setZoomX] = useState(1);
     const [panX, setPanX] = useState(0);
     const [isDraggingPan, setIsDraggingPan] = useState(false);
@@ -200,7 +194,6 @@ const History = () => {
 
     const handleSelectFiring = async (id: string) => {
         setIsDetailLoading(true);
-        setSelectedPlan(null);
         try {
             const res = await getJson<FiringDetail>(`/history/${id}`);
             if (!res.ok || !res.data) throw new Error(res.message || 'Failed to load firing details.');
@@ -219,8 +212,6 @@ const History = () => {
             } else {
                 setZoomX(1);
                 setPanX(0);
-                const plan = await fetchPlanForHistory(data);
-                setSelectedPlan(plan);
                 setSelectedFiring(data);
             }
         } catch (err) {
@@ -255,63 +246,13 @@ const History = () => {
         return { startTemp, endTemp, peakTemp, maxTarget, rise };
     };
 
-    const buildPlanFromSchedule = (detail: FiringDetail, schedule: ScheduleLike | null) => {
-        const steps = Array.isArray(schedule?.steps) ? schedule!.steps! : [];
-        const firstTemp = detail.data.find((p) => Number.isFinite(Number(p.temp)))?.temp;
-        const baseTemp = Number.isFinite(Number(firstTemp)) ? Number(firstTemp) : 25;
-        const points: { x: number; y: number }[] = [{ x: 0, y: baseTemp }];
-        let currentTemp = baseTemp;
-        let currentHours = 0;
-
-        for (const step of steps) {
-            const type = String(step?.type || '').toLowerCase();
-            const target = Number(step?.target);
-            const rate = Number(step?.rate);
-            const holdTime = Number(step?.holdTime);
-
-            const hasTarget = Number.isFinite(target);
-            const hasRate = Number.isFinite(rate) && rate > 0;
-            const hasHold = Number.isFinite(holdTime) && holdTime > 0;
-
-            if ((type === 'ramp' || type === '' || type === 'heat') && hasTarget) {
-                const diff = Math.abs(target - currentTemp);
-                const rampHours = diff / (hasRate ? rate : 100);
-                currentHours += rampHours;
-                currentTemp = target;
-                points.push({ x: currentHours, y: currentTemp });
-            }
-
-            if (type === 'hold' && hasTarget) {
-                currentTemp = target;
-            }
-
-            if (hasHold) {
-                currentHours += holdTime / 60;
-                points.push({ x: currentHours, y: currentTemp });
-            }
-        }
-
-        return points;
-    };
-
-    const fetchPlanForHistory = async (detail: FiringDetail) => {
-        const scheduleName = String(detail?.summary?.scheduleName || '').trim();
-        if (!scheduleName) return null;
-
-        const candidates = Array.from(new Set([
-            scheduleName,
-            scheduleName.replace(/\s+/g, '_'),
-            scheduleName.replace(/_/g, ' ')
-        ])).filter(Boolean);
-
-        for (const name of candidates) {
-            const res = await getJson<ScheduleLike>(`/schedules?name=${encodeURIComponent(name)}`);
-            if (!res.ok || !res.data) continue;
-            const points = buildPlanFromSchedule(detail, res.data);
-            if (points.length > 1) return points;
-        }
-
-        return null;
+    const buildPlanFromDetail = (detail: FiringDetail) => {
+        const planned = Array.isArray(detail?.planned) ? detail.planned : [];
+        if (planned.length < 2) return [] as { x: number; y: number }[];
+        return planned
+            .map((p) => ({ x: Number(p?.t) / 60, y: Number(p?.temp) }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+            .sort((a, b) => a.x - b.x);
     };
 
     const toHoursFromStart = (ts: number | undefined, start: number | undefined) => {
@@ -338,8 +279,9 @@ const History = () => {
             .filter((p) => Number.isFinite(p.temp))
             .map((p) => ({ x: p.x, y: p.temp }));
 
-        const targetRaw = (selectedPlan && selectedPlan.length > 1)
-            ? selectedPlan.map((p) => ({ x: Number(p.x), y: Number(p.y) }))
+        const detailPlan = buildPlanFromDetail(detail);
+        const targetRaw = (detailPlan.length > 1)
+            ? detailPlan
             : samples
                 .filter((p) => Number.isFinite(p.target))
                 .map((p) => ({ x: p.x, y: p.target }));
@@ -347,19 +289,14 @@ const History = () => {
         const target: { x: number; y: number }[] = [];
         for (let i = 0; i < targetRaw.length; i += 1) {
             const point = targetRaw[i];
-            if (i === 0) {
+            const prev = i > 0 ? targetRaw[i - 1] : null;
+            const next = i + 1 < targetRaw.length ? targetRaw[i + 1] : null;
+            const firstOrLast = i === 0 || i === targetRaw.length - 1;
+            const yChangedFromPrev = !!prev && Math.abs(point.y - prev.y) >= 0.1;
+            const yChangedToNext = !!next && Math.abs(next.y - point.y) >= 0.1;
+            // Keep breakpoints from both sides so hold plateaus keep exact start/end shelves.
+            if (firstOrLast || yChangedFromPrev || yChangedToNext) {
                 target.push(point);
-                continue;
-            }
-            const prev = targetRaw[i - 1];
-            if (Math.abs(point.y - prev.y) >= 0.1) {
-                target.push(point);
-            }
-        }
-        if (targetRaw.length > 0) {
-            const last = targetRaw[targetRaw.length - 1];
-            if (target.length === 0 || target[target.length - 1].x !== last.x) {
-                target.push(last);
             }
         }
 
@@ -547,7 +484,7 @@ const History = () => {
                                         <p className="text-sm text-zinc-400">{selectedFiring.summary.startTime > 946684800000 ? new Date(selectedFiring.summary.startTime).toLocaleString() : 'No RTC timestamp (uptime-based session)'}</p>
                                         <p className="text-xs text-zinc-500 mt-1">{t.history.steps}: {selectedFiring.summary.completedSteps} / {selectedFiring.summary.totalSteps}</p>
                                     </div>
-                                    <button onClick={() => { setSelectedFiring(null); setSelectedPlan(null); }} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-800 hover:text-white"><X size={20} /></button>
+                                        <button onClick={() => { setSelectedFiring(null); }} className="p-2 rounded-full text-zinc-400 hover:bg-zinc-800 hover:text-white"><X size={20} /></button>
                                 </div>
                                 <div className="p-4 md:p-6 flex-1 overflow-hidden">
                                     {(() => {
@@ -666,7 +603,7 @@ const History = () => {
                         ) : (
                              <div className="p-8 text-center text-red-400">
                                  <p>{t.history.errorDetails}</p>
-                                 <button onClick={() => { setSelectedFiring(null); setSelectedPlan(null); }} className="mt-4 px-4 py-2 bg-zinc-800 rounded-md text-white">{t.dashboard.done}</button>
+                                 <button onClick={() => { setSelectedFiring(null); }} className="mt-4 px-4 py-2 bg-zinc-800 rounded-md text-white">{t.dashboard.done}</button>
                              </div>
                         )}
                     </div>

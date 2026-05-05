@@ -1,0 +1,1214 @@
+Command: C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe C:\esp\.espressif\v6.0\esp-idf\tools/idf_monitor.py -p COM11 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\trae_controller.elf C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16\bootloader\bootloader.elf --force-color -m 'C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe' 'C:\esp\.espressif\v6.0\esp-idf\tools\idf.py' '-C' 'firmware' '-B' 'build_p4_r16' '-p' 'COM11'
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0xc (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff07116
+Core1 Saved PC:0x4ff09b5a
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x1738
+load:0x4ff29ed0,len:0xf7c
+load:0x4ff2cbd0,len:0x368c
+entry 0x4ff29eda
+[0;32mI (27) boot: ESP-IDF v6.0 2nd stage bootloader[0m
+[0;32mI (28) boot: compile time Apr 15 2026 21:06:55[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (29) boot: chip revision: v1.3[0m
+[0;32mI (30) boot: efuse block revision: v0.3[0m
+[0;32mI (34) qio_mode: Enabling default flash chip QIO[0m
+[0;32mI (38) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (42) boot.esp32p4: SPI Mode       : QIO[0m
+[0;32mI (46) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (50) boot: Enabling RNG early entropy source...[0m
+[0;32mI (54) boot: Partition Table:[0m
+[0;32mI (57) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (63) boot:  0 nvs              WiFi data        01 02 00009000 00005000[0m
+[0;32mI (70) boot:  1 otadata          OTA data         01 00 0000e000 00002000[0m
+[0;32mI (76) boot:  2 factory          factory app      00 00 00010000 00ca0000[0m
+[0;32mI (83) boot:  3 storage          Unknown data     01 83 00cb0000 00350000[0m
+[0;32mI (90) boot: End of partition table[0m
+[0;32mI (93) boot: Defaulting to factory image[0m
+[0;32mI (96) esp_image: segment 0: paddr=00010020 vaddr=403d0020 size=76196ch (7739756) map[0m
+[0;32mI (1102) esp_image: segment 1: paddr=00771994 vaddr=30100000 size=00068h (   104) load[0m
+[0;32mI (1104) esp_image: segment 2: paddr=00771a04 vaddr=4ff00000 size=0e614h ( 58900) load[0m
+[0;32mI (1115) esp_image: segment 3: paddr=00780020 vaddr=40000020 size=3c82a4h (3965604) map[0m
+[0;32mI (1628) esp_image: segment 4: paddr=00b482cc vaddr=4ff0e614 size=02ab0h ( 10928) load[0m
+[0;32mI (1632) esp_image: segment 5: paddr=00b4ad84 vaddr=4ff11100 size=04280h ( 17024) load[0m
+[0;32mI (1636) esp_image: segment 6: paddr=00b4f00c vaddr=50108080 size=00024h (    36) load[0m
+[0;32mI (1645) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (1645) boot: Disabling RNG early entropy source...[0m
+[0;32mI (1663) hex_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (1664) hex_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (1664) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
+[0;32mI (1665) hex_psram: dev id       : 0x03 (generation 4)[0m
+[0;32mI (1669) hex_psram: density      : 0x07 (256 Mbit)[0m
+[0;32mI (1674) hex_psram: good-die     : 0x06 (Pass)[0m
+[0;32mI (1678) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
+[0;32mI (1683) hex_psram: BurstType    : 0x00 ( Wrap)[0m
+[0;32mI (1687) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
+[0;32mI (1692) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
+[0;32mI (1696) hex_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
+[0;32mI (1701) hex_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (1705) MSPI Timing: Enter psram timing tuning[0m
+[0;32mI (1881) esp_psram: Found 32MB PSRAM device[0m
+[0;32mI (1882) esp_psram: Speed: 80MHz[0m
+[0;32mI (1885) hex_psram: psram CS IO is dedicated[0m
+[0;32mI (1885) cpu_start: Multicore app[0m
+[0;32mI (3154) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (3163) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (3164) cpu_start: Pro cpu start user code[0m
+[0;32mI (3164) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (3166) app_init: Application information:[0m
+[0;32mI (3170) app_init: Project name:     trae_controller[0m
+[0;32mI (3174) app_init: App version:      3d6c312-dirty[0m
+[0;32mI (3179) app_init: Compile time:     Apr 15 2026 21:05:38[0m
+[0;32mI (3184) app_init: ELF file SHA256:  7597c0bd4...[0m
+[0;32mI (3188) app_init: ESP-IDF:          v6.0[0m
+[0;32mI (3192) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (3196) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (3200) efuse_init: Chip rev:         v1.3[0m
+[0;32mI (3204) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (3210) heap_init: At 4FF19780 len 00021840 (134 KiB): RETENT_RAM[0m
+[0;32mI (3216) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (3221) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (3227) heap_init: At 501080A4 len 00007F5C (31 KiB): RTCRAM[0m
+[0;32mI (3232) heap_init: At 30100068 len 00001F98 (7 KiB): TCM[0m
+[0;32mI (3238) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;33mW (3244) spi_flash: Detected boya flash chip but using generic driver. For optimal functionality, enable `SPI_FLASH_SUPPORT_BOYA_CHIP` in menuconfig[0m
+[0;32mI (3257) spi_flash: detected chip: generic[0m
+[0;32mI (3261) spi_flash: flash io: qio[0m
+[0;32mI (3282) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (3288) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (3294) H_SDIO_DRV: sdio_data_to_rx_buf_task started[0m
+[0;32mI (3294) main_task: Started on CPU0[0m
+[0;32mI (3304) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (3314) main_task: Calling app_main()[0m
+[1;31mE (3314) esp_ota_ops: Running firmware is factory[0m
+[0;32mI (3314) MAIN: Reset reason: 11 (USB), free_heap=34041648, min_free_heap=34041568[0m
+[1;31mE (3324) task_wdt: esp_task_wdt_init(517): TWDT already initialized[0m
+[0;32mI (3344) MAIN: TRAE KILN CONTROLLER STARTING...[0m
+[0;32mI (3344) temperature_sensor: Range [-10°C ~ 80°C], error < 1°C[0m
+[0;32mI (3344) MAIN: Board temp sensor enabled[0m
+[0;32mI (3354) MAIN: Skip DS3231 init for NewP4 profile[0m
+[0;32mI (3354) MAIN: Skip fan+buzzer init for NewP4 profile[0m
+[0;32mI (3374) MAIN: LittleFS Mounted[0m
+[0;32mI (3394) MAIN: Init Thermal Control...[0m
+[0;32mI (3404) THERMAL: Thermal Controller initialized[0m
+[0;32mI (3404) THERMAL: KILN STOPPED: System Boot[0m
+[1;31mE (3404) MAIN: mDNS init failed: -1[0m
+[0;32mI (3404) MAIN: Setup Complete.[0m
+[0;32mI (3414) MAIN: Starting tasks...[0m
+[0;32mI (3414) CTRL_TASK: Starting control task[0m
+[0;32mI (3414) SRV_TASK: Starting server task[0m
+[0;32mI (3414) UI_TASK: Starting UI task[0m
+[0;32mI (3424) WIFI_CONN: Connecting to SSID: home[0m
+[1;31mE (3424) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (3424) DISPLAY: P4 BL apply=0 (dc=1 pwm_ready=0 lock=0)[0m
+[1;31mE (3434) system_api: 0 mac type is incorrect (not found)[0m
+[0;33mW (3444) WIFI_CONN: AP SSID suffix: MAC unavailable, using random fallback 'TRAE_KILN_SETUP_9A73'[0m
+[0;32mI (3454) transport: Attempt connection with slave: retry[0][0m
+[0;33mW (3454) H_SDIO_DRV: Reset slave using GPIO[54][0m
+[0;32mI (3464) os_wrapper_esp: GPIO [54] configured[0m
+[0;32mI (3414) MAIN: Main task done; deleting main task to avoid stack overflow.[0m
+[0;32mI (3634) st7701: version: 2.0.2[0m
+[0;32mI (3884) st7701_mipi: LCD ID: FF FF FF[0m
+[0;32mI (3884) st7701_mipi:  st7701->madctl_val: 0x0, st7701->colmod_val: 0x55[0m
+[0;32mI (4174) DISPLAY: P4 BL apply=100 (dc=1 pwm_ready=0 lock=0)[0m
+[0;32mI (4174) DISPLAY: P4 MIPI panel ready (physical): 480x800[0m
+[0;32mI (4174) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (4184) GT911: TouchPad_ID:0x39,0x31,0x31[0m
+[0;32mI (4184) GT911: TouchPad_Config_Version:250[0m
+[0;32mI (4194) DISPLAY: Touch initialized (GT911, I2C addr=0x5D, SDA=7 SCL=8)[0m
+[0;32mI (4194) DISPLAY: P4 BL apply=20 (dc=1 pwm_ready=0 lock=0)[0m
+[0;32mI (4264) DISPLAY: Display initialized successfully (P4)[0m
+[0;32mI (4294) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (4354) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (4354) SLINT_BRIDGE: CMD action=load_schedule result=0 ok=1[0m
+[1;31mE (4424) temperature_sensor: temperature_sensor_install(136): Already installed[0m
+[0;32mI (4424) DISPLAY: RENDER begin_frame ts=1186 ms frame=480x800[0m
+[0;32mI (4564) DISPLAY: RENDER present_frame ts=1322 ms frame=480x800[0m
+[0;32mI (4564) DISPLAY: RENDER begin_frame ts=1325 ms frame=480x800[0m
+[0;32mI (4594) DISPLAY: RENDER begin_frame ts=1357 ms frame=480x800[0m
+[0;32mI (4624) DISPLAY: RENDER begin_frame ts=1390 ms frame=480x800[0m
+[0;32mI (4664) DISPLAY: RENDER begin_frame ts=1423 ms frame=480x800[0m
+[0;32mI (4694) DISPLAY: RENDER begin_frame ts=1456 ms frame=480x800[0m
+[0;32mI (4724) DISPLAY: RENDER begin_frame ts=1489 ms frame=480x800[0m
+[0;32mI (4764) DISPLAY: RENDER begin_frame ts=1522 ms frame=480x800[0m
+[0;32mI (4794) DISPLAY: RENDER begin_frame ts=1555 ms frame=480x800[0m
+[0;32mI (4824) DISPLAY: RENDER begin_frame ts=1588 ms frame=480x800[0m
+[0;32mI (4854) DISPLAY: RENDER begin_frame ts=1621 ms frame=480x800[0m
+[0;32mI (4914) DISPLAY: RENDER begin_frame ts=1672 ms frame=480x800[0m
+[0;32mI (4964) DISPLAY: RENDER present_frame ts=1730 ms frame=480x800[0m
+[0;32mI (4974) DISPLAY: RENDER begin_frame ts=1732 ms frame=480x800[0m
+[0;32mI (5004) DISPLAY: RENDER begin_frame ts=1765 ms frame=480x800[0m
+[0;32mI (5034) DISPLAY: RENDER begin_frame ts=1798 ms frame=480x800[0m
+[0;32mI (5064) DISPLAY: RENDER begin_frame ts=1831 ms frame=480x800[0m
+[0;32mI (5104) DISPLAY: RENDER begin_frame ts=1864 ms frame=480x800[0m
+[0;32mI (5134) DISPLAY: RENDER begin_frame ts=1897 ms frame=480x800[0m
+[0;32mI (5164) DISPLAY: RENDER begin_frame ts=1930 ms frame=480x800[0m
+[0;32mI (5204) DISPLAY: RENDER begin_frame ts=1963 ms frame=480x800[0m
+[0;32mI (5234) DISPLAY: RENDER begin_frame ts=1996 ms frame=480x800[0m
+[0;32mI (5264) DISPLAY: RENDER begin_frame ts=2029 ms frame=480x800[0m
+[0;32mI (5304) DISPLAY: RENDER begin_frame ts=2062 ms frame=480x800[0m
+[0;32mI (5334) DISPLAY: RENDER begin_frame ts=2095 ms frame=480x800[0m
+[0;32mI (5364) DISPLAY: RENDER begin_frame ts=2128 ms frame=480x800[0m
+[0;32mI (5414) DISPLAY: RENDER begin_frame ts=2172 ms frame=480x800[0m
+[0;32mI (5464) DISPLAY: RENDER present_frame ts=2224 ms frame=480x800[0m
+[0;32mI (5464) DISPLAY: RENDER begin_frame ts=2227 ms frame=480x800[0m
+[0;32mI (5484) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz][0m
+[0;32mI (5484) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54][0m
+[0;32mI (5484) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1][0m
+[0;32mI (5494) DISPLAY: RENDER begin_frame ts=2260 ms frame=480x800[0m
+[0;32mI (5524) sdio_wrapper: Function 0 Blocksize: 512[0m
+[0;32mI (5524) sdio_wrapper: Function 1 Blocksize: 512[0m
+[0;32mI (5534) DISPLAY: RENDER begin_frame ts=2293 ms frame=480x800[0m
+[0;32mI (5564) DISPLAY: RENDER begin_frame ts=2326 ms frame=480x800[0m
+[0;32mI (5594) DISPLAY: RENDER begin_frame ts=2359 ms frame=480x800[0m
+[0;32mI (5624) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE[0m
+[0;32mI (5624) transport: set_transport_state: 1[0m
+[0;32mI (5624) transport: Waiting for esp_hosted slave to be ready[0m
+[0;32mI (5634) DISPLAY: RENDER begin_frame ts=2392 ms frame=480x800[0m
+[0;32mI (5664) DISPLAY: RENDER begin_frame ts=2425 ms frame=480x800[0m
+[0;32mI (5694) H_SDIO_DRV: SDIO Host operating in STREAMING MODE[0m
+[0;32mI (5694) H_SDIO_DRV: Open data path at slave[0m
+[0;32mI (5694) H_SDIO_DRV: Starting SDIO process rx task[0m
+[0;32mI (5694) DISPLAY: RENDER begin_frame ts=2458 ms frame=480x800[0m
+[0;32mI (5724) H_SDIO_DRV: Received ESP_PRIV_IF type message[0m
+[0;32mI (5724) transport: Received INIT event from ESP32 peripheral[0m
+[0;32mI (5724) transport: EVENT: 12[0m
+[0;32mI (5724) transport: Identified slave [esp32c6][0m
+[0;32mI (5724) transport: EVENT: 11[0m
+[0;32mI (5724) transport: capabilities: 0xd[0m
+[0;32mI (5734) transport: Features supported are:[0m
+[0;32mI (5734) transport: 	 * WLAN[0m
+[0;32mI (5734) transport: 	   - HCI over SDIO[0m
+[0;32mI (5744) transport: 	   - BLE only[0m
+[0;32mI (5744) transport: EVENT: 13[0m
+[0;33mW (5744) transport: Version mismatch: Host [2.12.0] > Co-proc [2.3.0] ==> Upgrade co-proc to avoid RPC timeouts[0m
+[0;32mI (5754) transport: ESP board type is : 13 [0m
+
+[0;32mI (5764) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE[0m
+[0;32mI (5764) H_API: Transport active[0m
+[0;32mI (5774) transport: Slave chip Id[12][0m
+[0;32mI (5774) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80][0m
+[0;32mI (5784) transport: transport_delayed_init[0m
+[0;32mI (5784) hci_stub_drv: Host BT Support: Disabled[0m
+[0;32mI (5784) H_SDIO_DRV: Received INIT event[0m
+[0;32mI (5794) H_SDIO_DRV: Event type: 0x22[0m
+[0;32mI (5794) H_SDIO_DRV: Write thread started[0m
+[0;32mI (5804) DISPLAY: RENDER begin_frame ts=2569 ms frame=480x800[0m
+[0;32mI (5844) DISPLAY: RENDER begin_frame ts=2602 ms frame=480x800[0m
+[0;32mI (5874) DISPLAY: RENDER begin_frame ts=2635 ms frame=480x800[0m
+[0;32mI (5904) DISPLAY: RENDER begin_frame ts=2668 ms frame=480x800[0m
+[0;32mI (5934) DISPLAY: RENDER begin_frame ts=2701 ms frame=480x800[0m
+[0;32mI (5974) DISPLAY: RENDER begin_frame ts=2734 ms frame=480x800[0m
+[0;32mI (6004) DISPLAY: RENDER begin_frame ts=2767 ms frame=480x800[0m
+[0;32mI (6034) DISPLAY: RENDER begin_frame ts=2800 ms frame=480x800[0m
+[0;32mI (6074) DISPLAY: RENDER begin_frame ts=2833 ms frame=480x800[0m
+[0;32mI (6104) DISPLAY: RENDER begin_frame ts=2866 ms frame=480x800[0m
+[0;32mI (6134) DISPLAY: RENDER begin_frame ts=2899 ms frame=480x800[0m
+[0;32mI (6174) DISPLAY: RENDER begin_frame ts=2932 ms frame=480x800[0m
+[0;32mI (6204) DISPLAY: RENDER begin_frame ts=2965 ms frame=480x800[0m
+[0;32mI (6234) DISPLAY: RENDER begin_frame ts=2998 ms frame=480x800[0m
+[0;32mI (6264) DISPLAY: RENDER begin_frame ts=3031 ms frame=480x800[0m
+[0;32mI (6304) DISPLAY: RENDER begin_frame ts=3064 ms frame=480x800[0m
+[0;32mI (6334) DISPLAY: RENDER begin_frame ts=3097 ms frame=480x800[0m
+[0;32mI (6364) DISPLAY: RENDER begin_frame ts=3130 ms frame=480x800[0m
+[0;32mI (6404) DISPLAY: RENDER begin_frame ts=3164 ms frame=480x800[0m
+[0;32mI (6434) DISPLAY: RENDER begin_frame ts=3196 ms frame=480x800[0m
+[0;32mI (6464) DISPLAY: RENDER begin_frame ts=3229 ms frame=480x800[0m
+[0;32mI (6504) DISPLAY: RENDER begin_frame ts=3262 ms frame=480x800[0m
+[0;32mI (6534) DISPLAY: RENDER begin_frame ts=3295 ms frame=480x800[0m
+[0;32mI (6564) WIFI_CONN: AP netif enforced: 192.168.4.1/24[0m
+[0;32mI (6564) WIFI_CONN: CAPPORT DHCP option disabled (legacy captive detection mode)[0m
+[0;32mI (6564) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6564) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (6564) DISPLAY: RENDER begin_frame ts=3331 ms frame=480x800[0m
+[0;32mI (6574) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6594) WIFI_CONN: STA_START: connect begin[0m
+[0;32mI (6594) H_API: esp_wifi_remote_connect[0m
+[0;32mI (6614) DISPLAY: RENDER begin_frame ts=3375 ms frame=480x800[0m
+[0;32mI (6634) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (6644) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[0;32mI (6644) WIFI_CONN: SoftAP started -> starting DNS captive responder[0m
+[0;32mI (6644) DISPLAY: RENDER begin_frame ts=3408 ms frame=480x800[0m
+[0;32mI (6644) DNS_SERVER: DNS server listening on port 53[0m
+[0;32mI (6684) DISPLAY: RENDER begin_frame ts=3443 ms frame=480x800[0m
+[0;32mI (6714) DISPLAY: RENDER begin_frame ts=3476 ms frame=480x800[0m
+[0;32mI (6744) DISPLAY: RENDER begin_frame ts=3509 ms frame=480x800[0m
+[0;32mI (6784) DISPLAY: RENDER begin_frame ts=3542 ms frame=480x800[0m
+[0;32mI (6814) DISPLAY: RENDER begin_frame ts=3575 ms frame=480x800[0m
+[0;32mI (6844) DISPLAY: RENDER begin_frame ts=3608 ms frame=480x800[0m
+[0;32mI (6874) DISPLAY: RENDER begin_frame ts=3641 ms frame=480x800[0m
+[0;32mI (6914) DISPLAY: RENDER begin_frame ts=3674 ms frame=480x800[0m
+[0;32mI (6944) DISPLAY: RENDER begin_frame ts=3707 ms frame=480x800[0m
+[0;32mI (6974) DISPLAY: RENDER begin_frame ts=3740 ms frame=480x800[0m
+[0;32mI (7014) DISPLAY: RENDER begin_frame ts=3773 ms frame=480x800[0m
+[0;32mI (7044) DISPLAY: RENDER begin_frame ts=3806 ms frame=480x800[0m
+[0;32mI (7074) DISPLAY: RENDER begin_frame ts=3839 ms frame=480x800[0m
+[0;32mI (7114) DISPLAY: RENDER begin_frame ts=3872 ms frame=480x800[0m
+[0;32mI (7144) DISPLAY: RENDER begin_frame ts=3905 ms frame=480x800[0m
+[0;32mI (7174) DISPLAY: RENDER begin_frame ts=3938 ms frame=480x800[0m
+[0;32mI (7204) DISPLAY: RENDER begin_frame ts=3971 ms frame=480x800[0m
+[0;32mI (7244) DISPLAY: RENDER begin_frame ts=4004 ms frame=480x800[0m
+[0;32mI (7274) DISPLAY: RENDER begin_frame ts=4037 ms frame=480x800[0m
+[0;32mI (7304) DISPLAY: RENDER begin_frame ts=4070 ms frame=480x800[0m
+[0;32mI (7344) DISPLAY: RENDER begin_frame ts=4103 ms frame=480x800[0m
+[0;32mI (7374) DISPLAY: RENDER begin_frame ts=4136 ms frame=480x800[0m
+[0;32mI (7404) DISPLAY: RENDER begin_frame ts=4169 ms frame=480x800[0m
+[0;32mI (7444) DISPLAY: RENDER begin_frame ts=4202 ms frame=480x800[0m
+[0;32mI (7474) DISPLAY: RENDER begin_frame ts=4235 ms frame=480x800[0m
+[0;32mI (7504) DISPLAY: RENDER begin_frame ts=4268 ms frame=480x800[0m
+[0;32mI (7534) DISPLAY: RENDER begin_frame ts=4301 ms frame=480x800[0m
+[0;32mI (7574) DISPLAY: RENDER begin_frame ts=4334 ms frame=480x800[0m
+[0;32mI (7604) DISPLAY: RENDER begin_frame ts=4367 ms frame=480x800[0m
+[0;32mI (7634) DISPLAY: RENDER begin_frame ts=4400 ms frame=480x800[0m
+[0;32mI (7674) DISPLAY: RENDER begin_frame ts=4433 ms frame=480x800[0m
+[0;32mI (7704) DISPLAY: RENDER begin_frame ts=4466 ms frame=480x800[0m
+[0;32mI (7734) DISPLAY: RENDER begin_frame ts=4499 ms frame=480x800[0m
+[0;32mI (7774) DISPLAY: RENDER begin_frame ts=4532 ms frame=480x800[0m
+[0;32mI (7884) DISPLAY: RENDER present_frame ts=4646 ms frame=480x800[0m
+[0;32mI (7884) DISPLAY: RENDER begin_frame ts=4649 ms frame=480x800[0m
+[0;32mI (7924) DISPLAY: RENDER begin_frame ts=4682 ms frame=480x800[0m
+[0;32mI (7954) DISPLAY: RENDER begin_frame ts=4715 ms frame=480x800[0m
+[0;32mI (7984) DISPLAY: RENDER begin_frame ts=4748 ms frame=480x800[0m
+[0;32mI (8014) DISPLAY: RENDER begin_frame ts=4781 ms frame=480x800[0m
+[0;32mI (8054) DISPLAY: RENDER begin_frame ts=4814 ms frame=480x800[0m
+[0;32mI (8084) DISPLAY: RENDER begin_frame ts=4847 ms frame=480x800[0m
+[0;32mI (8114) DISPLAY: RENDER begin_frame ts=4880 ms frame=480x800[0m
+[0;32mI (8154) DISPLAY: RENDER begin_frame ts=4913 ms frame=480x800[0m
+[0;32mI (8184) DISPLAY: RENDER begin_frame ts=4946 ms frame=480x800[0m
+[0;32mI (8214) DISPLAY: RENDER begin_frame ts=4979 ms frame=480x800[0m
+[0;32mI (8254) DISPLAY: RENDER begin_frame ts=5012 ms frame=480x800[0m
+[0;32mI (8284) DISPLAY: RENDER begin_frame ts=5045 ms frame=480x800[0m
+[0;32mI (8294) THERMAL: Thermo ok raw=0xffa81b30 measured=4.50 filtered=4.00 cj=27.19[0m
+[0;32mI (8294) CTRL_TASK: Stack watermark: 2712 words[0m
+[0;32mI (8294) CTRL_TASK: UI stack watermark: 13088 words[0m
+[0;32mI (8314) DISPLAY: RENDER begin_frame ts=5079 ms frame=480x800[0m
+[0;32mI (8354) DISPLAY: RENDER begin_frame ts=5112 ms frame=480x800[0m
+[0;32mI (8384) DISPLAY: RENDER begin_frame ts=5145 ms frame=480x800[0m
+[0;32mI (8414) DISPLAY: RENDER begin_frame ts=5179 ms frame=480x800[0m
+[0;32mI (8444) DISPLAY: RENDER begin_frame ts=5211 ms frame=480x800[0m
+[0;32mI (8484) DISPLAY: RENDER begin_frame ts=5244 ms frame=480x800[0m
+[0;32mI (8514) DISPLAY: RENDER begin_frame ts=5277 ms frame=480x800[0m
+[0;32mI (8544) DISPLAY: RENDER begin_frame ts=5310 ms frame=480x800[0m
+[0;32mI (8584) DISPLAY: RENDER begin_frame ts=5343 ms frame=480x800[0m
+[0;32mI (8614) DISPLAY: RENDER begin_frame ts=5376 ms frame=480x800[0m
+[0;32mI (8644) DISPLAY: RENDER begin_frame ts=5409 ms frame=480x800[0m
+[0;32mI (8684) DISPLAY: RENDER begin_frame ts=5442 ms frame=480x800[0m
+[0;32mI (8714) DISPLAY: RENDER begin_frame ts=5475 ms frame=480x800[0m
+[0;32mI (8744) DISPLAY: RENDER begin_frame ts=5508 ms frame=480x800[0m
+[0;32mI (8774) DISPLAY: RENDER begin_frame ts=5541 ms frame=480x800[0m
+[0;32mI (8814) DISPLAY: RENDER begin_frame ts=5574 ms frame=480x800[0m
+[0;32mI (8844) DISPLAY: RENDER begin_frame ts=5607 ms frame=480x800[0m
+[0;32mI (8874) DISPLAY: RENDER begin_frame ts=5640 ms frame=480x800[0m
+[0;32mI (8914) DISPLAY: RENDER begin_frame ts=5673 ms frame=480x800[0m
+[0;32mI (8944) DISPLAY: RENDER begin_frame ts=5706 ms frame=480x800[0m
+[0;32mI (8974) DISPLAY: RENDER begin_frame ts=5739 ms frame=480x800[0m
+[0;32mI (9014) DISPLAY: RENDER begin_frame ts=5772 ms frame=480x800[0m
+[0;32mI (9044) DISPLAY: RENDER begin_frame ts=5805 ms frame=480x800[0m
+[0;32mI (9074) DISPLAY: RENDER begin_frame ts=5838 ms frame=480x800[0m
+[0;32mI (9104) DISPLAY: RENDER begin_frame ts=5871 ms frame=480x800[0m
+[0;32mI (9144) DISPLAY: RENDER begin_frame ts=5904 ms frame=480x800[0m
+[0;32mI (9174) DISPLAY: RENDER begin_frame ts=5937 ms frame=480x800[0m
+[0;32mI (9204) DISPLAY: RENDER begin_frame ts=5970 ms frame=480x800[0m
+[0;32mI (9244) DISPLAY: RENDER begin_frame ts=6003 ms frame=480x800[0m
+[0;32mI (9274) DISPLAY: RENDER begin_frame ts=6036 ms frame=480x800[0m
+[0;32mI (9304) DISPLAY: RENDER begin_frame ts=6069 ms frame=480x800[0m
+[0;32mI (9344) DISPLAY: RENDER begin_frame ts=6102 ms frame=480x800[0m
+[0;32mI (9374) DISPLAY: RENDER begin_frame ts=6135 ms frame=480x800[0m
+[0;32mI (9444) DISPLAY: RENDER begin_frame ts=6208 ms frame=480x800[0m
+[0;32mI (9474) DISPLAY: RENDER begin_frame ts=6237 ms frame=480x800[0m
+[0;32mI (9504) DISPLAY: RENDER begin_frame ts=6269 ms frame=480x800[0m
+[0;32mI (9544) DISPLAY: RENDER begin_frame ts=6302 ms frame=480x800[0m
+[0;32mI (9574) DISPLAY: RENDER begin_frame ts=6335 ms frame=480x800[0m
+[0;32mI (9604) DISPLAY: RENDER begin_frame ts=6368 ms frame=480x800[0m
+[0;32mI (9634) DISPLAY: RENDER begin_frame ts=6401 ms frame=480x800[0m
+[0;32mI (9654) RPC_WRAP: ESP Event: Station mode: Connected[0m
+[0;32mI (9654) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x4038da52[0m
+[0;32mI (9674) DISPLAY: RENDER begin_frame ts=6434 ms frame=480x800[0m
+[0;32mI (9704) DISPLAY: RENDER begin_frame ts=6467 ms frame=480x800[0m
+[0;32mI (9734) DISPLAY: RENDER begin_frame ts=6500 ms frame=480x800[0m
+[0;32mI (9774) DISPLAY: RENDER begin_frame ts=6533 ms frame=480x800[0m
+[0;32mI (9804) DISPLAY: RENDER begin_frame ts=6567 ms frame=480x800[0m
+[0;32mI (9834) DISPLAY: RENDER begin_frame ts=6599 ms frame=480x800[0m
+[0;32mI (9874) DISPLAY: RENDER begin_frame ts=6632 ms frame=480x800[0m
+[0;32mI (9904) DISPLAY: RENDER begin_frame ts=6665 ms frame=480x800[0m
+[0;32mI (9934) DISPLAY: RENDER begin_frame ts=6698 ms frame=480x800[0m
+[0;32mI (9964) DISPLAY: RENDER begin_frame ts=6731 ms frame=480x800[0m
+[0;32mI (10004) DISPLAY: RENDER begin_frame ts=6764 ms frame=480x800[0m
+[0;32mI (10034) DISPLAY: RENDER begin_frame ts=6797 ms frame=480x800[0m
+[0;32mI (10064) DISPLAY: RENDER begin_frame ts=6830 ms frame=480x800[0m
+[0;32mI (10104) DISPLAY: RENDER begin_frame ts=6864 ms frame=480x800[0m
+[0;32mI (10134) DISPLAY: RENDER begin_frame ts=6896 ms frame=480x800[0m
+[0;32mI (10164) DISPLAY: RENDER begin_frame ts=6929 ms frame=480x800[0m
+[0;32mI (10204) DISPLAY: RENDER begin_frame ts=6962 ms frame=480x800[0m
+[0;32mI (10234) DISPLAY: RENDER begin_frame ts=6995 ms frame=480x800[0m
+[0;32mI (10264) DISPLAY: RENDER begin_frame ts=7028 ms frame=480x800[0m
+[0;32mI (10294) DISPLAY: RENDER begin_frame ts=7061 ms frame=480x800[0m
+[0;32mI (10334) DISPLAY: RENDER begin_frame ts=7094 ms frame=480x800[0m
+[0;32mI (10364) DISPLAY: RENDER begin_frame ts=7127 ms frame=480x800[0m
+[0;32mI (10394) DISPLAY: RENDER begin_frame ts=7160 ms frame=480x800[0m
+[0;32mI (10434) DISPLAY: RENDER begin_frame ts=7193 ms frame=480x800[0m
+[0;32mI (10464) DISPLAY: RENDER begin_frame ts=7226 ms frame=480x800[0m
+[0;32mI (10494) DISPLAY: RENDER begin_frame ts=7260 ms frame=480x800[0m
+[0;32mI (10534) DISPLAY: RENDER begin_frame ts=7292 ms frame=480x800[0m
+[0;32mI (10564) DISPLAY: RENDER begin_frame ts=7325 ms frame=480x800[0m
+[0;32mI (10594) DISPLAY: RENDER begin_frame ts=7358 ms frame=480x800[0m
+[0;32mI (10624) DISPLAY: RENDER begin_frame ts=7391 ms frame=480x800[0m
+[0;32mI (10664) DISPLAY: RENDER begin_frame ts=7424 ms frame=480x800[0m
+[0;32mI (10694) esp_netif_handlers: sta ip: 192.168.0.218, mask: 255.255.255.0, gw: 192.168.0.1[0m
+[0;32mI (10694) WIFI_CONN: got ip:192.168.0.218[0m
+[0;32mI (10694) WIFI_CONN: STA_GOT_IP: Wi-Fi connected[0m
+[0;32mI (10694) DISPLAY: RENDER begin_frame ts=7457 ms frame=480x800[0m
+[0;32mI (10694) WIFI_CONN: SNTP started (server=pool.ntp.org, TZ=EET-2EEST,M3.5.0/3,M10.5.0/4)[0m
+[0;32mI (10704) WIFI_CONN: connected to ap SSID:home[0m
+[1;31mE (10724) system_api: 0 mac type is incorrect (not found)[0m
+[0;32mI (10744) REMOTE: Remote access initialized (enabled=1, uri=mqtts://kilnpro:8888, device=000000000000)[0m
+[0;32mI (10754) DISPLAY: RENDER present_frame ts=7512 ms frame=480x800[0m
+[0;32mI (10754) DISPLAY: RENDER begin_frame ts=7515 ms frame=480x800[0m
+[0;32mI (10794) DISPLAY: RENDER begin_frame ts=7552 ms frame=480x800[0m
+[0;32mI (10844) DISPLAY: RENDER begin_frame ts=7609 ms frame=480x800[0m
+[0;32mI (10904) DISPLAY: RENDER begin_frame ts=7668 ms frame=480x800[0m
+[0;32mI (11004) DISPLAY: RENDER begin_frame ts=7768 ms frame=480x800[0m
+[0;32mI (11024) SRV_TASK: Stack watermark: 2904 words[0m
+[1;31mE (11034) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (11034) esp-tls: Failed to open new connection[0m
+[1;31mE (11034) transport_base: Failed to open a new connection[0m
+[1;31mE (11044) mqtt_client: Error transport connect[0m
+[0;32mI (11044) DISPLAY: RENDER begin_frame ts=7805 ms frame=480x800[0m
+[0;33mW (11044) REMOTE: Remote broker disconnected[0m
+[0;32mI (11084) DISPLAY: RENDER begin_frame ts=7843 ms frame=480x800[0m
+[0;32mI (11114) DISPLAY: RENDER begin_frame ts=7876 ms frame=480x800[0m
+[0;32mI (11154) DISPLAY: RENDER begin_frame ts=7916 ms frame=480x800[0m
+[0;32mI (11184) DISPLAY: RENDER begin_frame ts=7946 ms frame=480x800[0m
+[0;32mI (11214) DISPLAY: RENDER begin_frame ts=7979 ms frame=480x800[0m
+[0;32mI (11254) DISPLAY: RENDER begin_frame ts=8012 ms frame=480x800[0m
+[0;32mI (11284) DISPLAY: RENDER begin_frame ts=8045 ms frame=480x800[0m
+[0;32mI (11314) DISPLAY: RENDER begin_frame ts=8078 ms frame=480x800[0m
+[0;32mI (11344) DISPLAY: RENDER begin_frame ts=8111 ms frame=480x800[0m
+[0;32mI (11384) DISPLAY: RENDER begin_frame ts=8144 ms frame=480x800[0m
+[0;32mI (11414) DISPLAY: RENDER begin_frame ts=8176 ms frame=480x800[0m
+[0;32mI (11444) DISPLAY: RENDER begin_frame ts=8210 ms frame=480x800[0m
+[0;32mI (11484) DISPLAY: RENDER begin_frame ts=8243 ms frame=480x800[0m
+[0;32mI (11514) DISPLAY: RENDER begin_frame ts=8277 ms frame=480x800[0m
+[0;32mI (11554) DISPLAY: RENDER present_frame ts=8315 ms frame=480x800[0m
+[0;32mI (11554) DISPLAY: RENDER begin_frame ts=8318 ms frame=480x800[0m
+[0;32mI (11584) DISPLAY: RENDER begin_frame ts=8351 ms frame=480x800[0m
+[0;32mI (11624) DISPLAY: RENDER begin_frame ts=8384 ms frame=480x800[0m
+[0;32mI (11654) DISPLAY: RENDER begin_frame ts=8417 ms frame=480x800[0m
+[0;32mI (11684) DISPLAY: RENDER begin_frame ts=8450 ms frame=480x800[0m
+[0;32mI (11724) DISPLAY: RENDER begin_frame ts=8483 ms frame=480x800[0m
+[0;32mI (11754) DISPLAY: RENDER begin_frame ts=8516 ms frame=480x800[0m
+[0;32mI (11784) DISPLAY: RENDER begin_frame ts=8549 ms frame=480x800[0m
+[0;32mI (11824) DISPLAY: RENDER begin_frame ts=8582 ms frame=480x800[0m
+[0;32mI (11854) DISPLAY: RENDER begin_frame ts=8615 ms frame=480x800[0m
+[0;32mI (11884) DISPLAY: RENDER begin_frame ts=8648 ms frame=480x800[0m
+[0;32mI (11914) DISPLAY: RENDER begin_frame ts=8681 ms frame=480x800[0m
+[0;32mI (11954) DISPLAY: RENDER begin_frame ts=8714 ms frame=480x800[0m
+[0;32mI (11984) DISPLAY: RENDER begin_frame ts=8747 ms frame=480x800[0m
+[0;32mI (12014) DISPLAY: RENDER begin_frame ts=8780 ms frame=480x800[0m
+[0;32mI (12054) DISPLAY: RENDER begin_frame ts=8813 ms frame=480x800[0m
+[0;32mI (12084) DISPLAY: RENDER begin_frame ts=8846 ms frame=480x800[0m
+[0;32mI (12114) DISPLAY: RENDER begin_frame ts=8879 ms frame=480x800[0m
+[0;32mI (12154) DISPLAY: RENDER begin_frame ts=8912 ms frame=480x800[0m
+[0;32mI (12184) DISPLAY: RENDER begin_frame ts=8945 ms frame=480x800[0m
+[0;32mI (12214) DISPLAY: RENDER begin_frame ts=8978 ms frame=480x800[0m
+[0;32mI (12244) DISPLAY: RENDER begin_frame ts=9011 ms frame=480x800[0m
+[0;32mI (12284) DISPLAY: RENDER begin_frame ts=9044 ms frame=480x800[0m
+[0;32mI (12314) DISPLAY: RENDER begin_frame ts=9077 ms frame=480x800[0m
+[0;32mI (12344) DISPLAY: RENDER begin_frame ts=9110 ms frame=480x800[0m
+[0;32mI (12384) DISPLAY: RENDER begin_frame ts=9143 ms frame=480x800[0m
+[0;32mI (12414) DISPLAY: RENDER begin_frame ts=9176 ms frame=480x800[0m
+[0;32mI (12444) DISPLAY: RENDER begin_frame ts=9209 ms frame=480x800[0m
+[0;32mI (12484) DISPLAY: RENDER begin_frame ts=9242 ms frame=480x800[0m
+[0;32mI (12514) DISPLAY: RENDER begin_frame ts=9275 ms frame=480x800[0m
+[0;32mI (12544) DISPLAY: RENDER begin_frame ts=9309 ms frame=480x800[0m
+[0;32mI (12574) DISPLAY: RENDER begin_frame ts=9341 ms frame=480x800[0m
+[0;32mI (12614) DISPLAY: RENDER begin_frame ts=9374 ms frame=480x800[0m
+[0;32mI (12644) DISPLAY: RENDER begin_frame ts=9407 ms frame=480x800[0m
+[0;32mI (12674) DISPLAY: RENDER begin_frame ts=9440 ms frame=480x800[0m
+[0;32mI (12724) DISPLAY: RENDER begin_frame ts=9488 ms frame=480x800[0m
+[0;32mI (12774) DISPLAY: RENDER present_frame ts=9541 ms frame=480x800[0m
+[0;32mI (12784) DISPLAY: RENDER begin_frame ts=9543 ms frame=480x800[0m
+[0;32mI (12814) DISPLAY: RENDER begin_frame ts=9576 ms frame=480x800[0m
+[0;32mI (12844) DISPLAY: RENDER begin_frame ts=9609 ms frame=480x800[0m
+[0;32mI (12884) DISPLAY: RENDER begin_frame ts=9642 ms frame=480x800[0m
+[0;32mI (12914) DISPLAY: RENDER begin_frame ts=9675 ms frame=480x800[0m
+[0;32mI (12944) DISPLAY: RENDER begin_frame ts=9708 ms frame=480x800[0m
+[0;32mI (12974) DISPLAY: RENDER begin_frame ts=9741 ms frame=480x800[0m
+[0;32mI (13014) DISPLAY: RENDER begin_frame ts=9777 ms frame=480x800[0m
+[0;32mI (13044) DISPLAY: RENDER present_frame ts=9811 ms frame=480x800[0m
+[0;32mI (13054) DISPLAY: RENDER begin_frame ts=9814 ms frame=480x800[0m
+[0;32mI (13084) DISPLAY: RENDER begin_frame ts=9847 ms frame=480x800[0m
+[0;32mI (13114) DISPLAY: RENDER begin_frame ts=9881 ms frame=480x800[0m
+[0;32mI (13154) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (13214) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (13214) THERMAL: Schedule Started[0m
+[0;32mI (13224) SLINT_BRIDGE: CMD action=start result=0 ok=1[0m
+[0;32mI (13314) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13314) CTRL_TASK: Stack watermark: 2712 words[0m
+[0;32mI (13314) CTRL_TASK: UI stack watermark: 13088 words[0m
+[0;32mI (13334) DISPLAY: RENDER begin_frame ts=10099 ms frame=480x800[0m
+[0;32mI (13414) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13434) DISPLAY: RENDER present_frame ts=10200 ms frame=480x800[0m
+[0;32mI (13444) DISPLAY: RENDER begin_frame ts=10203 ms frame=480x800[0m
+[0;32mI (13474) DISPLAY: RENDER begin_frame ts=10236 ms frame=480x800[0m
+[0;32mI (13504) DISPLAY: RENDER begin_frame ts=10269 ms frame=480x800[0m
+[0;32mI (13514) THERMAL: Thermo ok raw=0x00601b30 measured=16.00 filtered=13.75 cj=27.19[0m
+[0;32mI (13514) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13544) DISPLAY: RENDER begin_frame ts=10302 ms frame=480x800[0m
+[0;32mI (13574) DISPLAY: RENDER begin_frame ts=10336 ms frame=480x800[0m
+[0;32mI (13604) DISPLAY: RENDER begin_frame ts=10368 ms frame=480x800[0m
+[0;32mI (13614) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13634) DISPLAY: RENDER begin_frame ts=10401 ms frame=480x800[0m
+[0;32mI (13674) DISPLAY: RENDER begin_frame ts=10434 ms frame=480x800[0m
+[0;32mI (13704) DISPLAY: RENDER begin_frame ts=10467 ms frame=480x800[0m
+[0;32mI (13714) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13734) DISPLAY: RENDER begin_frame ts=10500 ms frame=480x800[0m
+[0;32mI (13774) DISPLAY: RENDER begin_frame ts=10533 ms frame=480x800[0m
+[0;32mI (13804) DISPLAY: RENDER begin_frame ts=10566 ms frame=480x800[0m
+[0;32mI (13814) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13844) DISPLAY: RENDER begin_frame ts=10609 ms frame=480x800[0m
+[0;32mI (13904) DISPLAY: RENDER present_frame ts=10668 ms frame=480x800[0m
+[0;32mI (13904) DISPLAY: RENDER begin_frame ts=10671 ms frame=480x800[0m
+[0;32mI (13914) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (13944) DISPLAY: RENDER begin_frame ts=10704 ms frame=480x800[0m
+[0;32mI (13974) DISPLAY: RENDER begin_frame ts=10737 ms frame=480x800[0m
+[0;32mI (14004) DISPLAY: RENDER begin_frame ts=10770 ms frame=480x800[0m
+[0;32mI (14014) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14044) DISPLAY: RENDER begin_frame ts=10803 ms frame=480x800[0m
+[0;32mI (14074) DISPLAY: RENDER begin_frame ts=10836 ms frame=480x800[0m
+[0;32mI (14104) DISPLAY: RENDER begin_frame ts=10869 ms frame=480x800[0m
+[0;32mI (14114) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14144) DISPLAY: RENDER begin_frame ts=10902 ms frame=480x800[0m
+[0;32mI (14174) DISPLAY: RENDER begin_frame ts=10935 ms frame=480x800[0m
+[0;32mI (14204) DISPLAY: RENDER begin_frame ts=10968 ms frame=480x800[0m
+[0;32mI (14214) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14234) DISPLAY: RENDER begin_frame ts=11001 ms frame=480x800[0m
+[0;32mI (14274) DISPLAY: RENDER begin_frame ts=11034 ms frame=480x800[0m
+[0;32mI (14304) DISPLAY: RENDER begin_frame ts=11067 ms frame=480x800[0m
+[0;32mI (14314) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14344) DISPLAY: RENDER begin_frame ts=11110 ms frame=480x800[0m
+[0;32mI (14404) DISPLAY: RENDER present_frame ts=11162 ms frame=480x800[0m
+[0;32mI (14404) DISPLAY: RENDER begin_frame ts=11168 ms frame=480x800[0m
+[0;32mI (14414) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14444) DISPLAY: RENDER present_frame ts=11203 ms frame=480x800[0m
+[0;32mI (14484) DISPLAY: RENDER begin_frame ts=11245 ms frame=480x800[0m
+[0;32mI (14514) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14514) DISPLAY: RENDER begin_frame ts=11276 ms frame=480x800[0m
+[0;32mI (14614) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14644) DISPLAY: RENDER present_frame ts=11407 ms frame=480x800[0m
+[0;32mI (14644) DISPLAY: RENDER begin_frame ts=11411 ms frame=480x800[0m
+[0;32mI (14684) DISPLAY: RENDER begin_frame ts=11443 ms frame=480x800[0m
+[0;32mI (14714) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14714) DISPLAY: RENDER begin_frame ts=11478 ms frame=480x800[0m
+[0;32mI (14744) DISPLAY: RENDER begin_frame ts=11509 ms frame=480x800[0m
+[0;32mI (14784) DISPLAY: RENDER begin_frame ts=11542 ms frame=480x800[0m
+[0;32mI (14814) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14814) DISPLAY: RENDER begin_frame ts=11576 ms frame=480x800[0m
+[0;32mI (14844) DISPLAY: RENDER begin_frame ts=11609 ms frame=480x800[0m
+[0;32mI (14874) DISPLAY: RENDER begin_frame ts=11641 ms frame=480x800[0m
+[0;32mI (14914) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (14914) DISPLAY: RENDER begin_frame ts=11675 ms frame=480x800[0m
+[0;32mI (14944) DISPLAY: RENDER begin_frame ts=11707 ms frame=480x800[0m
+[0;32mI (14974) DISPLAY: RENDER begin_frame ts=11740 ms frame=480x800[0m
+[0;32mI (15014) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (15014) DISPLAY: RENDER begin_frame ts=11775 ms frame=480x800[0m
+[0;32mI (15044) DISPLAY: RENDER begin_frame ts=11806 ms frame=480x800[0m
+[0;32mI (15074) DISPLAY: RENDER begin_frame ts=11839 ms frame=480x800[0m
+[0;32mI (15114) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (15114) DISPLAY: RENDER begin_frame ts=11873 ms frame=480x800[0m
+[0;32mI (15144) DISPLAY: RENDER begin_frame ts=11905 ms frame=480x800[0m
+[0;32mI (15174) DISPLAY: RENDER begin_frame ts=11940 ms frame=480x800[0m
+[0;32mI (15214) DISPLAY: RENDER present_frame ts=11975 ms frame=480x800[0m
+[0;32mI (15214) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (15214) DISPLAY: RENDER begin_frame ts=11978 ms frame=480x800[0m
+[0;32mI (15244) DISPLAY: RENDER begin_frame ts=12011 ms frame=480x800[0m
+[0;32mI (15284) DISPLAY: RENDER begin_frame ts=12044 ms frame=480x800[0m
+[0;32mI (15314) THERMAL: Processing Step 1 of 3: Type 0, Value 200.00[0m
+[0;32mI (15314) DISPLAY: RENDER begin_frame ts=12078 ms frame=480x800[0m
+[0;32mI (15344) THERMAL: KILN STOPPED: User Button[0m
+[0;32mI (15344) SLINT_BRIDGE: CMD action=stop result=0 ok=1[0m
+[0;32mI (15464) DISPLAY: RENDER begin_frame ts=12226 ms frame=480x800[0m
+[0;32mI (15574) DISPLAY: RENDER present_frame ts=12341 ms frame=480x800[0m
+[0;32mI (15584) DISPLAY: RENDER begin_frame ts=12344 ms frame=480x800[0m
+[0;32mI (15614) DISPLAY: RENDER begin_frame ts=12377 ms frame=480x800[0m
+[0;32mI (15644) DISPLAY: RENDER begin_frame ts=12410 ms frame=480x800[0m
+[0;32mI (15684) DISPLAY: RENDER begin_frame ts=12444 ms frame=480x800[0m
+[0;32mI (15714) DISPLAY: RENDER begin_frame ts=12476 ms frame=480x800[0m
+[0;32mI (15744) DISPLAY: RENDER begin_frame ts=12509 ms frame=480x800[0m
+[0;32mI (15784) DISPLAY: RENDER begin_frame ts=12542 ms frame=480x800[0m
+[0;32mI (15814) DISPLAY: RENDER begin_frame ts=12575 ms frame=480x800[0m
+[0;32mI (15844) DISPLAY: RENDER begin_frame ts=12608 ms frame=480x800[0m
+[0;32mI (15874) DISPLAY: RENDER begin_frame ts=12641 ms frame=480x800[0m
+[0;32mI (15914) DISPLAY: RENDER begin_frame ts=12674 ms frame=480x800[0m
+[0;32mI (15944) DISPLAY: RENDER begin_frame ts=12707 ms frame=480x800[0m
+[0;32mI (15984) DISPLAY: RENDER begin_frame ts=12750 ms frame=480x800[0m
+[0;32mI (16034) SRV_TASK: Stack watermark: 2904 words[0m
+[0;32mI (16044) DISPLAY: RENDER present_frame ts=12802 ms frame=480x800[0m
+[0;32mI (16044) DISPLAY: RENDER begin_frame ts=12805 ms frame=480x800[0m
+[0;32mI (16074) DISPLAY: RENDER begin_frame ts=12838 ms frame=480x800[0m
+[0;32mI (16104) DISPLAY: RENDER begin_frame ts=12871 ms frame=480x800[0m
+[0;32mI (16144) DISPLAY: RENDER begin_frame ts=12904 ms frame=480x800[0m
+[0;32mI (16174) DISPLAY: RENDER begin_frame ts=12937 ms frame=480x800[0m
+[0;32mI (16204) DISPLAY: RENDER begin_frame ts=12970 ms frame=480x800[0m
+[0;32mI (16244) DISPLAY: RENDER begin_frame ts=13003 ms frame=480x800[0m
+[0;32mI (16274) DISPLAY: RENDER begin_frame ts=13036 ms frame=480x800[0m
+[0;32mI (16304) DISPLAY: RENDER begin_frame ts=13069 ms frame=480x800[0m
+[0;32mI (16344) DISPLAY: RENDER begin_frame ts=13102 ms frame=480x800[0m
+[0;32mI (16374) DISPLAY: RENDER begin_frame ts=13135 ms frame=480x800[0m
+[0;32mI (16404) DISPLAY: RENDER begin_frame ts=13168 ms frame=480x800[0m
+[0;32mI (16434) DISPLAY: RENDER begin_frame ts=13201 ms frame=480x800[0m
+[0;32mI (16474) DISPLAY: RENDER begin_frame ts=13234 ms frame=480x800[0m
+[0;32mI (16504) DISPLAY: RENDER begin_frame ts=13267 ms frame=480x800[0m
+[0;32mI (16534) DISPLAY: RENDER begin_frame ts=13300 ms frame=480x800[0m
+[0;32mI (16574) DISPLAY: RENDER begin_frame ts=13333 ms frame=480x800[0m
+[0;32mI (16604) DISPLAY: RENDER begin_frame ts=13366 ms frame=480x800[0m
+[0;32mI (16634) DISPLAY: RENDER begin_frame ts=13398 ms frame=480x800[0m
+[0;32mI (16674) DISPLAY: RENDER begin_frame ts=13432 ms frame=480x800[0m
+[0;32mI (16704) DISPLAY: RENDER begin_frame ts=13466 ms frame=480x800[0m
+[0;32mI (16734) DISPLAY: RENDER begin_frame ts=13497 ms frame=480x800[0m
+[0;32mI (16764) DISPLAY: RENDER begin_frame ts=13531 ms frame=480x800[0m
+[0;32mI (16804) DISPLAY: RENDER begin_frame ts=13564 ms frame=480x800[0m
+[0;32mI (16834) DISPLAY: RENDER begin_frame ts=13598 ms frame=480x800[0m
+[0;32mI (16864) DISPLAY: RENDER begin_frame ts=13630 ms frame=480x800[0m
+[0;32mI (16904) DISPLAY: RENDER begin_frame ts=13663 ms frame=480x800[0m
+[0;32mI (16934) DISPLAY: RENDER begin_frame ts=13696 ms frame=480x800[0m
+[0;32mI (16964) DISPLAY: RENDER begin_frame ts=13729 ms frame=480x800[0m
+[0;32mI (17004) DISPLAY: RENDER begin_frame ts=13762 ms frame=480x800[0m
+[0;32mI (17044) DISPLAY: RENDER begin_frame ts=13804 ms frame=480x800[0m
+[0;32mI (17094) DISPLAY: RENDER present_frame ts=13856 ms frame=480x800[0m
+[0;32mI (17094) DISPLAY: RENDER begin_frame ts=13859 ms frame=480x800[0m
+[0;32mI (17134) DISPLAY: RENDER begin_frame ts=13893 ms frame=480x800[0m
+[0;32mI (17164) DISPLAY: RENDER begin_frame ts=13925 ms frame=480x800[0m
+[0;32mI (17194) DISPLAY: RENDER begin_frame ts=13958 ms frame=480x800[0m
+[0;32mI (17224) DISPLAY: RENDER begin_frame ts=13991 ms frame=480x800[0m
+[0;32mI (17264) DISPLAY: RENDER begin_frame ts=14024 ms frame=480x800[0m
+[0;32mI (17294) DISPLAY: RENDER begin_frame ts=14057 ms frame=480x800[0m
+[0;32mI (17324) DISPLAY: RENDER begin_frame ts=14090 ms frame=480x800[0m
+[0;32mI (17364) DISPLAY: RENDER begin_frame ts=14123 ms frame=480x800[0m
+[0;32mI (17394) DISPLAY: RENDER begin_frame ts=14156 ms frame=480x800[0m
+[0;32mI (17424) DISPLAY: RENDER begin_frame ts=14189 ms frame=480x800[0m
+[0;32mI (17464) DISPLAY: RENDER begin_frame ts=14222 ms frame=480x800[0m
+[0;32mI (17494) DISPLAY: RENDER begin_frame ts=14255 ms frame=480x800[0m
+[0;32mI (17524) DISPLAY: RENDER begin_frame ts=14288 ms frame=480x800[0m
+[0;32mI (17564) DISPLAY: RENDER begin_frame ts=14331 ms frame=480x800[0m
+[0;32mI (17624) DISPLAY: RENDER present_frame ts=14383 ms frame=480x800[0m
+[0;32mI (17624) DISPLAY: RENDER begin_frame ts=14385 ms frame=480x800[0m
+[0;32mI (17654) DISPLAY: RENDER begin_frame ts=14418 ms frame=480x800[0m
+[0;32mI (17684) DISPLAY: RENDER begin_frame ts=14451 ms frame=480x800[0m
+[0;32mI (17724) DISPLAY: RENDER begin_frame ts=14485 ms frame=480x800[0m
+[0;32mI (17754) DISPLAY: RENDER begin_frame ts=14517 ms frame=480x800[0m
+[0;32mI (17784) DISPLAY: RENDER begin_frame ts=14550 ms frame=480x800[0m
+[0;32mI (17824) DISPLAY: RENDER begin_frame ts=14583 ms frame=480x800[0m
+[0;32mI (17854) DISPLAY: RENDER begin_frame ts=14616 ms frame=480x800[0m
+[0;32mI (17884) DISPLAY: RENDER begin_frame ts=14649 ms frame=480x800[0m
+[0;32mI (17924) DISPLAY: RENDER begin_frame ts=14682 ms frame=480x800[0m
+[0;32mI (17954) DISPLAY: RENDER begin_frame ts=14715 ms frame=480x800[0m
+[0;32mI (17984) DISPLAY: RENDER begin_frame ts=14748 ms frame=480x800[0m
+[0;32mI (18014) DISPLAY: RENDER begin_frame ts=14781 ms frame=480x800[0m
+[0;32mI (18054) DISPLAY: RENDER begin_frame ts=14814 ms frame=480x800[0m
+[0;32mI (18084) DISPLAY: RENDER begin_frame ts=14848 ms frame=480x800[0m
+[0;32mI (18114) DISPLAY: RENDER begin_frame ts=14880 ms frame=480x800[0m
+[0;32mI (18154) DISPLAY: RENDER begin_frame ts=14913 ms frame=480x800[0m
+[0;32mI (18184) DISPLAY: RENDER begin_frame ts=14946 ms frame=480x800[0m
+[0;32mI (18214) DISPLAY: RENDER begin_frame ts=14979 ms frame=480x800[0m
+[0;32mI (18254) DISPLAY: RENDER begin_frame ts=15012 ms frame=480x800[0m
+[0;32mI (18284) DISPLAY: RENDER begin_frame ts=15045 ms frame=480x800[0m
+[0;32mI (18314) DISPLAY: RENDER begin_frame ts=15078 ms frame=480x800[0m
+[0;32mI (18334) CTRL_TASK: Stack watermark: 2712 words[0m
+[0;32mI (18334) CTRL_TASK: UI stack watermark: 13088 words[0m
+[0;32mI (18344) DISPLAY: RENDER begin_frame ts=15111 ms frame=480x800[0m
+[0;32mI (18384) DISPLAY: RENDER begin_frame ts=15144 ms frame=480x800[0m
+[0;32mI (18414) DISPLAY: RENDER begin_frame ts=15177 ms frame=480x800[0m
+[0;32mI (18444) DISPLAY: RENDER begin_frame ts=15210 ms frame=480x800[0m
+[0;32mI (18484) DISPLAY: RENDER begin_frame ts=15243 ms frame=480x800[0m
+[0;32mI (18514) DISPLAY: RENDER begin_frame ts=15276 ms frame=480x800[0m
+[0;32mI (18544) DISPLAY: RENDER begin_frame ts=15309 ms frame=480x800[0m
+[0;32mI (18584) DISPLAY: RENDER begin_frame ts=15342 ms frame=480x800[0m
+[0;32mI (18614) DISPLAY: RENDER begin_frame ts=15376 ms frame=480x800[0m
+[0;32mI (18634) THERMAL: Thermo ok raw=0xffb41b30 measured=5.25 filtered=5.25 cj=27.19[0m
+[0;32mI (18644) DISPLAY: RENDER begin_frame ts=15408 ms frame=480x800[0m
+[0;32mI (18674) DISPLAY: RENDER begin_frame ts=15441 ms frame=480x800[0m
+[0;32mI (18714) DISPLAY: RENDER begin_frame ts=15474 ms frame=480x800[0m
+[0;32mI (18744) DISPLAY: RENDER begin_frame ts=15508 ms frame=480x800[0m
+[0;32mI (18774) DISPLAY: RENDER begin_frame ts=15540 ms frame=480x800[0m
+[0;32mI (18814) DISPLAY: RENDER begin_frame ts=15573 ms frame=480x800[0m
+[0;32mI (18844) DISPLAY: RENDER begin_frame ts=15606 ms frame=480x800[0m
+[0;32mI (18874) DISPLAY: RENDER begin_frame ts=15639 ms frame=480x800[0m
+[0;32mI (18914) DISPLAY: RENDER begin_frame ts=15672 ms frame=480x800[0m
+[0;32mI (18944) DISPLAY: RENDER begin_frame ts=15705 ms frame=480x800[0m
+[0;32mI (18974) DISPLAY: RENDER begin_frame ts=15738 ms frame=480x800[0m
+[0;32mI (19004) DISPLAY: RENDER begin_frame ts=15771 ms frame=480x800[0m
+[0;32mI (19044) DISPLAY: RENDER begin_frame ts=15804 ms frame=480x800[0m
+[0;32mI (19074) DISPLAY: RENDER begin_frame ts=15837 ms frame=480x800[0m
+[0;32mI (19104) DISPLAY: RENDER begin_frame ts=15870 ms frame=480x800[0m
+[0;32mI (19154) DISPLAY: RENDER begin_frame ts=15913 ms frame=480x800[0m
+[0;32mI (19204) DISPLAY: RENDER present_frame ts=15964 ms frame=480x800[0m
+[0;32mI (19204) DISPLAY: RENDER begin_frame ts=15967 ms frame=480x800[0m
+[0;32mI (19234) DISPLAY: RENDER begin_frame ts=16000 ms frame=480x800[0m
+[0;32mI (19274) DISPLAY: RENDER begin_frame ts=16033 ms frame=480x800[0m
+[0;32mI (19304) DISPLAY: RENDER begin_frame ts=16066 ms frame=480x800[0m
+[0;32mI (19334) DISPLAY: RENDER begin_frame ts=16099 ms frame=480x800[0m
+[0;32mI (19374) DISPLAY: RENDER begin_frame ts=16132 ms frame=480x800[0m
+[0;32mI (19404) DISPLAY: RENDER begin_frame ts=16165 ms frame=480x800[0m
+[0;32mI (19434) DISPLAY: RENDER begin_frame ts=16198 ms frame=480x800[0m
+[0;32mI (19504) DISPLAY: RENDER begin_frame ts=16270 ms frame=480x800[0m
+[0;32mI (19534) DISPLAY: RENDER begin_frame ts=16300 ms frame=480x800[0m
+[0;32mI (19574) DISPLAY: RENDER begin_frame ts=16333 ms frame=480x800[0m
+[0;32mI (19604) DISPLAY: RENDER begin_frame ts=16366 ms frame=480x800[0m
+[0;32mI (19634) DISPLAY: RENDER begin_frame ts=16399 ms frame=480x800[0m
+[0;32mI (19674) DISPLAY: RENDER begin_frame ts=16441 ms frame=480x800[0m
+[0;32mI (19734) DISPLAY: RENDER present_frame ts=16493 ms frame=480x800[0m
+[0;32mI (19734) DISPLAY: RENDER begin_frame ts=16496 ms frame=480x800[0m
+[0;32mI (19764) DISPLAY: RENDER begin_frame ts=16530 ms frame=480x800[0m
+[0;32mI (19804) DISPLAY: RENDER begin_frame ts=16562 ms frame=480x800[0m
+[0;32mI (19834) DISPLAY: RENDER begin_frame ts=16596 ms frame=480x800[0m
+[0;32mI (19864) DISPLAY: RENDER begin_frame ts=16628 ms frame=480x800[0m
+[0;32mI (19894) DISPLAY: RENDER begin_frame ts=16661 ms frame=480x800[0m
+[0;32mI (19934) DISPLAY: RENDER begin_frame ts=16694 ms frame=480x800[0m
+[0;32mI (19964) DISPLAY: RENDER begin_frame ts=16727 ms frame=480x800[0m
+[0;32mI (19994) DISPLAY: RENDER begin_frame ts=16760 ms frame=480x800[0m
+[0;32mI (20034) DISPLAY: RENDER begin_frame ts=16793 ms frame=480x800[0m
+[0;32mI (20064) DISPLAY: RENDER begin_frame ts=16826 ms frame=480x800[0m
+[0;32mI (20094) DISPLAY: RENDER begin_frame ts=16859 ms frame=480x800[0m
+[0;32mI (20134) DISPLAY: RENDER begin_frame ts=16893 ms frame=480x800[0m
+[0;32mI (20164) DISPLAY: RENDER begin_frame ts=16925 ms frame=480x800[0m
+[0;32mI (20194) DISPLAY: RENDER begin_frame ts=16959 ms frame=480x800[0m
+[0;32mI (20224) DISPLAY: RENDER begin_frame ts=16991 ms frame=480x800[0m
+[0;32mI (20264) DISPLAY: RENDER begin_frame ts=17024 ms frame=480x800[0m
+[0;32mI (20294) DISPLAY: RENDER begin_frame ts=17057 ms frame=480x800[0m
+[0;32mI (20324) DISPLAY: RENDER begin_frame ts=17090 ms frame=480x800[0m
+[0;32mI (20364) DISPLAY: RENDER begin_frame ts=17123 ms frame=480x800[0m
+[0;32mI (20394) DISPLAY: RENDER begin_frame ts=17156 ms frame=480x800[0m
+[0;32mI (20424) DISPLAY: RENDER begin_frame ts=17189 ms frame=480x800[0m
+[0;32mI (20464) DISPLAY: RENDER begin_frame ts=17222 ms frame=480x800[0m
+[0;32mI (20494) DISPLAY: RENDER begin_frame ts=17255 ms frame=480x800[0m
+[0;32mI (20524) DISPLAY: RENDER begin_frame ts=17288 ms frame=480x800[0m
+[0;32mI (20554) DISPLAY: RENDER begin_frame ts=17321 ms frame=480x800[0m
+[0;32mI (20594) DISPLAY: RENDER begin_frame ts=17354 ms frame=480x800[0m
+[0;32mI (20624) DISPLAY: RENDER begin_frame ts=17387 ms frame=480x800[0m
+[0;32mI (20654) DISPLAY: RENDER begin_frame ts=17420 ms frame=480x800[0m
+[0;32mI (20694) DISPLAY: RENDER begin_frame ts=17453 ms frame=480x800[0m
+[0;32mI (20724) DISPLAY: RENDER begin_frame ts=17487 ms frame=480x800[0m
+[0;32mI (20754) DISPLAY: RENDER begin_frame ts=17519 ms frame=480x800[0m
+[0;32mI (20794) DISPLAY: RENDER begin_frame ts=17553 ms frame=480x800[0m
+[0;32mI (20824) DISPLAY: RENDER begin_frame ts=17585 ms frame=480x800[0m
+[0;32mI (20854) DISPLAY: RENDER begin_frame ts=17618 ms frame=480x800[0m
+[0;32mI (20884) DISPLAY: RENDER begin_frame ts=17651 ms frame=480x800[0m
+[0;32mI (20924) DISPLAY: RENDER begin_frame ts=17684 ms frame=480x800[0m
+[0;32mI (20954) DISPLAY: RENDER begin_frame ts=17717 ms frame=480x800[0m
+[0;32mI (20984) DISPLAY: RENDER begin_frame ts=17750 ms frame=480x800[0m
+[0;32mI (21024) DISPLAY: RENDER begin_frame ts=17783 ms frame=480x800[0m
+[0;32mI (21034) SRV_TASK: Stack watermark: 2904 words[0m
+[0;32mI (21054) DISPLAY: RENDER begin_frame ts=17816 ms frame=480x800[0m
+[1;31mE (21054) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (21054) esp-tls: Failed to open new connection[0m
+[1;31mE (21064) transport_base: Failed to open a new connection[0m
+[1;31mE (21064) mqtt_client: Error transport connect[0m
+[0;33mW (21074) REMOTE: Remote broker disconnected[0m
+[0;32mI (21084) DISPLAY: RENDER begin_frame ts=17849 ms frame=480x800[0m
+[0;32mI (21124) DISPLAY: RENDER begin_frame ts=17882 ms frame=480x800[0m
+[0;32mI (21154) DISPLAY: RENDER begin_frame ts=17915 ms frame=480x800[0m
+[0;32mI (21184) DISPLAY: RENDER begin_frame ts=17948 ms frame=480x800[0m
+[0;32mI (21214) DISPLAY: RENDER begin_frame ts=17981 ms frame=480x800[0m
+[0;32mI (21254) DISPLAY: RENDER begin_frame ts=18015 ms frame=480x800[0m
+[0;32mI (21284) DISPLAY: RENDER begin_frame ts=18047 ms frame=480x800[0m
+[0;32mI (21314) DISPLAY: RENDER begin_frame ts=18080 ms frame=480x800[0m
+[0;32mI (21354) DISPLAY: RENDER begin_frame ts=18113 ms frame=480x800[0m
+[0;32mI (21384) DISPLAY: RENDER begin_frame ts=18146 ms frame=480x800[0m
+[0;32mI (21414) DISPLAY: RENDER begin_frame ts=18179 ms frame=480x800[0m
+[0;32mI (21454) DISPLAY: RENDER begin_frame ts=18212 ms frame=480x800[0m
+[0;32mI (21484) DISPLAY: RENDER begin_frame ts=18245 ms frame=480x800[0m
+[0;32mI (21514) DISPLAY: RENDER begin_frame ts=18278 ms frame=480x800[0m
+[0;32mI (21544) DISPLAY: RENDER begin_frame ts=18311 ms frame=480x800[0m
+[0;32mI (21584) DISPLAY: RENDER begin_frame ts=18344 ms frame=480x800[0m
+[0;32mI (21614) DISPLAY: RENDER begin_frame ts=18377 ms frame=480x800[0m
+[0;32mI (21644) DISPLAY: RENDER begin_frame ts=18411 ms frame=480x800[0m
+[0;32mI (21684) DISPLAY: RENDER begin_frame ts=18443 ms frame=480x800[0m
+[0;32mI (21714) DISPLAY: RENDER begin_frame ts=18476 ms frame=480x800[0m
+[0;32mI (21744) DISPLAY: RENDER begin_frame ts=18509 ms frame=480x800[0m
+[0;32mI (21784) DISPLAY: RENDER begin_frame ts=18543 ms frame=480x800[0m
+[0;32mI (21814) DISPLAY: RENDER begin_frame ts=18576 ms frame=480x800[0m
+[0;32mI (21844) DISPLAY: RENDER begin_frame ts=18608 ms frame=480x800[0m
+[0;32mI (21874) DISPLAY: RENDER begin_frame ts=18641 ms frame=480x800[0m
+[0;32mI (21914) DISPLAY: RENDER begin_frame ts=18674 ms frame=480x800[0m
+[0;32mI (21944) DISPLAY: RENDER begin_frame ts=18707 ms frame=480x800[0m
+[0;32mI (21974) DISPLAY: RENDER begin_frame ts=18740 ms frame=480x800[0m
+[0;32mI (22014) DISPLAY: RENDER begin_frame ts=18773 ms frame=480x800[0m
+[0;32mI (22044) DISPLAY: RENDER begin_frame ts=18806 ms frame=480x800[0m
+[0;32mI (22074) DISPLAY: RENDER begin_frame ts=18839 ms frame=480x800[0m
+[0;32mI (22114) DISPLAY: RENDER begin_frame ts=18872 ms frame=480x800[0m
+[0;32mI (22144) DISPLAY: RENDER begin_frame ts=18905 ms frame=480x800[0m
+[0;32mI (22174) DISPLAY: RENDER begin_frame ts=18938 ms frame=480x800[0m
+[0;32mI (22204) DISPLAY: RENDER begin_frame ts=18971 ms frame=480x800[0m
+[0;32mI (22244) DISPLAY: RENDER begin_frame ts=19004 ms frame=480x800[0m
+[0;32mI (22274) DISPLAY: RENDER begin_frame ts=19037 ms frame=480x800[0m
+[0;32mI (22304) DISPLAY: RENDER begin_frame ts=19071 ms frame=480x800[0m
+[0;32mI (22344) DISPLAY: RENDER begin_frame ts=19103 ms frame=480x800[0m
+[0;32mI (22374) DISPLAY: RENDER begin_frame ts=19136 ms frame=480x800[0m
+[0;32mI (22404) DISPLAY: RENDER begin_frame ts=19169 ms frame=480x800[0m
+[0;32mI (22444) DISPLAY: RENDER begin_frame ts=19202 ms frame=480x800[0m
+[0;32mI (22474) DISPLAY: RENDER begin_frame ts=19235 ms frame=480x800[0m
+[0;32mI (22504) DISPLAY: RENDER begin_frame ts=19268 ms frame=480x800[0m
+[0;32mI (22534) DISPLAY: RENDER begin_frame ts=19301 ms frame=480x800[0m
+[0;32mI (22574) DISPLAY: RENDER begin_frame ts=19334 ms frame=480x800[0m
+[0;32mI (22604) DISPLAY: RENDER begin_frame ts=19367 ms frame=480x800[0m
+[0;32mI (22634) DISPLAY: RENDER begin_frame ts=19400 ms frame=480x800[0m
+[0;32mI (22674) DISPLAY: RENDER begin_frame ts=19433 ms frame=480x800[0m
+[0;32mI (22704) DISPLAY: RENDER begin_frame ts=19466 ms frame=480x800[0m
+[0;32mI (22734) DISPLAY: RENDER begin_frame ts=19499 ms frame=480x800[0m
+[0;32mI (22774) DISPLAY: RENDER begin_frame ts=19532 ms frame=480x800[0m
+[0;32mI (22804) DISPLAY: RENDER begin_frame ts=19565 ms frame=480x800[0m
+[0;32mI (22834) DISPLAY: RENDER begin_frame ts=19600 ms frame=480x800[0m
+[0;32mI (22864) DISPLAY: RENDER begin_frame ts=19631 ms frame=480x800[0m
+[0;32mI (22904) DISPLAY: RENDER begin_frame ts=19664 ms frame=480x800[0m
+[0;32mI (22934) DISPLAY: RENDER begin_frame ts=19697 ms frame=480x800[0m
+[0;32mI (22964) DISPLAY: RENDER begin_frame ts=19730 ms frame=480x800[0m
+[0;32mI (23004) DISPLAY: RENDER begin_frame ts=19763 ms frame=480x800[0m
+[0;32mI (23034) DISPLAY: RENDER begin_frame ts=19796 ms frame=480x800[0m
+[0;32mI (23064) DISPLAY: RENDER begin_frame ts=19829 ms frame=480x800[0m
+[0;32mI (23104) DISPLAY: RENDER begin_frame ts=19862 ms frame=480x800[0m
+[0;32mI (23134) DISPLAY: RENDER begin_frame ts=19896 ms frame=480x800[0m
+[0;32mI (23164) DISPLAY: RENDER begin_frame ts=19928 ms frame=480x800[0m
+[0;32mI (23194) DISPLAY: RENDER begin_frame ts=19961 ms frame=480x800[0m
+[0;32mI (23234) DISPLAY: RENDER begin_frame ts=19994 ms frame=480x800[0m
+[0;32mI (23264) DISPLAY: RENDER begin_frame ts=20027 ms frame=480x800[0m
+[0;32mI (23294) DISPLAY: RENDER begin_frame ts=20060 ms frame=480x800[0m
+[0;32mI (23334) DISPLAY: RENDER begin_frame ts=20093 ms frame=480x800[0m
+[0;32mI (23374) DISPLAY: RENDER begin_frame ts=20136 ms frame=480x800[0m
+[0;32mI (23424) DISPLAY: RENDER present_frame ts=20187 ms frame=480x800[0m
+[0;32mI (23424) DISPLAY: RENDER begin_frame ts=20190 ms frame=480x800[0m
+[0;32mI (23434) CTRL_TASK: Stack watermark: 2712 words[0m
+[0;32mI (23434) CTRL_TASK: UI stack watermark: 13088 words[0m
+[0;32mI (23464) DISPLAY: RENDER begin_frame ts=20223 ms frame=480x800[0m
+[0;32mI (23494) DISPLAY: RENDER begin_frame ts=20256 ms frame=480x800[0m
+[0;32mI (23524) DISPLAY: RENDER begin_frame ts=20289 ms frame=480x800[0m
+[0;32mI (23564) DISPLAY: RENDER begin_frame ts=20322 ms frame=480x800[0m
+[0;32mI (23594) DISPLAY: RENDER begin_frame ts=20355 ms frame=480x800[0m
+[0;32mI (23624) DISPLAY: RENDER begin_frame ts=20388 ms frame=480x800[0m
+[0;32mI (23654) DISPLAY: RENDER begin_frame ts=20421 ms frame=480x800[0m
+[0;32mI (23694) DISPLAY: RENDER begin_frame ts=20454 ms frame=480x800[0m
+[0;32mI (23724) DISPLAY: RENDER begin_frame ts=20487 ms frame=480x800[0m
+[0;32mI (23734) THERMAL: Thermo ok raw=0xffe81b30 measured=8.50 filtered=5.50 cj=27.19[0m
+[0;32mI (23754) DISPLAY: RENDER begin_frame ts=20520 ms frame=480x800[0m
+[0;32mI (23794) DISPLAY: RENDER begin_frame ts=20553 ms frame=480x800[0m
+[0;32mI (23824) DISPLAY: RENDER begin_frame ts=20586 ms frame=480x800[0m
+[0;32mI (23854) DISPLAY: RENDER begin_frame ts=20620 ms frame=480x800[0m
+[0;32mI (23894) DISPLAY: RENDER begin_frame ts=20653 ms frame=480x800[0m
+[0;32mI (23924) DISPLAY: RENDER begin_frame ts=20685 ms frame=480x800[0m
+[0;32mI (23954) DISPLAY: RENDER begin_frame ts=20718 ms frame=480x800[0m
+[0;32mI (23984) DISPLAY: RENDER begin_frame ts=20751 ms frame=480x800[0m
+[0;32mI (24024) DISPLAY: RENDER begin_frame ts=20784 ms frame=480x800[0m
+[0;32mI (24054) DISPLAY: RENDER begin_frame ts=20817 ms frame=480x800[0m
+[0;32mI (24084) DISPLAY: RENDER begin_frame ts=20850 ms frame=480x800[0m
+[0;32mI (24124) DISPLAY: RENDER begin_frame ts=20883 ms frame=480x800[0m
+[0;32mI (24154) DISPLAY: RENDER begin_frame ts=20916 ms frame=480x800[0m
+[0;32mI (24184) DISPLAY: RENDER begin_frame ts=20949 ms frame=480x800[0m
+[0;32mI (24224) DISPLAY: RENDER begin_frame ts=20982 ms frame=480x800[0m
+[0;32mI (24254) DISPLAY: RENDER begin_frame ts=21015 ms frame=480x800[0m
+[0;32mI (24284) DISPLAY: RENDER begin_frame ts=21048 ms frame=480x800[0m
+[0;32mI (24314) DISPLAY: RENDER begin_frame ts=21081 ms frame=480x800[0m
+[0;32mI (24354) DISPLAY: RENDER begin_frame ts=21114 ms frame=480x800[0m
+[0;32mI (24384) DISPLAY: RENDER begin_frame ts=21149 ms frame=480x800[0m
+[0;32mI (24424) DISPLAY: RENDER present_frame ts=21184 ms frame=480x800[0m
+[0;32mI (24434) DISPLAY: RENDER begin_frame ts=21196 ms frame=480x800[0m
+[0;32mI (24484) DISPLAY: RENDER present_frame ts=21247 ms frame=480x800[0m
+[0;32mI (24524) DISPLAY: RENDER begin_frame ts=21290 ms frame=480x800[0m
+[0;32mI (24564) DISPLAY: RENDER present_frame ts=21323 ms frame=480x800[0m
+[0;32mI (24564) DISPLAY: RENDER begin_frame ts=21325 ms frame=480x800[0m
+[0;32mI (24594) DISPLAY: RENDER begin_frame ts=21359 ms frame=480x800[0m
+[0;32mI (24634) DISPLAY: RENDER begin_frame ts=21392 ms frame=480x800[0m
+[0;32mI (24664) DISPLAY: RENDER begin_frame ts=21425 ms frame=480x800[0m
+[0;32mI (24694) DISPLAY: RENDER begin_frame ts=21458 ms frame=480x800[0m
+[0;32mI (24724) DISPLAY: RENDER begin_frame ts=21491 ms frame=480x800[0m
+[0;32mI (24764) DISPLAY: RENDER begin_frame ts=21524 ms frame=480x800[0m
+[0;32mI (24794) DISPLAY: RENDER begin_frame ts=21557 ms frame=480x800[0m
+[0;32mI (24824) DISPLAY: RENDER begin_frame ts=21590 ms frame=480x800[0m
+[0;32mI (24864) DISPLAY: RENDER begin_frame ts=21624 ms frame=480x800[0m
+[0;32mI (24894) DISPLAY: RENDER begin_frame ts=21656 ms frame=480x800[0m
+[0;32mI (1327) esp_image: segment 1: paddr=00771994 vaddr=30100000 size=00068h (   104) load[0m
+[0;32mI (1329) esp_image: segment 2: paddr=00771a04 vaddr=4ff00000 size=0e614h ( 58900) load[0m
+[0;32mI (1343) esp_image: segment 3: paddr=00780020 vaddr=40000020 size=3c82a4h (3965604) map[0m
+[0;32mI (1972) esp_image: segment 4: paddr=00b482cc vaddr=4ff0e614 size=02ab0h ( 10928) load[0m
+[0;32mI (1976) esp_image: segment 5: paddr=00b4ad84 vaddr=4ff11100 size=04280h ( 17024) load[0m
+[0;32mI (1981) esp_image: segment 6: paddr=00b4f00c vaddr=50108080 size=00024h (    36) load[0m
+[0;32mI (1989) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (1989) boot: Disabling RNG early entropy source...[0m
+[0;32mI (2007) hex_psram: vendor id    : 0x0d (AP)[0m
+[0;32mI (2007) hex_psram: Latency      : 0x01 (Fixed)[0m
+[0;32mI (2007) hex_psram: DriveStr.    : 0x00 (25 Ohm)[0m
+[0;32mI (2008) hex_psram: dev id       : 0x03 (generation 4)[0m
+[0;32mI (2013) hex_psram: density      : 0x07 (256 Mbit)[0m
+[0;32mI (2018) hex_psram: good-die     : 0x06 (Pass)[0m
+[0;32mI (2022) hex_psram: SRF          : 0x02 (Slow Refresh)[0m
+[0;32mI (2027) hex_psram: BurstType    : 0x00 ( Wrap)[0m
+[0;32mI (2031) hex_psram: BurstLen     : 0x03 (2048 Byte)[0m
+[0;32mI (2035) hex_psram: BitMode      : 0x01 (X16 Mode)[0m
+[0;32mI (2040) hex_psram: Readlatency  : 0x02 (10 cycles@Fixed)[0m
+[0;32mI (2045) hex_psram: DriveStrength: 0x00 (1/1)[0m
+[0;32mI (2049) MSPI Timing: Enter psram timing tuning[0m
+[0;32mI (2225) esp_psram: Found 32MB PSRAM device[0m
+[0;32mI (2225) esp_psram: Speed: 80MHz[0m
+[0;32mI (2227) hex_psram: psram CS IO is dedicated[0m
+[0;32mI (2227) cpu_start: Multicore app[0m
+[0;32mI (3496) esp_psram: SPI SRAM memory test OK[0m
+[0;32mI (3505) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (3505) cpu_start: Pro cpu start user code[0m
+[0;32mI (3506) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (3508) app_init: Application information:[0m
+[0;32mI (3511) app_init: Project name:     trae_controller[0m
+[0;32mI (3516) app_init: App version:      3d6c312-dirty[0m
+[0;32mI (3521) app_init: Compile time:     Apr 15 2026 21:05:38[0m
+[0;32mI (3526) app_init: ELF file SHA256:  7597c0bd4...[0m
+[0;32mI (3530) app_init: ESP-IDF:          v6.0[0m
+[0;32mI (3534) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (3538) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (3542) efuse_init: Chip rev:         v1.3[0m
+[0;32mI (3546) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (3552) heap_init: At 4FF19780 len 00021840 (134 KiB): RETENT_RAM[0m
+[0;32mI (3558) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (3563) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (3569) heap_init: At 501080A4 len 00007F5C (31 KiB): RTCRAM[0m
+[0;32mI (3574) heap_init: At 30100068 len 00001F98 (7 KiB): TCM[0m
+[0;32mI (3579) esp_psram: Adding pool of 32768K of PSRAM memory to heap allocator[0m
+[0;33mW (3586) spi_flash: Detected boya flash chip but using generic driver. For optimal functionality, enable `SPI_FLASH_SUPPORT_BOYA_CHIP` in menuconfig[0m
+[0;32mI (3599) spi_flash: detected chip: generic[0m
+[0;32mI (3603) spi_flash: flash io: qio[0m
+[0;32mI (3624) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (3629) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (3636) H_SDIO_DRV: sdio_data_to_rx_buf_task started[0m
+[0;32mI (3636) main_task: Started on CPU0[0m
+[0;32mI (3646) esp_psram: Reserving pool of 32K of internal memory for DMA/internal allocations[0m
+[0;32mI (3656) main_task: Calling app_main()[0m
+[1;31mE (3656) esp_ota_ops: Running firmware is factory[0m
+[0;32mI (3656) MAIN: Reset reason: 1 (POWERON), free_heap=34041648, min_free_heap=34041568[0m
+[1;31mE (3666) task_wdt: esp_task_wdt_init(517): TWDT already initialized[0m
+[0;32mI (3686) MAIN: TRAE KILN CONTROLLER STARTING...[0m
+[0;32mI (3686) temperature_sensor: Range [-10°C ~ 80°C], error < 1°C[0m
+[0;32mI (3696) MAIN: Board temp sensor enabled[0m
+[0;32mI (3696) MAIN: Skip DS3231 init for NewP4 profile[0m
+[0;32mI (3696) MAIN: Skip fan+buzzer init for NewP4 profile[0m
+[0;32mI (3716) MAIN: LittleFS Mounted[0m
+[0;32mI (3736) MAIN: Init Thermal Control...[0m
+[0;32mI (3746) THERMAL: Thermal Controller initialized[0m
+[0;32mI (3746) THERMAL: KILN STOPPED: System Boot[0m
+[1;31mE (3756) MAIN: mDNS init failed: -1[0m
+[0;32mI (3756) MAIN: Setup Complete.[0m
+[0;32mI (3756) MAIN: Starting tasks...[0m
+[0;32mI (3756) CTRL_TASK: Starting control task[0m
+[0;32mI (3756) SRV_TASK: Starting server task[0m
+[0;32mI (3756) UI_TASK: Starting UI task[0m
+[0;32mI (3766) WIFI_CONN: Connecting to SSID: home[0m
+[1;31mE (3776) system_api: 1 mac type is incorrect (not found)[0m
+[0;32mI (3776) DISPLAY: P4 BL apply=0 (dc=1 pwm_ready=0 lock=0)[0m
+[1;31mE (3776) system_api: 0 mac type is incorrect (not found)[0m
+[0;33mW (3786) WIFI_CONN: AP SSID suffix: MAC unavailable, using random fallback 'TRAE_KILN_SETUP_C415'[0m
+[0;32mI (3796) transport: Attempt connection with slave: retry[0][0m
+[0;33mW (3796) H_SDIO_DRV: Reset slave using GPIO[54][0m
+[0;32mI (3806) os_wrapper_esp: GPIO [54] configured[0m
+[0;32mI (3756) MAIN: Main task done; deleting main task to avoid stack overflow.[0m
+[0;32mI (3986) st7701: version: 2.0.2[0m
+[0;32mI (4236) st7701_mipi: LCD ID: FF FF FF[0m
+[0;32mI (4236) st7701_mipi:  st7701->madctl_val: 0x0, st7701->colmod_val: 0x55[0m
+[0;32mI (4526) DISPLAY: P4 BL apply=100 (dc=1 pwm_ready=0 lock=0)[0m
+[0;32mI (4526) DISPLAY: P4 MIPI panel ready (physical): 480x800[0m
+[0;32mI (4526) GT911: I2C address initialization procedure skipped - using default GT9xx setup[0m
+[0;32mI (4536) GT911: TouchPad_ID:0x39,0x31,0x31[0m
+[0;32mI (4536) GT911: TouchPad_Config_Version:250[0m
+[0;32mI (4546) DISPLAY: Touch initialized (GT911, I2C addr=0x5D, SDA=7 SCL=8)[0m
+[0;32mI (4546) DISPLAY: P4 BL apply=20 (dc=1 pwm_ready=0 lock=0)[0m
+[0;32mI (4616) DISPLAY: Display initialized successfully (P4)[0m
+[0;32mI (4646) THERMAL: Received schedule JSON: {"id":"__1","name":"Нова_програма_1","type":"Custom","created":"","stepsCount":3,"glassDetails":null,"steps":[{"type":"ramp","rate":100,"target":200,"holdTime":10,"id":1776614520316.7922,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":1776614520316.8044,"fan":false,"duration":0,"hold":0,"holdMinutes":0,"time":0},{"type":"ramp","rate":100,"target":225,"holdTime":0,"id":null,"fan":null}],"segments":[{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.7922,"rate":100,"target":125,"time":0,"type":"ramp"},{"duration":0,"fan":false,"hold":0,"holdMinutes":0,"holdTime":0,"id":1776614520316.8044,"rate":100,"target":225,"time":0,"type":"ramp"}],"title":"Нова програма 1"}[0m
+[0;32mI (4706) THERMAL: Schedule Loaded with 3 steps[0m
+[0;32mI (4706) SLINT_BRIDGE: CMD action=load_schedule result=0 ok=1[0m
+[1;31mE (4776) temperature_sensor: temperature_sensor_install(136): Already installed[0m
+[0;32mI (4776) DISPLAY: RENDER begin_frame ts=1196 ms frame=480x800[0m
+[0;32mI (4916) DISPLAY: RENDER present_frame ts=1332 ms frame=480x800[0m
+[0;32mI (4916) DISPLAY: RENDER begin_frame ts=1335 ms frame=480x800[0m
+[0;32mI (4946) DISPLAY: RENDER begin_frame ts=1368 ms frame=480x800[0m
+[0;32mI (4976) DISPLAY: RENDER begin_frame ts=1401 ms frame=480x800[0m
+[0;32mI (5016) DISPLAY: RENDER begin_frame ts=1434 ms frame=480x800[0m
+[0;32mI (5046) DISPLAY: RENDER begin_frame ts=1467 ms frame=480x800[0m
+[0;32mI (5076) DISPLAY: RENDER begin_frame ts=1500 ms frame=480x800[0m
+[0;32mI (5116) DISPLAY: RENDER begin_frame ts=1533 ms frame=480x800[0m
+[0;32mI (5146) DISPLAY: RENDER begin_frame ts=1566 ms frame=480x800[0m
+[0;32mI (5176) DISPLAY: RENDER begin_frame ts=1599 ms frame=480x800[0m
+[0;32mI (5216) DISPLAY: RENDER begin_frame ts=1632 ms frame=480x800[0m
+[0;32mI (5266) DISPLAY: RENDER begin_frame ts=1683 ms frame=480x800[0m
+[0;32mI (5316) DISPLAY: RENDER present_frame ts=1740 ms frame=480x800[0m
+[0;32mI (5326) DISPLAY: RENDER begin_frame ts=1743 ms frame=480x800[0m
+[0;32mI (5356) DISPLAY: RENDER begin_frame ts=1776 ms frame=480x800[0m
+[0;32mI (5386) DISPLAY: RENDER begin_frame ts=1809 ms frame=480x800[0m
+[0;32mI (5426) DISPLAY: RENDER begin_frame ts=1842 ms frame=480x800[0m
+[0;32mI (5456) DISPLAY: RENDER begin_frame ts=1875 ms frame=480x800[0m
+[0;32mI (5486) DISPLAY: RENDER begin_frame ts=1908 ms frame=480x800[0m
+[0;32mI (5516) DISPLAY: RENDER begin_frame ts=1941 ms frame=480x800[0m
+[0;32mI (5556) DISPLAY: RENDER begin_frame ts=1974 ms frame=480x800[0m
+[0;32mI (5586) DISPLAY: RENDER begin_frame ts=2007 ms frame=480x800[0m
+[0;32mI (5616) DISPLAY: RENDER begin_frame ts=2040 ms frame=480x800[0m
+[0;32mI (5656) DISPLAY: RENDER begin_frame ts=2073 ms frame=480x800[0m
+[0;32mI (5686) DISPLAY: RENDER begin_frame ts=2106 ms frame=480x800[0m
+[0;32mI (5716) DISPLAY: RENDER begin_frame ts=2139 ms frame=480x800[0m
+[0;32mI (5766) DISPLAY: RENDER begin_frame ts=2182 ms frame=480x800[0m
+[0;32mI (5816) DISPLAY: RENDER present_frame ts=2234 ms frame=480x800[0m
+[0;32mI (5816) DISPLAY: RENDER begin_frame ts=2237 ms frame=480x800[0m
+[0;32mI (5826) sdio_wrapper: SDIO master: Slot 1, Data-Lines: 4-bit Freq(KHz)[40000 KHz][0m
+[0;32mI (5826) sdio_wrapper: GPIOs: CLK[18] CMD[19] D0[14] D1[15] D2[16] D3[17] Slave_Reset[54][0m
+[0;32mI (5826) sdio_wrapper: Queues: Tx[20] Rx[20] SDIO-Rx-Mode[1][0m
+[0;32mI (5846) DISPLAY: RENDER begin_frame ts=2270 ms frame=480x800[0m
+[0;32mI (5866) sdio_wrapper: Function 0 Blocksize: 512[0m
+[0;32mI (5866) sdio_wrapper: Function 1 Blocksize: 512[0m
+[0;32mI (5886) DISPLAY: RENDER begin_frame ts=2303 ms frame=480x800[0m
+[0;32mI (5916) DISPLAY: RENDER begin_frame ts=2336 ms frame=480x800[0m
+[0;32mI (5946) DISPLAY: RENDER begin_frame ts=2369 ms frame=480x800[0m
+[0;32mI (5966) H_SDIO_DRV: Card init success, TRANSPORT_RX_ACTIVE[0m
+[0;32mI (5966) transport: set_transport_state: 1[0m
+[0;32mI (5966) transport: Waiting for esp_hosted slave to be ready[0m
+[0;32mI (5986) DISPLAY: RENDER begin_frame ts=2402 ms frame=480x800[0m
+[0;32mI (6016) DISPLAY: RENDER begin_frame ts=2435 ms frame=480x800[0m
+[0;32mI (6036) H_SDIO_DRV: SDIO Host operating in STREAMING MODE[0m
+[0;32mI (6036) H_SDIO_DRV: Open data path at slave[0m
+[0;32mI (6036) H_SDIO_DRV: Starting SDIO process rx task[0m
+[0;32mI (6046) DISPLAY: RENDER begin_frame ts=2468 ms frame=480x800[0m
+[0;32mI (6066) H_SDIO_DRV: Received ESP_PRIV_IF type message[0m
+[0;32mI (6066) transport: Received INIT event from ESP32 peripheral[0m
+[0;32mI (6066) transport: EVENT: 12[0m
+[0;32mI (6066) transport: Identified slave [esp32c6][0m
+[0;32mI (6066) transport: EVENT: 11[0m
+[0;32mI (6066) transport: capabilities: 0xd[0m
+[0;32mI (6076) transport: Features supported are:[0m
+[0;32mI (6076) transport: 	 * WLAN[0m
+[0;32mI (6076) transport: 	   - HCI over SDIO[0m
+[0;32mI (6086) transport: 	   - BLE only[0m
+[0;32mI (6086) transport: EVENT: 13[0m
+[0;33mW (6086) transport: Version mismatch: Host [2.12.0] > Co-proc [2.3.0] ==> Upgrade co-proc to avoid RPC timeouts[0m
+[0;32mI (6096) transport: ESP board type is : 13 [0m
+
+[0;32mI (6106) transport: Base transport is set-up, TRANSPORT_TX_ACTIVE[0m
+[0;32mI (6106) H_API: Transport active[0m
+[0;32mI (6116) transport: Slave chip Id[12][0m
+[0;32mI (6116) transport: raw_tp_dir[-], flow_ctrl: low[60] high[80][0m
+[0;32mI (6126) transport: transport_delayed_init[0m
+[0;32mI (6126) hci_stub_drv: Host BT Support: Disabled[0m
+[0;32mI (6126) H_SDIO_DRV: Received INIT event[0m
+[0;32mI (6136) H_SDIO_DRV: Event type: 0x22[0m
+[0;32mI (6136) H_SDIO_DRV: Write thread started[0m
+[0;32mI (6156) DISPLAY: RENDER begin_frame ts=2577 ms frame=480x800[0m
+[0;32mI (6186) DISPLAY: RENDER begin_frame ts=2610 ms frame=480x800[0m
+[0;32mI (6226) DISPLAY: RENDER begin_frame ts=2643 ms frame=480x800[0m
+[0;32mI (6256) DISPLAY: RENDER begin_frame ts=2676 ms frame=480x800[0m
+[0;32mI (6286) DISPLAY: RENDER begin_frame ts=2709 ms frame=480x800[0m
+[0;32mI (6326) DISPLAY: RENDER begin_frame ts=2742 ms frame=480x800[0m
+[0;32mI (6356) DISPLAY: RENDER begin_frame ts=2775 ms frame=480x800[0m
+[0;32mI (6386) DISPLAY: RENDER begin_frame ts=2808 ms frame=480x800[0m
+[0;32mI (6416) DISPLAY: RENDER begin_frame ts=2841 ms frame=480x800[0m
+[0;32mI (6456) DISPLAY: RENDER begin_frame ts=2874 ms frame=480x800[0m
+[0;32mI (6486) DISPLAY: RENDER begin_frame ts=2907 ms frame=480x800[0m
+[0;32mI (6516) DISPLAY: RENDER begin_frame ts=2940 ms frame=480x800[0m
+[0;32mI (6556) DISPLAY: RENDER begin_frame ts=2973 ms frame=480x800[0m
+[0;32mI (6586) DISPLAY: RENDER begin_frame ts=3006 ms frame=480x800[0m
+[0;32mI (6616) DISPLAY: RENDER begin_frame ts=3039 ms frame=480x800[0m
+[0;32mI (6656) DISPLAY: RENDER begin_frame ts=3072 ms frame=480x800[0m
+[0;32mI (6686) DISPLAY: RENDER begin_frame ts=3105 ms frame=480x800[0m
+[0;32mI (6716) DISPLAY: RENDER begin_frame ts=3138 ms frame=480x800[0m
+[0;32mI (6746) DISPLAY: RENDER begin_frame ts=3171 ms frame=480x800[0m
+[0;32mI (6786) DISPLAY: RENDER begin_frame ts=3204 ms frame=480x800[0m
+[0;32mI (6816) DISPLAY: RENDER begin_frame ts=3237 ms frame=480x800[0m
+[0;32mI (6846) DISPLAY: RENDER begin_frame ts=3270 ms frame=480x800[0m
+[0;32mI (6886) DISPLAY: RENDER begin_frame ts=3303 ms frame=480x800[0m
+[0;32mI (6916) DISPLAY: RENDER begin_frame ts=3336 ms frame=480x800[0m
+[0;32mI (6926) WIFI_CONN: AP netif enforced: 192.168.4.1/24[0m
+[0;32mI (6926) WIFI_CONN: CAPPORT DHCP option disabled (legacy captive detection mode)[0m
+[0;32mI (6926) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6936) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (6946) RPC_WRAP: ESP Event: wifi station started[0m
+[0;32mI (6956) DISPLAY: RENDER begin_frame ts=3375 ms frame=480x800[0m
+[0;32mI (6956) WIFI_CONN: STA_START: connect begin[0m
+[0;32mI (6956) H_API: esp_wifi_remote_connect[0m
+[0;32mI (6986) DISPLAY: RENDER begin_frame ts=3408 ms frame=480x800[0m
+[0;32mI (6996) RPC_WRAP: ESP Event: softap started[0m
+[0;32mI (7006) esp_netif_lwip: DHCP server started on interface WIFI_AP_DEF with IP: 192.168.4.1[0m
+[0;32mI (7006) WIFI_CONN: SoftAP started -> starting DNS captive responder[0m
+[0;32mI (7016) DNS_SERVER: DNS server listening on port 53[0m
+[0;32mI (7026) DISPLAY: RENDER begin_frame ts=3442 ms frame=480x800[0m
+[0;32mI (7056) DISPLAY: RENDER begin_frame ts=3475 ms frame=480x800[0m
+[0;32mI (7086) DISPLAY: RENDER begin_frame ts=3508 ms frame=480x800[0m
+[0;32mI (7116) DISPLAY: RENDER begin_frame ts=3541 ms frame=480x800[0m
+[0;32mI (7156) DISPLAY: RENDER begin_frame ts=3574 ms frame=480x800[0m
+[0;32mI (7186) DISPLAY: RENDER begin_frame ts=3607 ms frame=480x800[0m
+[0;32mI (7216) DISPLAY: RENDER begin_frame ts=3640 ms frame=480x800[0m
+[0;32mI (7256) DISPLAY: RENDER begin_frame ts=3673 ms frame=480x800[0m
+[0;32mI (7286) DISPLAY: RENDER begin_frame ts=3706 ms frame=480x800[0m
+[0;32mI (7316) DISPLAY: RENDER begin_frame ts=3739 ms frame=480x800[0m
+[0;32mI (7356) DISPLAY: RENDER begin_frame ts=3772 ms frame=480x800[0m
+[0;32mI (7386) DISPLAY: RENDER begin_frame ts=3805 ms frame=480x800[0m
+[0;32mI (7416) DISPLAY: RENDER begin_frame ts=3838 ms frame=480x800[0m
+[0;32mI (7446) DISPLAY: RENDER begin_frame ts=3871 ms frame=480x800[0m
+[0;32mI (7486) DISPLAY: RENDER begin_frame ts=3904 ms frame=480x800[0m
+[0;32mI (7516) DISPLAY: RENDER begin_frame ts=3937 ms frame=480x800[0m
+[0;32mI (7546) DISPLAY: RENDER begin_frame ts=3970 ms frame=480x800[0m
+[0;32mI (7586) DISPLAY: RENDER begin_frame ts=4003 ms frame=480x800[0m
+[0;32mI (7616) DISPLAY: RENDER begin_frame ts=4036 ms frame=480x800[0m
+[0;32mI (7646) DISPLAY: RENDER begin_frame ts=4069 ms frame=480x800[0m
+[0;32mI (7686) DISPLAY: RENDER begin_frame ts=4102 ms frame=480x800[0m
+[0;32mI (7716) DISPLAY: RENDER begin_frame ts=4135 ms frame=480x800[0m
+[0;32mI (7746) DISPLAY: RENDER begin_frame ts=4168 ms frame=480x800[0m
+[0;32mI (7776) DISPLAY: RENDER begin_frame ts=4201 ms frame=480x800[0m
+[0;32mI (7816) DISPLAY: RENDER begin_frame ts=4235 ms frame=480x800[0m
+[0;32mI (7846) DISPLAY: RENDER begin_frame ts=4267 ms frame=480x800[0m
+[0;32mI (7876) DISPLAY: RENDER begin_frame ts=4300 ms frame=480x800[0m
+[0;32mI (7916) DISPLAY: RENDER begin_frame ts=4333 ms frame=480x800[0m
+[0;32mI (7946) DISPLAY: RENDER begin_frame ts=4366 ms frame=480x800[0m
+[0;32mI (7976) DISPLAY: RENDER begin_frame ts=4399 ms frame=480x800[0m
+[0;32mI (8016) DISPLAY: RENDER begin_frame ts=4432 ms frame=480x800[0m
+[0;32mI (8046) DISPLAY: RENDER begin_frame ts=4465 ms frame=480x800[0m
+[0;32mI (8076) DISPLAY: RENDER begin_frame ts=4498 ms frame=480x800[0m
+[0;32mI (8106) DISPLAY: RENDER begin_frame ts=4531 ms frame=480x800[0m
+[0;32mI (8146) DISPLAY: RENDER begin_frame ts=4565 ms frame=480x800[0m
+[0;32mI (8256) DISPLAY: RENDER present_frame ts=4678 ms frame=480x800[0m
+[0;32mI (8256) DISPLAY: RENDER begin_frame ts=4680 ms frame=480x800[0m
+[0;32mI (8296) DISPLAY: RENDER begin_frame ts=4713 ms frame=480x800[0m
+[0;32mI (8326) DISPLAY: RENDER begin_frame ts=4747 ms frame=480x800[0m
+[0;32mI (8356) DISPLAY: RENDER begin_frame ts=4779 ms frame=480x800[0m
+[0;32mI (8396) DISPLAY: RENDER begin_frame ts=4812 ms frame=480x800[0m
+[0;32mI (8426) DISPLAY: RENDER begin_frame ts=4845 ms frame=480x800[0m
+[0;32mI (8456) DISPLAY: RENDER begin_frame ts=4878 ms frame=480x800[0m
+[0;32mI (8486) DISPLAY: RENDER begin_frame ts=4911 ms frame=480x800[0m
+[0;32mI (8526) DISPLAY: RENDER begin_frame ts=4944 ms frame=480x800[0m
+[0;32mI (8556) DISPLAY: RENDER begin_frame ts=4977 ms frame=480x800[0m
+[0;32mI (8586) DISPLAY: RENDER begin_frame ts=5010 ms frame=480x800[0m
+[0;32mI (8626) DISPLAY: RENDER begin_frame ts=5043 ms frame=480x800[0m
+[0;32mI (8636) THERMAL: Thermo ok raw=0xff941b00 measured=3.25 filtered=3.25 cj=27.00[0m
+[0;32mI (8636) CTRL_TASK: Stack watermark: 2712 words[0m
+[0;32mI (8636) CTRL_TASK: UI stack watermark: 13088 words[0m
+[0;32mI (8656) DISPLAY: RENDER begin_frame ts=5078 ms frame=480x800[0m
+[0;32mI (8686) DISPLAY: RENDER begin_frame ts=5111 ms frame=480x800[0m
+[0;32mI (8726) DISPLAY: RENDER begin_frame ts=5144 ms frame=480x800[0m
+[0;32mI (8756) DISPLAY: RENDER begin_frame ts=5177 ms frame=480x800[0m
+[0;32mI (8786) DISPLAY: RENDER begin_frame ts=5210 ms frame=480x800[0m
+[0;32mI (8826) DISPLAY: RENDER begin_frame ts=5244 ms frame=480x800[0m
+[0;32mI (8856) DISPLAY: RENDER begin_frame ts=5277 ms frame=480x800[0m
+[0;32mI (8886) DISPLAY: RENDER begin_frame ts=5309 ms frame=480x800[0m
+[0;32mI (8926) DISPLAY: RENDER begin_frame ts=5342 ms frame=480x800[0m
+[0;32mI (8956) DISPLAY: RENDER begin_frame ts=5375 ms frame=480x800[0m
+[0;32mI (8986) DISPLAY: RENDER begin_frame ts=5408 ms frame=480x800[0m
+[0;32mI (9016) DISPLAY: RENDER begin_frame ts=5441 ms frame=480x800[0m
+[0;32mI (9056) DISPLAY: RENDER begin_frame ts=5474 ms frame=480x800[0m
+[0;32mI (9086) DISPLAY: RENDER begin_frame ts=5507 ms frame=480x800[0m
+[0;32mI (9116) DISPLAY: RENDER begin_frame ts=5540 ms frame=480x800[0m
+[0;32mI (9156) DISPLAY: RENDER begin_frame ts=5573 ms frame=480x800[0m
+[0;32mI (9186) DISPLAY: RENDER begin_frame ts=5606 ms frame=480x800[0m
+[0;32mI (9216) DISPLAY: RENDER begin_frame ts=5639 ms frame=480x800[0m
+[0;32mI (9256) DISPLAY: RENDER begin_frame ts=5672 ms frame=480x800[0m
+[0;32mI (9286) DISPLAY: RENDER begin_frame ts=5705 ms frame=480x800[0m
+[0;32mI (9316) DISPLAY: RENDER begin_frame ts=5738 ms frame=480x800[0m
+[0;32mI (9346) DISPLAY: RENDER begin_frame ts=5771 ms frame=480x800[0m
+[0;32mI (9396) DISPLAY: RENDER begin_frame ts=5814 ms frame=480x800[0m
+[0;32mI (9446) DISPLAY: RENDER present_frame ts=5865 ms frame=480x800[0m
+[0;32mI (9446) DISPLAY: RENDER begin_frame ts=5868 ms frame=480x800[0m
+[0;32mI (9476) DISPLAY: RENDER begin_frame ts=5901 ms frame=480x800[0m
+[0;32mI (9516) DISPLAY: RENDER begin_frame ts=5934 ms frame=480x800[0m
+[0;32mI (9546) DISPLAY: RENDER begin_frame ts=5968 ms frame=480x800[0m
+[0;32mI (9576) DISPLAY: RENDER begin_frame ts=6000 ms frame=480x800[0m
+[0;32mI (9616) DISPLAY: RENDER begin_frame ts=6033 ms frame=480x800[0m
+[0;32mI (9646) DISPLAY: RENDER begin_frame ts=6066 ms frame=480x800[0m
+[0;32mI (9676) DISPLAY: RENDER begin_frame ts=6099 ms frame=480x800[0m
+[0;32mI (9716) DISPLAY: RENDER begin_frame ts=6132 ms frame=480x800[0m
+[0;32mI (9786) DISPLAY: RENDER begin_frame ts=6205 ms frame=480x800[0m
+[0;32mI (9816) DISPLAY: RENDER begin_frame ts=6234 ms frame=480x800[0m
+[0;32mI (9846) DISPLAY: RENDER begin_frame ts=6268 ms frame=480x800[0m
+[0;32mI (9876) DISPLAY: RENDER begin_frame ts=6300 ms frame=480x800[0m
+[0;32mI (9916) DISPLAY: RENDER begin_frame ts=6334 ms frame=480x800[0m
+[0;32mI (9946) DISPLAY: RENDER begin_frame ts=6366 ms frame=480x800[0m
+[0;32mI (9976) DISPLAY: RENDER begin_frame ts=6399 ms frame=480x800[0m
+[0;32mI (10016) DISPLAY: RENDER begin_frame ts=6432 ms frame=480x800[0m
+[0;32mI (10036) RPC_WRAP: ESP Event: Station mode: Connected[0m
+[0;32mI (10036) esp_wifi_remote: esp_wifi_internal_reg_rxcb: sta: 0x4038da52[0m
+[0;32mI (10046) DISPLAY: RENDER begin_frame ts=6466 ms frame=480x800[0m
+[0;32mI (10076) DISPLAY: RENDER begin_frame ts=6498 ms frame=480x800[0m
+[0;32mI (10106) DISPLAY: RENDER begin_frame ts=6531 ms frame=480x800[0m
+[0;32mI (10146) DISPLAY: RENDER begin_frame ts=6565 ms frame=480x800[0m
+[0;32mI (10176) DISPLAY: RENDER begin_frame ts=6597 ms frame=480x800[0m
+[0;32mI (10206) DISPLAY: RENDER begin_frame ts=6630 ms frame=480x800[0m
+[0;32mI (10246) DISPLAY: RENDER begin_frame ts=6663 ms frame=480x800[0m
+[0;32mI (10276) DISPLAY: RENDER begin_frame ts=6696 ms frame=480x800[0m
+[0;32mI (10306) DISPLAY: RENDER begin_frame ts=6729 ms frame=480x800[0m
+[0;32mI (10346) DISPLAY: RENDER begin_frame ts=6762 ms frame=480x800[0m
+[0;32mI (10376) DISPLAY: RENDER begin_frame ts=6795 ms frame=480x800[0m
+[0;32mI (10406) DISPLAY: RENDER begin_frame ts=6828 ms frame=480x800[0m
+[0;32mI (10446) DISPLAY: RENDER begin_frame ts=6862 ms frame=480x800[0m
+[0;32mI (10476) DISPLAY: RENDER begin_frame ts=6894 ms frame=480x800[0m
+[0;32mI (10506) DISPLAY: RENDER begin_frame ts=6927 ms frame=480x800[0m
+[0;32mI (10536) DISPLAY: RENDER begin_frame ts=6960 ms frame=480x800[0m
+[0;32mI (10576) DISPLAY: RENDER begin_frame ts=6993 ms frame=480x800[0m
+[0;32mI (10606) DISPLAY: RENDER begin_frame ts=7026 ms frame=480x800[0m
+[0;32mI (10636) DISPLAY: RENDER begin_frame ts=7059 ms frame=480x800[0m
+[0;32mI (10676) DISPLAY: RENDER begin_frame ts=7092 ms frame=480x800[0m
+[0;32mI (10706) DISPLAY: RENDER begin_frame ts=7125 ms frame=480x800[0m
+[0;32mI (10736) DISPLAY: RENDER begin_frame ts=7158 ms frame=480x800[0m
+[0;32mI (10766) DISPLAY: RENDER begin_frame ts=7191 ms frame=480x800[0m
+[0;32mI (10806) DISPLAY: RENDER begin_frame ts=7224 ms frame=480x800[0m
+[0;32mI (10836) DISPLAY: RENDER begin_frame ts=7257 ms frame=480x800[0m
+[0;32mI (10866) DISPLAY: RENDER begin_frame ts=7290 ms frame=480x800[0m
+[0;32mI (10906) DISPLAY: RENDER begin_frame ts=7323 ms frame=480x800[0m
+[0;32mI (10936) DISPLAY: RENDER begin_frame ts=7356 ms frame=480x800[0m
+[0;32mI (10966) DISPLAY: RENDER begin_frame ts=7390 ms frame=480x800[0m
+[0;32mI (11006) DISPLAY: RENDER begin_frame ts=7422 ms frame=480x800[0m
+[0;32mI (11036) DISPLAY: RENDER begin_frame ts=7455 ms frame=480x800[0m
+[0;32mI (11056) esp_netif_handlers: sta ip: 192.168.0.218, mask: 255.255.255.0, gw: 192.168.0.1[0m
+[0;32mI (11056) WIFI_CONN: got ip:192.168.0.218[0m
+[0;32mI (11056) WIFI_CONN: STA_GOT_IP: Wi-Fi connected[0m
+[0;32mI (11056) WIFI_CONN: SNTP started (server=pool.ntp.org, TZ=EET-2EEST,M3.5.0/3,M10.5.0/4)[0m
+[0;32mI (11066) WIFI_CONN: connected to ap SSID:home[0m
+[0;32mI (11066) DISPLAY: RENDER begin_frame ts=7488 ms frame=480x800[0m
+[1;31mE (11076) system_api: 0 mac type is incorrect (not found)[0m
+[0;32mI (11106) REMOTE: Remote access initialized (enabled=1, uri=mqtts://kilnpro:8888, device=000000000000)[0m
+[0;32mI (11126) DISPLAY: RENDER present_frame ts=7550 ms frame=480x800[0m
+[0;32mI (11136) DISPLAY: RENDER begin_frame ts=7553 ms frame=480x800[0m
+[0;32mI (11186) DISPLAY: RENDER begin_frame ts=7605 ms frame=480x800[0m
+[0;32mI (11246) DISPLAY: RENDER begin_frame ts=7668 ms frame=480x800[0m
+[0;32mI (11346) DISPLAY: RENDER begin_frame ts=7768 ms frame=480x800[0m
+[0;32mI (11366) SRV_TASK: Stack watermark: 2952 words[0m
+[1;31mE (11376) esp-tls: couldn't get hostname for :kilnpro: getaddrinfo() returns 202, addrinfo=0[0m
+[1;31mE (11376) esp-tls: Failed to open new connection[0m
+[1;31mE (11376) transport_base: Failed to open a new connection[0m
+[1;31mE (11376) mqtt_client: Error transport connect[0m
+[0;32mI (11386) DISPLAY: RENDER begin_frame ts=7804 ms frame=480x800[0m
+[0;33mW (11386) REMOTE: Remote broker disconnected[0m
+[0;32mI (11416) DISPLAY: RENDER begin_frame ts=7840 ms frame=480x800[0m
+[0;32mI (11456) DISPLAY: RENDER begin_frame ts=7873 ms frame=480x800[0m
+[0;32mI (11496) DISPLAY: RENDER begin_frame ts=7913 ms frame=480x800[0m
+[0;32mI (11526) DISPLAY: RENDER begin_frame ts=7942 ms frame=480x800[0m
+[0;32mI (11556) DISPLAY: RENDER begin_frame ts=7975 ms frame=480x800[0m
+[0;32mI (11586) DISPLAY: RENDER begin_frame ts=8008 ms frame=480x800[0m
+[0;32mI (11616) DISPLAY: RENDER begin_frame ts=8041 ms frame=480x800[0m
+[0;32mI (11656) DISPLAY: RENDER begin_frame ts=8074 ms frame=480x800[0m
+[0;32mI (11686) DISPLAY: RENDER begin_frame ts=8107 ms frame=480x800[0m
+[0;32mI (11716) DISPLAY: RENDER begin_frame ts=8140 ms frame=480x800[0m
+[0;32mI (11756) DISPLAY: RENDER begin_frame ts=8173 ms frame=480x800[0m
+[0;32mI (11786) DISPLAY: RENDER begin_frame ts=8206 ms frame=480x800[0m
+[0;32mI (11816) DISPLAY: RENDER begin_frame ts=8239 ms frame=480x800[0m
+[0;32mI (11856) DISPLAY: RENDER begin_frame ts=8272 ms frame=480x800[0m
+[0;32mI (11886) DISPLAY: RENDER begin_frame ts=8305 ms frame=480x800[0m
+[0;32mI (11916) DISPLAY: RENDER begin_frame ts=8338 ms frame=480x800[0m
+[0;32mI (11946) DISPLAY: RENDER begin_frame ts=8371 ms frame=480x800[0m
+[0;32mI (11986) DISPLAY: RENDER begin_frame ts=8404 ms frame=480x800[0m
+[0;32mI (12016) DISPLAY: RENDER begin_frame ts=8437 ms frame=480x800[0m
+[0;32mI (12046) DISPLAY: RENDER begin_frame ts=8470 ms frame=480x800[0m
+[0;32mI (12086) DISPLAY: RENDER begin_frame ts=8503 ms frame=480x800[0m
+[0;32mI (12116) DISPLAY: RENDER begin_frame ts=8535 ms frame=480x800[0m
+[0;32mI (12146) DISPLAY: RENDER begin_frame ts=8568 ms frame=480x800[0m
+[0;32mI (12186) DISPLAY: RENDER begin_frame ts=8602 ms frame=480x800[0m
+[0;32mI (12216) DISPLAY: RENDER begin_frame ts=8634 ms frame=480x800[0m
+[0;32mI (12246) DISPLAY: RENDER begin_frame ts=8669 ms frame=480x800[0m
+[0;32mI (12276) DISPLAY: RENDER begin_frame ts=8701 ms frame=480x800[0m
+[0;32mI (12316) DISPLAY: RENDER begin_frame ts=8734 ms frame=480x800[0m
+[0;32mI (12346) DISPLAY: RENDER begin_frame ts=8766 ms frame=480x800[0m
+[0;32mI (12376) DISPLAY: RENDER begin_frame ts=8800 ms frame=480x800[0m
+[0;32mI (12416) DISPLAY: RENDER begin_frame ts=8833 ms frame=480x800[0m
+[0;32mI (12446) DISPLAY: RENDER begin_frame ts=8866 ms frame=480x800[0m
+[0;32mI (12476) DISPLAY: RENDER begin_frame ts=8899 ms frame=480x800[0m
+[0;32mI (12516) DISPLAY: RENDER begin_frame ts=8932 ms frame=480x800[0m
+[0;32mI (12556) DISPLAY: RENDER begin_frame ts=8981 ms frame=480x800[0m
+[0;32mI (12616) DISPLAY: RENDER present_frame ts=9033 ms frame=480x800[0m

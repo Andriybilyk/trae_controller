@@ -1,0 +1,9 @@
+Command: cmake -G Ninja -B C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16 -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe -DESP_PLATFORM=1 -DCCACHE_ENABLE=True C:\Users\andri\Documents\GitHub\trae_controller\firmware
+Configuration Report               
++---------------------------------+
+|  Parser Version: 1              |
+|  Verbosity: default             |
+|  Defaults policy: sdkconfig     |
+|  Status: Finished successfully  |
+|                                 |
++---------------------------------+

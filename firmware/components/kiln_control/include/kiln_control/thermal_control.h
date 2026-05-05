@@ -57,17 +57,17 @@ public:
 
     // Commands
     void startSchedule(const std::string& scheduleJson);
-    void loadSchedule(const std::string& scheduleJson);
+    bool loadSchedule(const std::string& scheduleJson);
     void start();
     void stop(const std::string& reason = std::string("User Request"));
     bool startAutotune(float setpointC);
     void stopAutotune(const std::string& reason = std::string("User Request"));
     void emergencyStop(const std::string& reason);
     bool clearFault();
-    void skipCurrentStep();
-    void addTemperatureToTarget(float tempToAdd);
-    void addTimeToHold(float minutesToAdd);
-    void setCurrentRampRate(float rateCPerMin);
+    bool skipCurrentStep();
+    bool addTemperatureToTarget(float tempToAdd);
+    bool addTimeToHold(float minutesToAdd);
+    bool setCurrentRampRate(float rateCPerMin);
     bool setTemperatureOffset(float offsetC);
     float getTemperatureOffset();
     bool setUserMaxTemperatureC(float maxC);
@@ -162,6 +162,7 @@ private:
     bool historyActive;
     std::string historyId;
     uint64_t historyStartMs;
+    uint64_t historyStartUnixMs;
     float historyPeakTemp;
     uint64_t lastHistorySampleMs;
     std::vector<HistoryPoint> historyPoints;

@@ -43,7 +43,11 @@ static void unlock_state() {
 static void apply_output(void) {
     if (!s_inited) return;
     const uint8_t out = s_effective_power_percent;
-    const uint32_t duty = (out > 0) ? duty_from_percent(out) : 0;
+    uint32_t duty = (out > 0) ? duty_from_percent(out) : 0;
+#if FAN_ACTIVE_LOW
+    const uint32_t max_duty = (1u << kDutyRes) - 1u;
+    duty = max_duty - duty;
+#endif
     (void)ledc_set_duty(kMode, kChannel, duty);
     (void)ledc_update_duty(kMode, kChannel);
 }
@@ -69,6 +73,11 @@ void fan_driver_init(void) {
     if (!s_mutex) s_mutex = xSemaphoreCreateRecursiveMutex();
     lock_state();
     if (s_inited) {
+        unlock_state();
+        return;
+    }
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(FAN_PIN)) {
+        ESP_LOGI(TAG, "Skipped (invalid GPIO for current board profile)");
         unlock_state();
         return;
     }

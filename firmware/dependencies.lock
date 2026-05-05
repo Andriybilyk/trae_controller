@@ -5,18 +5,60 @@ dependencies:
       path: managed_components\atanisoft__esp_lcd_touch_xpt2046
       type: local
     version: 1.0.6
+  esp_lcd_touch_gt911:
+    dependencies: []
+    source:
+      path: components\esp_lcd_touch_gt911
+      type: local
+    version: 1.2.0~2
   espressif/cjson:
     dependencies: []
     source:
       path: managed_components\espressif__cjson
       type: local
-    version: 1.7.19~1
+    version: 1.7.19~2
+  espressif/cmake_utilities:
+    dependencies: []
+    source:
+      path: managed_components\espressif__cmake_utilities
+      type: local
+    version: 0.5.3
+  espressif/eppp_link:
+    dependencies: []
+    source:
+      path: managed_components\espressif__eppp_link
+      type: local
+    version: 1.1.4
+  espressif/esp_hosted:
+    dependencies: []
+    source:
+      path: managed_components\espressif__esp_hosted
+      type: local
+    version: 2.12.3
+  espressif/esp_lcd_st7701:
+    dependencies: []
+    source:
+      path: managed_components\espressif__esp_lcd_st7701
+      type: local
+    version: 2.0.2
   espressif/esp_lcd_touch:
     dependencies: []
     source:
       path: managed_components\espressif__esp_lcd_touch
       type: local
     version: 1.2.1
+  espressif/esp_serial_slave_link:
+    dependencies: []
+    source:
+      path: managed_components\espressif__esp_serial_slave_link
+      type: local
+    version: 1.1.2
+  espressif/esp_wifi_remote:
+    dependencies: []
+    source:
+      path: managed_components\espressif__esp_wifi_remote
+      type: local
+    version: 1.5.1
   espressif/mdns:
     dependencies: []
     source:
@@ -29,6 +71,12 @@ dependencies:
       path: managed_components\espressif__mqtt
       type: local
     version: 1.0.0
+  espressif/wifi_remote_over_eppp:
+    dependencies: []
+    source:
+      path: managed_components\espressif__wifi_remote_over_eppp
+      type: local
+    version: 0.3.2
   idf:
     source:
       type: idf
@@ -42,11 +90,19 @@ dependencies:
 direct_dependencies:
 - atanisoft/esp_lcd_touch_xpt2046
 - espressif/cjson
+- espressif/cmake_utilities
+- espressif/eppp_link
+- espressif/esp_hosted
+- espressif/esp_lcd_st7701
 - espressif/esp_lcd_touch
+- espressif/esp_lcd_touch_gt911
+- espressif/esp_serial_slave_link
+- espressif/esp_wifi_remote
 - espressif/mdns
 - espressif/mqtt
+- espressif/wifi_remote_over_eppp
 - idf
 - joltwallet/littlefs
-manifest_hash: e142ab49494604dc5b46b02fb9df2aac2c7eab8bd3ab500c5010d740d349ef24
-target: esp32s3
+manifest_hash: 8e389a8c88514640fa5bb6ca70b3e5fdbc0df86d6366ff4582f67ca84d32f4f0
+target: esp32p4
 version: 3.0.0

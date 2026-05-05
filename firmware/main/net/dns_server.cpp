@@ -6,129 +6,129 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 #include "esp_log.h"
-#include "lwip/dns.h"
-#include "esp_wifi.h"
 
 static const char *TAG = "DNS_SERVER";
 static int s_dns_socket = -1;
+static TaskHandle_t s_dns_task = nullptr;
 
-// Minimal DNS header structure
-typedef struct __attribute__((packed)) {
-    uint16_t id;
-    uint16_t flags;
-    uint16_t qd_count;
-    uint16_t an_count;
-    uint16_t ns_count;
-    uint16_t ar_count;
-} dns_header_t;
+static constexpr int DNS_PORT = 53;
+static constexpr int DNS_BUF_SIZE = 512;
 
-static void dns_server_task(void *pvParameters) {
-    uint8_t rx_buffer[512];
-    struct sockaddr_in dest_addr;
-    dest_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(53);
-
-    s_dns_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
-    if (s_dns_socket < 0) {
-        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
-        vTaskDelete(NULL);
-        return;
-    }
-
-    int err = bind(s_dns_socket, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-    if (err < 0) {
-        ESP_LOGE(TAG, "Socket unable to bind: errno %d", errno);
-        close(s_dns_socket);
-        s_dns_socket = -1;
-        vTaskDelete(NULL);
-        return;
-    }
-
-    ESP_LOGI(TAG, "DNS Server started on port 53");
-
-    while (1) {
-        struct sockaddr_in source_addr;
-        socklen_t socklen = sizeof(source_addr);
-        int len = recvfrom(s_dns_socket, rx_buffer, sizeof(rx_buffer), 0, (struct sockaddr *)&source_addr, &socklen);
-
-        if (len < 0) {
-            ESP_LOGE(TAG, "recvfrom failed: errno %d", errno);
+static int dns_question_end_offset(const uint8_t *buf, int len) {
+    if (!buf || len < 12) return -1;
+    int off = 12;
+    while (off < len) {
+        const uint8_t label_len = buf[off];
+        if (label_len == 0) {
+            off += 1;
             break;
         }
+        // Reject compression pointers in question for this tiny captive DNS responder.
+        if ((label_len & 0xC0) == 0xC0) return -1;
+        off += 1 + label_len;
+    }
+    // Need QTYPE + QCLASS
+    if (off + 4 > len) return -1;
+    return off + 4;
+}
 
-        if (len > sizeof(dns_header_t)) {
-            dns_header_t *header = (dns_header_t *)rx_buffer;
-            
-            // Standard query response, no error
-            // QR=1, Opcode=0, AA=1, TC=0, RD=1, RA=1, Z=0, RCODE=0
-            header->flags = htons(0x8180); 
-            header->an_count = header->qd_count;
-            header->ar_count = 0;
-            header->ns_count = 0;
+// Matches MichMich/esp-idf-wifi-provisioner DNS behavior:
+// answer every DNS question with A=192.168.4.1 to force captive portal detection.
+static void dns_server_task(void *pvParameters) {
+    (void)pvParameters;
+    uint8_t buf[DNS_BUF_SIZE];
+    struct sockaddr_in client = {};
+    socklen_t client_len = sizeof(client);
 
-            // Simple DNS Parsing to find end of QNAME
-            // We just skip the QNAME and QTYPE/QCLASS to append answer
-            int idx = sizeof(dns_header_t);
-            
-            // Skip QNAME
-            while (idx < len && rx_buffer[idx] != 0) {
-                idx += rx_buffer[idx] + 1;
-            }
-            idx += 1; // End of domain
-            idx += 4; // QTYPE + QCLASS
+    const uint32_t ap_ip = htonl(0xC0A80401); // 192.168.4.1
 
-            // Only append answer if buffer has space
-            // Answer is 16 bytes fixed
-            if (idx + 16 <= sizeof(rx_buffer)) {
-                // Name ptr (pointer to offset 12 - the start of QNAME)
-                rx_buffer[idx++] = 0xC0;
-                rx_buffer[idx++] = 0x0C; 
-                
-                // Type A (0x0001)
-                rx_buffer[idx++] = 0x00;
-                rx_buffer[idx++] = 0x01;
-
-                // Class IN (0x0001)
-                rx_buffer[idx++] = 0x00;
-                rx_buffer[idx++] = 0x01;
-
-                // TTL (60s)
-                rx_buffer[idx++] = 0x00;
-                rx_buffer[idx++] = 0x00;
-                rx_buffer[idx++] = 0x00;
-                rx_buffer[idx++] = 0x3C;
-
-                // Data Length (4)
-                rx_buffer[idx++] = 0x00;
-                rx_buffer[idx++] = 0x04;
-
-                // IP Address: 192.168.4.1 (C0 A8 04 01)
-                rx_buffer[idx++] = 192;
-                rx_buffer[idx++] = 168;
-                rx_buffer[idx++] = 4;
-                rx_buffer[idx++] = 1;
-
-                sendto(s_dns_socket, rx_buffer, idx, 0, (struct sockaddr *)&source_addr, socklen);
-                // ESP_LOGD(TAG, "DNS query replied");
-            }
-        }
+    s_dns_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (s_dns_socket < 0) {
+        ESP_LOGE(TAG, "Failed to create DNS socket");
+        s_dns_task = nullptr;
+        vTaskDelete(nullptr);
+        return;
     }
 
-    if (s_dns_socket != -1) {
+    struct sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(DNS_PORT);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(s_dns_socket, reinterpret_cast<struct sockaddr *>(&addr), sizeof(addr)) < 0) {
+        ESP_LOGE(TAG, "Failed to bind DNS socket");
+        close(s_dns_socket);
+        s_dns_socket = -1;
+        s_dns_task = nullptr;
+        vTaskDelete(nullptr);
+        return;
+    }
+
+    ESP_LOGI(TAG, "DNS server listening on port %d", DNS_PORT);
+
+    while (true) {
+        client_len = sizeof(client);
+        int len = recvfrom(s_dns_socket, buf, sizeof(buf), 0,
+                           reinterpret_cast<struct sockaddr *>(&client), &client_len);
+        if (len < 0) {
+            break; // socket closed by stop_dns_server()
+        }
+        if (len < 12) {
+            continue; // too short for DNS header
+        }
+
+        // Build response in-place.
+        buf[2] = 0x81; // QR=1, Opcode=0, AA=1
+        buf[3] = 0x80; // RA=1, RCODE=0 (No error)
+        // Keep one question
+        buf[4] = 0x00;
+        buf[5] = 0x01;
+        // Answer count = 1
+        buf[6] = 0x00;
+        buf[7] = 0x01;
+        // Authority/additional = 0
+        buf[8] = 0x00;
+        buf[9] = 0x00;
+        buf[10] = 0x00;
+        buf[11] = 0x00;
+
+        // Append one A answer right after the DNS question section.
+        const int q_end = dns_question_end_offset(buf, len);
+        if (q_end < 0 || q_end >= DNS_BUF_SIZE - 16) {
+            continue;
+        }
+        uint8_t *p = buf + q_end;
+        *p++ = 0xC0; *p++ = 0x0C; // name pointer to question at offset 12
+        *p++ = 0x00; *p++ = 0x01; // Type A
+        *p++ = 0x00; *p++ = 0x01; // Class IN
+        *p++ = 0x00; *p++ = 0x00; *p++ = 0x00; *p++ = 0x3C; // TTL 60s
+        *p++ = 0x00; *p++ = 0x04; // RDLENGTH 4
+        memcpy(p, &ap_ip, 4);
+        p += 4;
+
+        sendto(s_dns_socket, buf, static_cast<size_t>(p - buf), 0,
+               reinterpret_cast<struct sockaddr *>(&client), client_len);
+    }
+
+    ESP_LOGI(TAG, "DNS server stopped");
+    if (s_dns_socket >= 0) {
         close(s_dns_socket);
         s_dns_socket = -1;
     }
-    vTaskDelete(NULL);
+    s_dns_task = nullptr;
+    vTaskDelete(nullptr);
 }
 
 void start_dns_server(void) {
-    xTaskCreate(dns_server_task, "dns_server", 4096, NULL, 5, NULL);
+    if (s_dns_task != nullptr) return;
+    xTaskCreate(dns_server_task, "dns_server", 4096, nullptr, 5, &s_dns_task);
 }
 
 void stop_dns_server(void) {
-    if (s_dns_socket != -1) {
-        close(s_dns_socket); // This should cause recvfrom to fail and task to exit
+    if (s_dns_socket >= 0) {
+        shutdown(s_dns_socket, SHUT_RDWR);
+        close(s_dns_socket);
         s_dns_socket = -1;
     }
+    s_dns_task = nullptr;
 }

@@ -86,9 +86,14 @@
 - Runtime state model aligned for UI/API clarity: kiln status string now emits `IDLE/RUNNING/HOLD/COOLING/COMPLETE/FAULT/PAUSED/TUNING`.
 - ESP-IDF migration baseline updated to v6.0: `dependencies.lock` now resolves `idf (6.0.0)` and firmware builds/flashes with toolchain v6.
 - Partition layout changed for v6-sized firmware: switched from dual OTA slots (`app0/app1`) to single large `factory` app partition (`0xCA0000`) + LittleFS storage (`0x350000`) to fit current Slint/Rust image.
+- Dual-board migration started: introduced board profile config (`legacy_s3` / `new_p4`) via `firmware/main/Kconfig.projbuild`, runtime board API (`board_profile.*`), and Slint bridge getters for board/display geometry.
+- Slint startup now reads board display geometry from firmware bridge and sets window size dynamically; layout is still largely 480x320 and will be generalized incrementally.
+- Added board-specific defaults overlays: `firmware/sdkconfig.defaults.board_legacy_s3` and `firmware/sdkconfig.defaults.board_new_p4`.
 
 - Settings spacing follow-up: the top block offset now comes from shared Settings metrics, and the display temperature/time/date card was widened to the same right visual edge used by the header close button.
 - Library graph action now opens a dedicated Slint `ScheduleGraph` screen with a read-only time/temperature preview generated from the selected program steps.
+- Competitive analysis document added: `docs/OPEN_KILN_CONTROLLERS_COMPARISON_2026-04-09.md` (PyKiln / kiln-controller / PIDKiln / PiLN Flask / picoReflow) with prioritized 30/60/90 roadmap for safety, functionality, and UI/UX.
+- Detailed code-audit roadmap added: `docs/DETAILED_CODE_AUDIT_AND_ROADMAP_2026-04-09.md` with verified implemented/partial areas and file-level action plan (status mapping fix, truthful command results, fault/event logs unification, recovery policy gates, SSR stuck detection).
 
 ## TODO
 - P0: Verify Slint embedded build for `xtensa-esp32s3-espidf` and confirm Slint software renderer + touch input on hardware.
@@ -113,10 +118,17 @@
 - P1: Add a tiny “screen-safe checklist” in PR flow: verify `480x320` bounds, `clip` where needed, and `overflow: elide` on UA/EN long labels.
 - P1: Hardware check for new Slint Settings/standby/boot layout on real 480x320 panel (verify no clipping in UA/EN strings and touch hit zones).
 - P1: Re-test editor input on hardware after UI changes: numeric keypad open/close, long program names, UA/EN keyboard rows, and touch-release edge cases.
+- P0: Replace hardcoded `480x320` constants in `firmware/slint_ui/ui/app.slint` with `root.width/root.height`-driven tokens (phase-by-phase to avoid UI regressions on legacy hardware).
+- P0: Implement display/touch HAL split for dual-board support, keeping `drivers/display_driver.cpp` as legacy path and adding new P4 path behind board profile gates.
 - P1: Persist fan curve + mode at boot explicitly (load config before fan init or defer fan init until LittleFS config is applied).
 - P1: Remote access hardening: broker TLS cert pinning/CA upload, per-device command auth (signed nonce), and role-based command allowlist.
 - P1: Remote hardening next: add CA upload/pinning (`mqtts` cert field in config), signed-command helper docs/examples, and per-command role scopes.
 - P1: Reintroduce OTA-friendly partitioning after binary size reduction (or compressed/delta OTA strategy) so dual-slot updates can be restored safely.
+- P1: Execute roadmap from `docs/OPEN_KILN_CONTROLLERS_COMPARISON_2026-04-09.md` starting with P0 safety tasks: dual-channel heater cutoff manager, preflight checklist screen, and persistent fault/event journal API.
+- P0: Fix Slint status mapping drift vs firmware enum (`RUNNING/HOLD/COOLING/COMPLETE/FAULT`) in `firmware/slint_ui/src/lib.rs::apply_state_to_ui`.
+- P0: Make command results truthful end-to-end (`load/skip/add/setRate`) by returning real result codes from thermal/device command layers (currently several paths always return `ok`).
+- P0: Fix API rate-limit timestamp bug for `/api/setRate` (currently shares `lastAddTimeCommandMs`).
+- P0: Add fault event logging on `tripFaultLocked()` and expose merged fault timeline to UI (audit + events logs).
 - P2: API schema: extend compatibility fields with `fault_code` and `uptime_ms` across endpoints (DONE: `schema_version` + `fw_version` already added to canonical state).
 - P2: Persistent event log: ring-buffer faults/start/stop/overtemp into `/littlefs/logs`.
 - P2: OTA updates: add signed manifest validation (cryptographic signature) and rollback-status reporting endpoint.

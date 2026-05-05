@@ -1,11 +1,15 @@
 use slint::platform::software_renderer::{MinimalSoftwareWindow, RepaintBufferType, Rgb565Pixel, LineBufferProvider};
 use slint::platform::{Platform, PointerEventButton, WindowEvent};
 use slint::{Color, Image, ModelRc, Rgb8Pixel, SharedPixelBuffer, Timer, VecModel};
+use slint::Model;
+use serde::Deserialize;
+use serde::de::Deserializer;
+use encoding_rs::WINDOWS_1251;
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 // Fonts are embedded via @font-face in the .slint files (compile-time), so we don't
 // need any runtime font registration here.
@@ -18,6 +22,7 @@ const TOUCH_DEBUG_MIN_Z: u16 = 140;
 const TOUCH_DEBUG_DEADZONE_PX: i32 = 2;
 const TOUCH_DEBUG_UPDATE_MIN_MS: u64 = 16;
 const STANDBY_TIMEOUT_MS: u64 = 180_000;
+const UI_STATE_APPLY_PERIOD_MS: u64 = 220;
 
 slint::include_modules!();
 
@@ -118,6 +123,7 @@ extern "C" {
     fn slint_bridge_wifi_scan_ready() -> bool;
     fn slint_bridge_wifi_scan_copy_results(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_wifi_server_url_copy(out: *mut c_char, out_len: i32) -> bool;
+    fn slint_bridge_wifi_ap_ssid_copy(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_get_schedules_revision() -> u32;
     fn slint_bridge_get_command_result_revision() -> u32;
     fn slint_bridge_copy_command_result(out: *mut SlintCommandResult) -> bool;
@@ -129,6 +135,13 @@ extern "C" {
     fn slint_bridge_get_device_id_copy(out: *mut c_char, out_len: i32) -> bool;
     fn slint_bridge_get_uptime_seconds() -> u64;
     fn slint_bridge_get_free_heap_bytes() -> u32;
+    fn slint_bridge_get_total_heap_bytes() -> u32;
+    fn slint_bridge_get_free_psram_bytes() -> u32;
+    fn slint_bridge_get_total_psram_bytes() -> u32;
+    fn slint_bridge_get_chip_temp_c(out_c: *mut f32) -> bool;
+    fn slint_bridge_get_board_profile() -> u8;
+    fn slint_bridge_get_display_width() -> i32;
+    fn slint_bridge_get_display_height() -> i32;
     fn slint_bridge_get_language_is_ua() -> bool;
     fn slint_bridge_set_language_is_ua(is_ua: bool);
     fn slint_bridge_get_temp_unit() -> u8;
@@ -148,6 +161,11 @@ extern "C" {
     fn display_driver_set_touch_affine(enabled: bool, a: f32, b: f32, c: f32, d: f32, e: f32, f: f32) -> bool;
     fn display_driver_set_touch_grid(enabled: bool, dx: *const f32, dy: *const f32) -> bool;
     fn display_driver_blit_rgb565(x: i32, y: i32, w: i32, h: i32, data: *const u16) -> bool;
+    fn display_driver_p4_begin_frame(out_fb: *mut *mut u16, out_w: *mut i32, out_h: *mut i32) -> bool;
+    fn display_driver_p4_present_frame() -> bool;
+    fn display_driver_p4_present_frame_region(x: i32, y: i32, w: i32, h: i32) -> bool;
+    fn display_driver_p4_cancel_frame();
+    fn slint_bridge_wifi_last_got_ip_ms() -> u64;
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -197,58 +215,58 @@ struct WifiScanAp {
 
 #[derive(Clone, serde::Deserialize, Default)]
 struct HistorySample {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_i64_any")]
     timestamp: i64,
-    #[serde(alias = "temperature", alias = "actual", default)]
+    #[serde(alias = "temperature", alias = "actual", default, deserialize_with = "de_f32_any")]
     temp: f32,
-    #[serde(alias = "setpoint", alias = "planned", default)]
+    #[serde(alias = "setpoint", alias = "planned", default, deserialize_with = "de_f32_any")]
     target: f32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_f32_any")]
     voltage: f32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_f32_any")]
     current: f32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_f32_any")]
     power: f32,
 }
 
 #[allow(dead_code)]
 #[derive(Clone, serde::Deserialize, Default)]
 struct HistorySummary {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_string_any")]
     id: String,
-    #[serde(rename = "scheduleName", default)]
+    #[serde(rename = "scheduleName", default, deserialize_with = "de_string_any")]
     schedule_name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_i64_any")]
     duration: i64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_string_any")]
     status: String,
-    #[serde(rename = "statusCode", default)]
+    #[serde(rename = "statusCode", default, deserialize_with = "de_string_any")]
     status_code: String,
-    #[serde(rename = "totalSteps", default)]
+    #[serde(rename = "totalSteps", default, deserialize_with = "de_i64_any")]
     total_steps: i64,
-    #[serde(rename = "completedSteps", default)]
+    #[serde(rename = "completedSteps", default, deserialize_with = "de_i64_any")]
     completed_steps: i64,
-    #[serde(rename = "startTime", default)]
+    #[serde(rename = "startTime", default, deserialize_with = "de_string_any")]
     start_time: String,
-    #[serde(rename = "endTime", default)]
+    #[serde(rename = "endTime", default, deserialize_with = "de_string_any")]
     end_time: String,
-    #[serde(rename = "startTs", default)]
+    #[serde(rename = "startTs", default, deserialize_with = "de_i64_any")]
     start_ts: i64,
-    #[serde(rename = "endTs", default)]
+    #[serde(rename = "endTs", default, deserialize_with = "de_i64_any")]
     end_ts: i64,
-    #[serde(rename = "energyKwh", default)]
+    #[serde(rename = "energyKwh", default, deserialize_with = "de_f32_any")]
     energy_kwh: f32,
-    #[serde(rename = "energyWh", default)]
+    #[serde(rename = "energyWh", default, deserialize_with = "de_f32_any")]
     energy_wh: f32,
-    #[serde(rename = "cost", default)]
+    #[serde(rename = "cost", default, deserialize_with = "de_f32_any")]
     cost: f32,
-    #[serde(rename = "peakPower", default)]
+    #[serde(rename = "peakPower", default, deserialize_with = "de_f32_any")]
     peak_power: f32,
-    #[serde(rename = "peakCurrent", default)]
+    #[serde(rename = "peakCurrent", default, deserialize_with = "de_f32_any")]
     peak_current: f32,
-    #[serde(rename = "peakTemp", default)]
+    #[serde(rename = "peakTemp", default, deserialize_with = "de_f32_any")]
     peak_temp: f32,
-    #[serde(rename = "faultReason", default)]
+    #[serde(rename = "faultReason", default, deserialize_with = "de_string_any")]
     fault_reason: String,
 }
 
@@ -259,7 +277,21 @@ struct HistoryDetail {
     #[serde(default)]
     data: Vec<HistorySample>,
     #[serde(default)]
+    planned: Vec<HistoryCurvePoint>,
+    #[serde(default)]
+    actual: Vec<HistoryCurvePoint>,
+    #[serde(default)]
     changes: Vec<HistoryChange>,
+}
+
+#[derive(Clone, serde::Deserialize, Default)]
+struct HistoryCurvePoint {
+    #[serde(alias = "t", alias = "time", alias = "x", default, deserialize_with = "de_f32_any")]
+    t: f32,
+    #[serde(alias = "temp", alias = "y", alias = "target", alias = "value", default, deserialize_with = "de_f32_any")]
+    temp: f32,
+    #[serde(alias = "timestamp", default, deserialize_with = "de_i64_any")]
+    timestamp: i64,
 }
 
 #[derive(Clone, serde::Deserialize, Default)]
@@ -280,11 +312,21 @@ struct HistoryChange {
     delta: f32,
 }
 
+#[derive(Clone)]
+struct GraphTapPoint {
+    x: i32,
+    y: i32,
+    temp_label: String,
+    time_label: String,
+}
+
 struct AppState {
     schedules: Vec<ScheduleFile>,
     selected_index: Option<usize>,
     editing_index: Option<usize>,
     graph_index: Option<usize>,
+    graph_zoom_level: i32,
+    graph_points: Vec<GraphTapPoint>,
     history_graph_id: Option<String>,
     history_detail_id: Option<String>,
     editor_steps: Vec<EditorStepRow>,
@@ -312,6 +354,47 @@ enum DateFormat {
     Dmy,
     Mdy,
     Ymd,
+}
+
+fn de_string_any<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let v = serde_json::Value::deserialize(deserializer)?;
+    Ok(match v {
+        serde_json::Value::String(s) => s,
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Bool(b) => {
+            if b { "true".to_string() } else { "false".to_string() }
+        }
+        _ => String::new(),
+    })
+}
+
+fn de_i64_any<'de, D>(deserializer: D) -> Result<i64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let v = serde_json::Value::deserialize(deserializer)?;
+    Ok(match v {
+        serde_json::Value::Number(n) => n.as_i64().or_else(|| n.as_f64().map(|f| f as i64)).unwrap_or(0),
+        serde_json::Value::String(s) => s.trim().parse::<i64>().ok().unwrap_or(0),
+        serde_json::Value::Bool(b) => if b { 1 } else { 0 },
+        _ => 0,
+    })
+}
+
+fn de_f32_any<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let v = serde_json::Value::deserialize(deserializer)?;
+    Ok(match v {
+        serde_json::Value::Number(n) => n.as_f64().map(|f| f as f32).unwrap_or(0.0),
+        serde_json::Value::String(s) => s.trim().parse::<f32>().ok().unwrap_or(0.0),
+        serde_json::Value::Bool(b) => if b { 1.0 } else { 0.0 },
+        _ => 0.0,
+    })
 }
 
 fn c_to_f(c: f32) -> f32 {
@@ -370,9 +453,9 @@ fn rate_to_c_from_display(value: i32, unit: TempUnit) -> i32 {
 
 fn update_unit_labels(ui: &AppWindow, unit: TempUnit) {
     ui.set_temp_unit(match unit { TempUnit::C => "C", TempUnit::F => "F" }.into());
-    ui.set_temp_unit_label(match unit { TempUnit::C => "°C", TempUnit::F => "°F" }.into());
-    ui.set_rate_unit_label(match unit { TempUnit::C => "°C/h", TempUnit::F => "°F/h" }.into());
-    ui.set_rate_unit_label_min(match unit { TempUnit::C => "°C/min", TempUnit::F => "°F/min" }.into());
+    ui.set_temp_unit_label(match unit { TempUnit::C => "\u{00B0}C", TempUnit::F => "\u{00B0}F" }.into());
+    ui.set_rate_unit_label(match unit { TempUnit::C => "\u{00B0}C/h", TempUnit::F => "\u{00B0}F/h" }.into());
+    ui.set_rate_unit_label_min(match unit { TempUnit::C => "\u{00B0}C/min", TempUnit::F => "\u{00B0}F/min" }.into());
 }
 
 fn apply_temp_unit_change(ui: &AppWindow, state: &mut AppState, new_unit: TempUnit) {
@@ -446,17 +529,129 @@ impl<'a> LineBufferProvider for DisplayLineBuffer<'a> {
         range: core::ops::Range<usize>,
         render_fn: impl FnOnce(&mut [Self::TargetPixel]),
     ) {
-        render_fn(&mut self.line_buffer[range.clone()]);
+        let start = range.start.min(self.line_buffer.len());
+        let end = range.end.min(self.line_buffer.len());
+        if end <= start {
+            return;
+        }
+        render_fn(&mut self.line_buffer[start..end]);
         unsafe {
-            let ptr = self.line_buffer[range.clone()].as_ptr() as *const u16;
+            let ptr = self.line_buffer[start..end].as_ptr() as *const u16;
             let _ = display_driver_blit_rgb565(
-                range.start as i32,
+                start as i32,
                 line as i32,
-                (range.end - range.start) as i32,
+                (end - start) as i32,
                 1,
                 ptr,
             );
         }
+    }
+}
+
+struct BufferedDisplayLineBuffer<'a> {
+    line_buffer: &'a mut [Rgb565Pixel],
+    frame_buffer: &'a mut [Rgb565Pixel],
+    frame_width: usize,
+    had_updates: &'a mut bool,
+    dirty_min_x: &'a mut i32,
+    dirty_min_y: &'a mut i32,
+    dirty_max_x: &'a mut i32,
+    dirty_max_y: &'a mut i32,
+}
+
+impl<'a> LineBufferProvider for BufferedDisplayLineBuffer<'a> {
+    type TargetPixel = Rgb565Pixel;
+
+    fn process_line(
+        &mut self,
+        line: usize,
+        range: core::ops::Range<usize>,
+        render_fn: impl FnOnce(&mut [Self::TargetPixel]),
+    ) {
+        let start = range.start.min(self.line_buffer.len());
+        let end = range.end.min(self.line_buffer.len());
+        if end <= start {
+            return;
+        }
+
+        render_fn(&mut self.line_buffer[start..end]);
+
+        let row_start = line.saturating_mul(self.frame_width);
+        let dst_start = row_start.saturating_add(start);
+        let dst_end = row_start.saturating_add(end);
+        if dst_end <= self.frame_buffer.len() && dst_end > dst_start {
+            self.frame_buffer[dst_start..dst_end].copy_from_slice(&self.line_buffer[start..end]);
+            *self.had_updates = true;
+            let x1 = start as i32;
+            let x2 = end.saturating_sub(1) as i32;
+            let y = line as i32;
+            if x1 < *self.dirty_min_x { *self.dirty_min_x = x1; }
+            if y < *self.dirty_min_y { *self.dirty_min_y = y; }
+            if x2 > *self.dirty_max_x { *self.dirty_max_x = x2; }
+            if y > *self.dirty_max_y { *self.dirty_max_y = y; }
+        }
+    }
+}
+
+struct P4RotatedLineBuffer<'a> {
+    line_buffer: &'a mut [Rgb565Pixel],
+    frame_buffer: &'a mut [u16],
+    frame_width: usize,
+    src_width: usize,
+    src_height: usize,
+    had_updates: &'a mut bool,
+    dirty_min_x: &'a mut i32,
+    dirty_min_y: &'a mut i32,
+    dirty_max_x: &'a mut i32,
+    dirty_max_y: &'a mut i32,
+}
+
+impl<'a> LineBufferProvider for P4RotatedLineBuffer<'a> {
+    type TargetPixel = Rgb565Pixel;
+
+    fn process_line(
+        &mut self,
+        line: usize,
+        range: core::ops::Range<usize>,
+        render_fn: impl FnOnce(&mut [Self::TargetPixel]),
+    ) {
+        if line >= self.src_height || line >= self.frame_width {
+            return;
+        }
+        let start = range.start.min(self.line_buffer.len());
+        let end = range.end.min(self.line_buffer.len());
+        if end <= start {
+            return;
+        }
+
+        render_fn(&mut self.line_buffer[start..end]);
+
+        let src_width = self.src_width.max(1);
+        let end = end.min(src_width);
+        if start >= end {
+            return;
+        }
+
+        let raw_line = unsafe {
+            std::slice::from_raw_parts(self.line_buffer.as_ptr() as *const u16, self.line_buffer.len())
+        };
+
+        for x in start..end {
+            let dst_x = line;
+            let dst_y = src_width - 1 - x;
+            let dst_index = dst_y.saturating_mul(self.frame_width).saturating_add(dst_x);
+            if dst_index < self.frame_buffer.len() {
+                self.frame_buffer[dst_index] = raw_line[x];
+                *self.had_updates = true;
+            }
+        }
+        let px = line as i32;
+        let py1 = (src_width.saturating_sub(end)) as i32;
+        let py2 = (src_width.saturating_sub(1 + start)) as i32;
+        if px < *self.dirty_min_x { *self.dirty_min_x = px; }
+        if py1 < *self.dirty_min_y { *self.dirty_min_y = py1; }
+        if px > *self.dirty_max_x { *self.dirty_max_x = px; }
+        if py2 > *self.dirty_max_y { *self.dirty_max_y = py2; }
     }
 }
 
@@ -474,23 +669,23 @@ fn translate_fault_reason(reason: &str, is_ua: bool) -> String {
         return reason.to_string();
     }
     match reason {
-        "Autotune sensor fault" => "Помилка сенсора під час автоналаштування".to_string(),
-        "Autotune timeout" => "Автоналаштування: таймаут".to_string(),
-        "Autotune insufficient data" => "Автоналаштування: недостатньо даних".to_string(),
-        "Sensor comm/no-data" => "Немає даних від сенсора".to_string(),
-        "Sensor open" => "Обрив сенсора".to_string(),
-        "Sensor short" => "Коротке замикання сенсора".to_string(),
-        "Sensor NaN/open" => "Некоректне значення сенсора".to_string(),
-        "Sensor out of range" => "Температура поза діапазоном".to_string(),
-        "Sensor spike/out of range" => "Стрибок температури сенсора".to_string(),
-        "Sensor stuck" => "Сенсор не змінює покази".to_string(),
-        "Sensor not stable yet" => "Сенсор ще не стабілізувався".to_string(),
-        "Sensor comm fault" => "Помилка зв'язку з сенсором".to_string(),
-        "Sensor open fault" => "Обрив сенсора".to_string(),
-        "Sensor short fault" => "Коротке замикання сенсора".to_string(),
-        "Temperature read timeout" => "Таймаут зчитування температури".to_string(),
-        "Temperature runaway" => "Аварійний перегрів".to_string(),
-        "Unknown fault" => "Невідома помилка".to_string(),
+        "Autotune sensor fault" => "\u{041F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430} \u{043F}\u{0456}\u{0434} \u{0447}\u{0430}\u{0441} \u{0430}\u{0432}\u{0442}\u{043E}\u{043D}\u{0430}\u{043B}\u{0430}\u{0448}\u{0442}\u{0443}\u{0432}\u{0430}\u{043D}\u{043D}\u{044F}".to_string(),
+        "Autotune timeout" => "\u{0410}\u{0432}\u{0442}\u{043E}\u{043D}\u{0430}\u{043B}\u{0430}\u{0448}\u{0442}\u{0443}\u{0432}\u{0430}\u{043D}\u{043D}\u{044F}: \u{0442}\u{0430}\u{0439}\u{043C}\u{0430}\u{0443}\u{0442}".to_string(),
+        "Autotune insufficient data" => "\u{0410}\u{0432}\u{0442}\u{043E}\u{043D}\u{0430}\u{043B}\u{0430}\u{0448}\u{0442}\u{0443}\u{0432}\u{0430}\u{043D}\u{043D}\u{044F}: \u{043D}\u{0435}\u{0434}\u{043E}\u{0441}\u{0442}\u{0430}\u{0442}\u{043D}\u{044C}\u{043E} \u{0434}\u{0430}\u{043D}\u{0438}\u{0445}".to_string(),
+        "Sensor comm/no-data" => "\u{041D}\u{0435}\u{043C}\u{0430}\u{0454} \u{0434}\u{0430}\u{043D}\u{0438}\u{0445} \u{0432}\u{0456}\u{0434} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430}".to_string(),
+        "Sensor open" => "\u{041E}\u{0431}\u{0440}\u{0438}\u{0432} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430}".to_string(),
+        "Sensor short" => "\u{041A}\u{043E}\u{0440}\u{043E}\u{0442}\u{043A}\u{0435} \u{0437}\u{0430}\u{043C}\u{0438}\u{043A}\u{0430}\u{043D}\u{043D}\u{044F} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430}".to_string(),
+        "Sensor NaN/open" => "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0435} \u{0437}\u{043D}\u{0430}\u{0447}\u{0435}\u{043D}\u{043D}\u{044F} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430}".to_string(),
+        "Sensor out of range" => "\u{0422}\u{0435}\u{043C}\u{043F}\u{0435}\u{0440}\u{0430}\u{0442}\u{0443}\u{0440}\u{0430} \u{043F}\u{043E}\u{0437}\u{0430} \u{0434}\u{0456}\u{0430}\u{043F}\u{0430}\u{0437}\u{043E}\u{043D}\u{043E}\u{043C}".to_string(),
+        "Sensor spike/out of range" => "\u{0421}\u{0442}\u{0440}\u{0438}\u{0431}\u{043E}\u{043A} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430} \u{043F}\u{043E}\u{0437}\u{0430} \u{043C}\u{0435}\u{0436}\u{0430}\u{043C}\u{0438}".to_string(),
+        "Sensor stuck" => "\u{0421}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440} \u{0437}\u{0430}\u{0432}\u{0438}\u{0441} \u{043D}\u{0430} \u{043E}\u{0434}\u{043D}\u{043E}\u{043C}\u{0443} \u{0437}\u{043D}\u{0430}\u{0447}\u{0435}\u{043D}\u{043D}\u{0456}".to_string(),
+        "Sensor not stable yet" => "\u{0421}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440} \u{0449}\u{0435} \u{043D}\u{0435} \u{0441}\u{0442}\u{0430}\u{0431}\u{0456}\u{043B}\u{0456}\u{0437}\u{0443}\u{0432}\u{0430}\u{0432}\u{0441}\u{044F}".to_string(),
+        "Sensor comm fault" => "\u{041F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430} \u{0437}\u{0432}'\u{044F}\u{0437}\u{043A}\u{0443} \u{0437} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{043E}\u{043C}".to_string(),
+        "Sensor open fault" => "\u{041E}\u{0431}\u{0440}\u{0438}\u{0432} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430}".to_string(),
+        "Sensor short fault" => "\u{041A}\u{043E}\u{0440}\u{043E}\u{0442}\u{043A}\u{0435} \u{0437}\u{0430}\u{043C}\u{0438}\u{043A}\u{0430}\u{043D}\u{043D}\u{044F} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}\u{0430}".to_string(),
+        "Temperature read timeout" => "\u{0422}\u{0430}\u{0439}\u{043C}\u{0430}\u{0443}\u{0442} \u{0437}\u{0447}\u{0438}\u{0442}\u{0443}\u{0432}\u{0430}\u{043D}\u{043D}\u{044F} \u{0442}\u{0435}\u{043C}\u{043F}\u{0435}\u{0440}\u{0430}\u{0442}\u{0443}\u{0440}\u{0438}".to_string(),
+        "Temperature runaway" => "\u{0410}\u{0432}\u{0430}\u{0440}\u{0456}\u{0439}\u{043D}\u{0438}\u{0439} \u{043F}\u{0435}\u{0440}\u{0435}\u{0433}\u{0440}\u{0456}\u{0432}".to_string(),
+        "Unknown fault" => "\u{041D}\u{0435}\u{0432}\u{0456}\u{0434}\u{043E}\u{043C}\u{0430} \u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430}".to_string(),
         _ => reason.to_string(),
     }
 }
@@ -500,36 +695,36 @@ fn translate_command_message(message: &str, is_ua: bool) -> String {
         return message.to_string();
     }
     match message {
-        "ok" => "успішно".to_string(),
-        "error" => "помилка".to_string(),
-        "internal" => "внутрішня помилка".to_string(),
-        "started" => "запущено".to_string(),
-        "stopped" => "зупинено".to_string(),
-        "loaded" => "завантажено".to_string(),
-        "cleared" => "скинуто".to_string(),
-        "clear_rejected" => "скидання відхилено".to_string(),
-        "busy" => "зачекайте, команда виконується".to_string(),
-        "invalid_payload" => "Некоректні дані".to_string(),
-        "invalid_schedule" => "Некоректна програма".to_string(),
-        "no_schedule" => "Програму не завантажено".to_string(),
-        "sensor_invalid" => "Сенсор недійсний".to_string(),
-        "touch_not_calibrated" => "Тач не відкалібрований".to_string(),
-        "fault_active" => "Активна помилка".to_string(),
-        "fan_unsafe" => "Небезпечна конфігурація вентилятора".to_string(),
-        "schedule_over_max_temp" => "Програма перевищує maxC".to_string(),
-        "clock_not_set" => "Годинник RTC/системний час не встановлено".to_string(),
-        "rate_limited" => "Забагато запитів".to_string(),
-        "Sensor invalid" => "Сенсор недійсний".to_string(),
-        "Invalid payload" => "Некоректні дані".to_string(),
-        "Invalid schedule" => "Некоректна програма".to_string(),
-        "No schedule loaded" => "Програму не завантажено".to_string(),
-        "Touch not calibrated" => "Тач не відкалібрований".to_string(),
-        "Fault active" => "Активна помилка".to_string(),
-        "Fan configuration unsafe" => "Небезпечна конфігурація вентилятора".to_string(),
-        "Schedule exceeds max temperature" => "Програма перевищує maxC".to_string(),
-        "RTC/system clock not set" => "Годинник RTC/системний час не встановлено".to_string(),
-        "Too many requests" => "Забагато запитів".to_string(),
-        "Internal error" => "Внутрішня помилка".to_string(),
+        "ok" => "\u{0443}\u{0441}\u{043F}\u{0456}\u{0448}\u{043D}\u{043E}".to_string(),
+        "error" => "\u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430}".to_string(),
+        "internal" => "\u{0432}\u{043D}\u{0443}\u{0442}\u{0440}\u{0456}\u{0448}\u{043D}\u{044F} \u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430}".to_string(),
+        "started" => "\u{0437}\u{0430}\u{043F}\u{0443}\u{0449}\u{0435}\u{043D}\u{043E}".to_string(),
+        "stopped" => "\u{0437}\u{0443}\u{043F}\u{0438}\u{043D}\u{0435}\u{043D}\u{043E}".to_string(),
+        "loaded" => "\u{0437}\u{0430}\u{0432}\u{0430}\u{043D}\u{0442}\u{0430}\u{0436}\u{0435}\u{043D}\u{043E}".to_string(),
+        "cleared" => "\u{0441}\u{043A}\u{0438}\u{043D}\u{0443}\u{0442}\u{043E}".to_string(),
+        "clear_rejected" => "\u{0441}\u{043A}\u{0438}\u{0434}\u{0430}\u{043D}\u{043D}\u{044F} \u{0432}\u{0456}\u{0434}\u{0445}\u{0438}\u{043B}\u{0435}\u{043D}\u{043E}".to_string(),
+        "busy" => "\u{0437}\u{0430}\u{0447}\u{0435}\u{043A}\u{0430}\u{0439}\u{0442}\u{0435}, \u{043A}\u{043E}\u{043C}\u{0430}\u{043D}\u{0434}\u{0430} \u{0432}\u{0438}\u{043A}\u{043E}\u{043D}\u{0443}\u{0454}\u{0442}\u{044C}\u{0441}\u{044F}".to_string(),
+        "invalid_payload" => "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0456} \u{0434}\u{0430}\u{043D}\u{0456}".to_string(),
+        "invalid_schedule" => "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0430} \u{043F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0430}".to_string(),
+        "no_schedule" => "\u{041F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0443} \u{043D}\u{0435} \u{0437}\u{0430}\u{0432}\u{0430}\u{043D}\u{0442}\u{0430}\u{0436}\u{0435}\u{043D}\u{043E}".to_string(),
+        "sensor_invalid" => "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0438}\u{0439} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}".to_string(),
+        "touch_not_calibrated" => "\u{0422}\u{0430}\u{0447} \u{043D}\u{0435} \u{0432}\u{0456}\u{0434}\u{043A}\u{0430}\u{043B}\u{0456}\u{0431}\u{0440}\u{043E}\u{0432}\u{0430}\u{043D}\u{0438}\u{0439}".to_string(),
+        "fault_active" => "\u{0410}\u{043A}\u{0442}\u{0438}\u{0432}\u{043D}\u{0430} \u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430}".to_string(),
+        "fan_unsafe" => "\u{041D}\u{0435}\u{0431}\u{0435}\u{0437}\u{043F}\u{0435}\u{0447}\u{043D}\u{0430} \u{043A}\u{043E}\u{043D}\u{0444}\u{0456}\u{0433}\u{0443}\u{0440}\u{0430}\u{0446}\u{0456}\u{044F} \u{0432}\u{0435}\u{043D}\u{0442}\u{0438}\u{043B}\u{044F}\u{0442}\u{043E}\u{0440}\u{0430}".to_string(),
+        "schedule_over_max_temp" => "\u{041F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0430} \u{043F}\u{0435}\u{0440}\u{0435}\u{0432}\u{0438}\u{0449}\u{0443}\u{0454} maxC".to_string(),
+        "clock_not_set" => "\u{0413}\u{043E}\u{0434}\u{0438}\u{043D}\u{043D}\u{0438}\u{043A} RTC/\u{0441}\u{0438}\u{0441}\u{0442}\u{0435}\u{043C}\u{043D}\u{0438}\u{0439} \u{0447}\u{0430}\u{0441} \u{043D}\u{0435} \u{0432}\u{0441}\u{0442}\u{0430}\u{043D}\u{043E}\u{0432}\u{043B}\u{0435}\u{043D}\u{043E}".to_string(),
+        "rate_limited" => "\u{0417}\u{0430}\u{0431}\u{0430}\u{0433}\u{0430}\u{0442}\u{043E} \u{0437}\u{0430}\u{043F}\u{0438}\u{0442}\u{0456}\u{0432}".to_string(),
+        "Sensor invalid" => "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0438}\u{0439} \u{0441}\u{0435}\u{043D}\u{0441}\u{043E}\u{0440}".to_string(),
+        "Invalid payload" => "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0456} \u{0434}\u{0430}\u{043D}\u{0456}".to_string(),
+        "Invalid schedule" => "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0430} \u{043F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0430}".to_string(),
+        "No schedule loaded" => "\u{041F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0443} \u{043D}\u{0435} \u{0437}\u{0430}\u{0432}\u{0430}\u{043D}\u{0442}\u{0430}\u{0436}\u{0435}\u{043D}\u{043E}".to_string(),
+        "Touch not calibrated" => "\u{0422}\u{0430}\u{0447} \u{043D}\u{0435} \u{0432}\u{0456}\u{0434}\u{043A}\u{0430}\u{043B}\u{0456}\u{0431}\u{0440}\u{043E}\u{0432}\u{0430}\u{043D}\u{0438}\u{0439}".to_string(),
+        "Fault active" => "\u{0410}\u{043A}\u{0442}\u{0438}\u{0432}\u{043D}\u{0430} \u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430}".to_string(),
+        "Fan configuration unsafe" => "\u{041D}\u{0435}\u{0431}\u{0435}\u{0437}\u{043F}\u{0435}\u{0447}\u{043D}\u{0430} \u{043A}\u{043E}\u{043D}\u{0444}\u{0456}\u{0433}\u{0443}\u{0440}\u{0430}\u{0446}\u{0456}\u{044F} \u{0432}\u{0435}\u{043D}\u{0442}\u{0438}\u{043B}\u{044F}\u{0442}\u{043E}\u{0440}\u{0430}".to_string(),
+        "Schedule exceeds max temperature" => "\u{041F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0430} \u{043F}\u{0435}\u{0440}\u{0435}\u{0432}\u{0438}\u{0449}\u{0443}\u{0454} maxC".to_string(),
+        "RTC/system clock not set" => "\u{0413}\u{043E}\u{0434}\u{0438}\u{043D}\u{043D}\u{0438}\u{043A} RTC/\u{0441}\u{0438}\u{0441}\u{0442}\u{0435}\u{043C}\u{043D}\u{0438}\u{0439} \u{0447}\u{0430}\u{0441} \u{043D}\u{0435} \u{0432}\u{0441}\u{0442}\u{0430}\u{043D}\u{043E}\u{0432}\u{043B}\u{0435}\u{043D}\u{043E}".to_string(),
+        "Too many requests" => "\u{0417}\u{0430}\u{0431}\u{0430}\u{0433}\u{0430}\u{0442}\u{043E} \u{0437}\u{0430}\u{043F}\u{0438}\u{0442}\u{0456}\u{0432}".to_string(),
+        "Internal error" => "\u{0412}\u{043D}\u{0443}\u{0442}\u{0440}\u{0456}\u{0448}\u{043D}\u{044F} \u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430}".to_string(),
         _ => message.to_string(),
     }
 }
@@ -539,7 +734,11 @@ fn load_schedules() -> Vec<ScheduleFile> {
     let Ok(data) = std::fs::read_to_string(path) else {
         return Vec::new();
     };
-    serde_json::from_str(&data).unwrap_or_default()
+    let mut schedules: Vec<ScheduleFile> = serde_json::from_str(&data).unwrap_or_default();
+    for s in &mut schedules {
+                    s.name = sanitize_display_text(&s.name);
+    }
+    schedules
 }
 
 fn save_schedules(schedules: &[ScheduleFile]) -> bool {
@@ -568,33 +767,139 @@ fn truncate_preview(mut text: String, max_chars: usize) -> String {
     text
 }
 
-fn compact_duration_label(seconds: i64, is_ua: bool) -> String {
+fn compact_duration_label(seconds: i64, _is_ua: bool) -> String {
     if seconds <= 0 {
-        return if is_ua { "тривалість невідома".to_string() } else { "duration unknown".to_string() };
+        return "duration unknown".to_string();
     }
     let hours = seconds / 3600;
     let minutes = (seconds % 3600) / 60;
     if hours > 0 {
-        if is_ua {
-            format!("{} год {} хв", hours, minutes)
-        } else {
-            format!("{}h {}m", hours, minutes)
-        }
-    } else if is_ua {
-        format!("{} хв", minutes.max(1))
+        format!("{}h {}m", hours, minutes)
     } else {
-        format!("{} min", minutes.max(1))
+        format!("{}m", minutes.max(1))
     }
 }
 
-fn history_status_label(status: &str, is_ua: bool) -> String {
+fn unix_seconds_to_ymdhm_utc(ts_sec: i64) -> Option<(i32, u32, u32, u32, u32)> {
+    if ts_sec < 0 {
+        return None;
+    }
+    let days = ts_sec.div_euclid(86_400);
+    let sec_of_day = ts_sec.rem_euclid(86_400);
+    let hour = (sec_of_day / 3_600) as u32;
+    let minute = ((sec_of_day % 3_600) / 60) as u32;
+
+    // Civil date from days since Unix epoch (UTC).
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let mut y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    y += if m <= 2 { 1 } else { 0 };
+
+    Some((y as i32, m as u32, d as u32, hour, minute))
+}
+
+fn current_unix_ms() -> Option<i64> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?;
+    Some(now.as_millis() as i64)
+}
+
+fn normalize_history_start_ms(item: &serde_json::Value) -> Option<i64> {
+    let mut start_ms = item.get("startTime").and_then(|v| v.as_i64()).unwrap_or(0);
+    if start_ms <= 0 {
+        start_ms = item
+            .get("startTs")
+            .or_else(|| item.get("startTimestamp"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+    }
+    if start_ms <= 0 {
+        return None;
+    }
+
+    // Convert seconds to milliseconds when needed.
+    if start_ms > 0 && start_ms < 10_000_000_000 {
+        start_ms *= 1000;
+    }
+
+    // Valid Unix time in ms.
+    if start_ms >= 1_700_000_000_000 {
+        return Some(start_ms);
+    }
+
+    // Older records may store uptime-ms; recover approximate Unix time.
+    let uptime_ms = unsafe { slint_bridge_get_uptime_seconds() }.saturating_mul(1000) as i64;
+    let now_ms = current_unix_ms().unwrap_or(0);
+    if now_ms >= 1_700_000_000_000 && uptime_ms > 0 && start_ms <= uptime_ms {
+        return Some(now_ms.saturating_sub(uptime_ms.saturating_sub(start_ms)));
+    }
+
+    None
+}
+
+fn load_history_items_sorted() -> Option<Vec<serde_json::Value>> {
+    let data = std::fs::read_to_string("/littlefs/history.json").ok()?;
+    let value = serde_json::from_str::<serde_json::Value>(data.trim()).ok()?;
+    let items = value.as_array()?;
+    let mut sorted: Vec<serde_json::Value> = items.clone();
+    sorted.sort_by(|a, b| {
+        let a_ts = normalize_history_start_ms(a).unwrap_or(0);
+        let b_ts = normalize_history_start_ms(b).unwrap_or(0);
+        b_ts.cmp(&a_ts)
+    });
+    Some(sorted)
+}
+
+fn history_start_label(item: &serde_json::Value, is_ua: bool) -> Option<String> {
+    let start_ms = normalize_history_start_ms(item)?;
+    let (y, m, d, hh, mm) = unix_seconds_to_ymdhm_utc(start_ms / 1000)?;
+    let dt = format!("{:04}-{:02}-{:02} {:02}:{:02}", y, m, d, hh, mm);
+    Some(if is_ua {
+        format!("\u{0421}\u{0442}\u{0430}\u{0440}\u{0442} {}", dt)
+    } else {
+        format!("Start {}", dt)
+    })
+}
+
+fn ui_clean_text(raw: &str, fallback: &str) -> String {
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn ui_clean_multiline(raw: &str, fallback: &str) -> String {
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| *c == '\n' || !c.is_control())
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn history_status_label(status: &str, _is_ua: bool) -> String {
     match status {
-        "COMPLETE" => if is_ua { "ГОТОВО".to_string() } else { "COMPLETE".to_string() },
-        "STOPPED" => if is_ua { "ЗУПИНЕНО".to_string() } else { "STOPPED".to_string() },
-        "ERROR" => if is_ua { "ПОМИЛКА".to_string() } else { "ERROR".to_string() },
-        "COOL" => if is_ua { "ОХОЛОДЖ.".to_string() } else { "COOL".to_string() },
+        "COMPLETE" => "COMPLETE".to_string(),
+        "STOPPED" => "STOPPED".to_string(),
+        "ERROR" => "ERROR".to_string(),
+        "COOL" => "COOL".to_string(),
         other if !other.is_empty() => other.to_string(),
-        _ => if is_ua { "НЕВІДОМО".to_string() } else { "UNKNOWN".to_string() },
+        _ => "UNKNOWN".to_string(),
     }
 }
 
@@ -606,7 +911,7 @@ fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
     let Ok(data) = std::fs::read_to_string("/littlefs/history.json") else {
         return vec![HistoryPreviewCard {
             id: "".into(),
-            title: (if is_ua { "Історія відпалів поки порожня." } else { "Firing history is empty." }).into(),
+            title: (if is_ua { "\u{0406}\u{0441}\u{0442}\u{043E}\u{0440}\u{0456}\u{044F} \u{0432}\u{0456}\u{0434}\u{043F}\u{0430}\u{043B}\u{0456}\u{0432} \u{043F}\u{043E}\u{043A}\u{0438} \u{043F}\u{043E}\u{0440}\u{043E}\u{0436}\u{043D}\u{044F}." } else { "Firing history is empty." }).into(),
             status: "".into(),
             status_code: "".into(),
             subtitle: "".into(),
@@ -616,22 +921,23 @@ fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
     if trimmed.is_empty() || trimmed == "[]" {
         return vec![HistoryPreviewCard {
             id: "".into(),
-            title: (if is_ua { "Історія відпалів поки порожня." } else { "Firing history is empty." }).into(),
+            title: (if is_ua { "\u{0406}\u{0441}\u{0442}\u{043E}\u{0440}\u{0456}\u{044F} \u{0432}\u{0456}\u{0434}\u{043F}\u{0430}\u{043B}\u{0456}\u{0432} \u{043F}\u{043E}\u{043A}\u{0438} \u{043F}\u{043E}\u{0440}\u{043E}\u{0436}\u{043D}\u{044F}." } else { "Firing history is empty." }).into(),
             status: "".into(),
             status_code: "".into(),
             subtitle: "".into(),
         }];
     }
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
-        if let Some(items) = value.as_array() {
+    if let Some(items) = load_history_items_sorted() {
+        if !items.is_empty() {
             let mut cards = Vec::new();
-            for item in items.iter().rev().take(3) {
+            for item in &items {
                 let name = item
                     .get("name")
                     .or_else(|| item.get("scheduleName"))
                     .or_else(|| item.get("program"))
                     .and_then(|v| v.as_str())
-                    .unwrap_or(if is_ua { "Без назви" } else { "Untitled" });
+                    .unwrap_or(if is_ua { "\u{0411}\u{0435}\u{0437} \u{043D}\u{0430}\u{0437}\u{0432}\u{0438}" } else { "Untitled" });
+                let name = sanitize_display_text(name);
                 let raw_status = item
                     .get("status")
                     .or_else(|| item.get("result"))
@@ -654,28 +960,23 @@ fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
                 let completed_steps = item.get("completedSteps").and_then(|v| v.as_i64()).unwrap_or(0);
 
                 let mut subtitle_parts = Vec::new();
+                if let Some(start_label) = history_start_label(item, is_ua) {
+                    subtitle_parts.push(start_label);
+                }
                 subtitle_parts.push(compact_duration_label(duration, is_ua));
                 if peak_temp > 0.0 {
-                    subtitle_parts.push(if is_ua {
-                        format!("пік {:.0}°C", peak_temp)
-                    } else {
-                        format!("peak {:.0}°C", peak_temp)
-                    });
+                    subtitle_parts.push(format!("Tmax {:.0}\u{00B0}C", peak_temp));
                 }
                 if total_steps > 0 {
-                    subtitle_parts.push(if is_ua {
-                        format!("кроки {}/{}", completed_steps.max(0), total_steps)
-                    } else {
-                        format!("steps {}/{}", completed_steps.max(0), total_steps)
-                    });
+                    subtitle_parts.push(format!("steps {}/{}", completed_steps.max(0), total_steps));
                 }
 
                 cards.push(HistoryPreviewCard {
                     id: id.into(),
-                    title: truncate_preview(name.to_string(), 48).into(),
+                    title: truncate_preview(name, 48).into(),
                     status: history_status_label(raw_status, is_ua).into(),
                     status_code: status_code.into(),
-                    subtitle: truncate_preview(subtitle_parts.join(" • "), 72).into(),
+                    subtitle: truncate_preview(subtitle_parts.join(" | "), 72).into(),
                 });
             }
             if !cards.is_empty() {
@@ -693,11 +994,8 @@ fn load_history_items(is_ua: bool) -> Vec<HistoryPreviewCard> {
 }
 
 fn load_history_item_id_by_preview_index(index: usize) -> Option<String> {
-    let data = std::fs::read_to_string("/littlefs/history.json").ok()?;
-    let value = serde_json::from_str::<serde_json::Value>(data.trim()).ok()?;
-    let items = value.as_array()?;
-    let rev_index = items.len().checked_sub(index + 1)?;
-    let item = items.get(rev_index)?;
+    let items = load_history_items_sorted()?;
+    let item = items.get(index)?;
     item.get("id")
         .or_else(|| item.get("runId"))
         .or_else(|| item.get("historyId"))
@@ -734,32 +1032,98 @@ fn history_summary_from_item(item: &serde_json::Value) -> HistorySummary {
     };
     HistorySummary {
         id: get_str(&["id", "runId", "historyId"]),
-        schedule_name: get_str(&["scheduleName", "name", "program", "title"]),
+        schedule_name: sanitize_display_text(&get_str(&["scheduleName", "name", "program", "title"])),
         duration: get_i64(&["duration"]),
         status,
         status_code,
         total_steps: get_i64(&["totalSteps", "stepsCount"]),
         completed_steps: get_i64(&["completedSteps"]),
-        start_time: get_str(&["startTime"]),
-        end_time: get_str(&["endTime"]),
-        start_ts: get_i64(&["startTs", "startTimestamp"]),
-        end_ts: get_i64(&["endTs", "endTimestamp"]),
+        start_time: sanitize_display_text(&get_str(&["startTime"])),
+        end_time: sanitize_display_text(&get_str(&["endTime"])),
+        start_ts: get_i64(&["startTs", "startTimestamp", "startTime"]),
+        end_ts: get_i64(&["endTs", "endTimestamp", "endTime"]),
         energy_kwh: get_f32(&["energyKwh", "energy_kwh"]),
         energy_wh: get_f32(&["energyWh", "energy_wh"]),
         cost: get_f32(&["cost"]),
         peak_power: get_f32(&["peakPower", "maxPower"]),
         peak_current: get_f32(&["peakCurrent", "maxCurrent"]),
         peak_temp: get_f32(&["peakTemp", "maxTemp"]),
-        fault_reason: get_str(&["faultReason", "error", "reason"]),
+        fault_reason: sanitize_display_text(&get_str(&["faultReason", "error", "reason"])),
+    }
+}
+
+fn history_start_label_from_summary(summary: &HistorySummary, is_ua: bool) -> Option<String> {
+    let mut ts = 0_i64;
+    if !summary.start_time.is_empty() {
+        let s = summary.start_time.trim();
+        if s.chars().all(|c| c.is_ascii_digit()) {
+            ts = s.parse::<i64>().unwrap_or(0);
+        } else {
+            return Some(summary.start_time.clone());
+        }
+    }
+    if ts <= 0 {
+        ts = summary.start_ts;
+    }
+    if ts <= 0 {
+        return None;
+    }
+    if ts < 10_000_000_000 {
+        ts *= 1000;
+    }
+    if ts < 1_700_000_000_000 {
+        let uptime_ms = unsafe { slint_bridge_get_uptime_seconds() }.saturating_mul(1000) as i64;
+        let now_ms = current_unix_ms().unwrap_or(0);
+        if now_ms >= 1_700_000_000_000 && uptime_ms > 0 && ts <= uptime_ms {
+            ts = now_ms.saturating_sub(uptime_ms.saturating_sub(ts));
+        }
+    }
+    let (y, m, d, hh, mm) = unix_seconds_to_ymdhm_utc(ts / 1000)?;
+    let dt = format!("{:04}-{:02}-{:02} {:02}:{:02}", y, m, d, hh, mm);
+    Some(if is_ua { dt } else { dt })
+}
+
+fn history_end_label_from_summary(summary: &HistorySummary, _is_ua: bool) -> Option<String> {
+    let mut ts = 0_i64;
+    if !summary.end_time.is_empty() {
+        let s = summary.end_time.trim();
+        if s.chars().all(|c| c.is_ascii_digit()) {
+            ts = s.parse::<i64>().unwrap_or(0);
+        } else {
+            return Some(summary.end_time.clone());
+        }
+    }
+    if ts <= 0 {
+        ts = summary.end_ts;
+    }
+    if ts <= 0 {
+        return None;
+    }
+    if ts < 10_000_000_000 {
+        ts *= 1000;
+    }
+    if ts < 1_700_000_000_000 {
+        let uptime_ms = unsafe { slint_bridge_get_uptime_seconds() }.saturating_mul(1000) as i64;
+        let now_ms = current_unix_ms().unwrap_or(0);
+        if now_ms >= 1_700_000_000_000 && uptime_ms > 0 && ts <= uptime_ms {
+            ts = now_ms.saturating_sub(uptime_ms.saturating_sub(ts));
+        }
+    }
+    let (y, m, d, hh, mm) = unix_seconds_to_ymdhm_utc(ts / 1000)?;
+    Some(format!("{:04}-{:02}-{:02} {:02}:{:02}", y, m, d, hh, mm))
+}
+
+fn duration_seconds_to_minutes(seconds: i64) -> i32 {
+    if seconds <= 0 {
+        0
+    } else {
+        ((seconds as f32) / 60.0).ceil() as i32
     }
 }
 
 fn load_history_summary_by_preview_index(index: usize) -> Option<HistorySummary> {
-    let data = std::fs::read_to_string("/littlefs/history.json").ok()?;
-    let value = serde_json::from_str::<serde_json::Value>(data.trim()).ok()?;
-    let items = value.as_array()?;
-    let rev_index = items.len().checked_sub(index + 1)?;
-    let item = items.get(rev_index)?;
+    let items = load_history_items_sorted()?;
+    let item = items.get(index)?;
     Some(history_summary_from_item(item))
 }
 
@@ -776,24 +1140,24 @@ fn history_status_verbose(summary: &HistorySummary, is_ua: bool) -> String {
         summary.status.to_ascii_uppercase()
     };
     if code.contains("COMPLETE") || code == "OK" {
-        if is_ua { "Успішно".to_string() } else { "Completed".to_string() }
+        if is_ua { "\u{0423}\u{0441}\u{043F}\u{0456}\u{0448}\u{043D}\u{043E}".to_string() } else { "Completed".to_string() }
     } else if code.contains("STOP") {
-        if is_ua { "Перервано користувачем".to_string() } else { "Stopped by user".to_string() }
+        if is_ua { "\u{041F}\u{0435}\u{0440}\u{0435}\u{0440}\u{0432}\u{0430}\u{043D}\u{043E} \u{043A}\u{043E}\u{0440}\u{0438}\u{0441}\u{0442}\u{0443}\u{0432}\u{0430}\u{0447}\u{0435}\u{043C}".to_string() } else { "Stopped by user".to_string() }
     } else if code.contains("ERROR") || code.contains("FAULT") {
         let reason = if !summary.fault_reason.is_empty() {
             translate_fault_reason(&summary.fault_reason, is_ua)
         } else if is_ua {
-            "невідома причина".to_string()
+            "\u{043D}\u{0435}\u{0432}\u{0456}\u{0434}\u{043E}\u{043C}\u{0430} \u{043F}\u{0440}\u{0438}\u{0447}\u{0438}\u{043D}\u{0430}".to_string()
         } else {
             "unknown reason".to_string()
         };
         if is_ua {
-            format!("Помилка ({})", reason)
+            format!("\u{041F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430} ({})", reason)
         } else {
             format!("Error ({})", reason)
         }
     } else if summary.status.is_empty() {
-        if is_ua { "Невідомо".to_string() } else { "Unknown".to_string() }
+        if is_ua { "\u{041D}\u{0435}\u{0432}\u{0456}\u{0434}\u{043E}\u{043C}\u{043E}".to_string() } else { "Unknown".to_string() }
     } else {
         summary.status.clone()
     }
@@ -834,11 +1198,11 @@ fn compute_voltage_stability(detail: &HistoryDetail, is_ua: bool) -> String {
         }
     }
     if max_v <= 0.0 || min_v == f32::MAX {
-        return if is_ua { "Н/Д".to_string() } else { "N/A".to_string() };
+        return if is_ua { "\u{041D}/\u{0414}".to_string() } else { "N/A".to_string() };
     }
     let span = (max_v - min_v).max(0.0);
     if is_ua {
-        format!("{:.0}-{:.0} В (±{:.1}В)", min_v, max_v, span * 0.5)
+        format!("{:.0}-{:.0} \u{0412} (\u{00B1}{:.1}\u{0412})", min_v, max_v, span * 0.5)
     } else {
         format!("{:.0}-{:.0} V (+/-{:.1}V)", min_v, max_v, span * 0.5)
     }
@@ -846,7 +1210,7 @@ fn compute_voltage_stability(detail: &HistoryDetail, is_ua: bool) -> String {
 
 fn build_step_plan_actual_text(detail: &HistoryDetail, is_ua: bool) -> String {
     if detail.data.len() < 2 {
-        return if is_ua { "Н/Д".to_string() } else { "N/A".to_string() };
+        return if is_ua { "\u{041D}/\u{0414}".to_string() } else { "N/A".to_string() };
     }
     let ts_div = detect_timestamp_seconds_divisor(&detail.data) as f64;
     let mut boundaries: Vec<usize> = vec![0];
@@ -867,13 +1231,13 @@ fn build_step_plan_actual_text(detail: &HistoryDetail, is_ua: bool) -> String {
         let plan_lbl = format_minutes_label(dt_min.max(0), is_ua);
         let act_lbl = format_minutes_label(dt_min.max(0), is_ua);
         out.push(if is_ua {
-            format!("Крок {}: ціль {}°, план {}, факт {}", step_idx + 1, target, plan_lbl, act_lbl)
+            format!("\u{041A}\u{0440}\u{043E}\u{043A} {}: \u{0446}\u{0456}\u{043B}\u{044C} {}\u{00B0}, \u{043F}\u{043B}\u{0430}\u{043D} {}, \u{0444}\u{0430}\u{043A}\u{0442} {}", step_idx + 1, target, plan_lbl, act_lbl)
         } else {
-            format!("Step {}: target {}°, plan {}, actual {}", step_idx + 1, target, plan_lbl, act_lbl)
+            format!("Step {}: target {}\u{00B0}, plan {}, actual {}", step_idx + 1, target, plan_lbl, act_lbl)
         });
     }
     if out.is_empty() {
-        if is_ua { "Н/Д".to_string() } else { "N/A".to_string() }
+        if is_ua { "\u{041D}/\u{0414}".to_string() } else { "N/A".to_string() }
     } else {
         out.join("\n")
     }
@@ -881,33 +1245,33 @@ fn build_step_plan_actual_text(detail: &HistoryDetail, is_ua: bool) -> String {
 
 fn build_change_diff_text(detail: &HistoryDetail, is_ua: bool) -> String {
     if detail.changes.is_empty() {
-        return if is_ua { "Н/Д".to_string() } else { "N/A".to_string() };
+        return if is_ua { "\u{041D}/\u{0414}".to_string() } else { "N/A".to_string() };
     }
     let mut lines = Vec::new();
     for (idx, ch) in detail.changes.iter().enumerate() {
         if idx >= 14 {
             lines.push(if is_ua {
-                format!("... ще {} змін", detail.changes.len() - idx)
+                format!("... \u{0449}\u{0435} {} \u{0437}\u{043C}\u{0456}\u{043D}", detail.changes.len() - idx)
             } else {
                 format!("... {} more changes", detail.changes.len() - idx)
             });
             break;
         }
         let action = match ch.action.as_str() {
-            "add_temp" => if is_ua { "Додано температуру" } else { "Added temperature" },
-            "add_time" => if is_ua { "Додано час витримки" } else { "Added hold time" },
-            "set_rate" => if is_ua { "Змінено швидкість" } else { "Changed rate" },
-            "skip_step" => if is_ua { "Пропуск кроку" } else { "Skipped step" },
-            _ => if is_ua { "Зміна" } else { "Change" },
+            "add_temp" => if is_ua { "\u{0414}\u{043E}\u{0434}\u{0430}\u{043D}\u{043E} \u{0442}\u{0435}\u{043C}\u{043F}\u{0435}\u{0440}\u{0430}\u{0442}\u{0443}\u{0440}\u{0443}" } else { "Added temperature" },
+            "add_time" => if is_ua { "\u{0414}\u{043E}\u{0434}\u{0430}\u{043D}\u{043E} \u{0447}\u{0430}\u{0441} \u{0432}\u{0438}\u{0442}\u{0440}\u{0438}\u{043C}\u{043A}\u{0438}" } else { "Added hold time" },
+            "set_rate" => if is_ua { "\u{0417}\u{043C}\u{0456}\u{043D}\u{0435}\u{043D}\u{043E} \u{0448}\u{0432}\u{0438}\u{0434}\u{043A}\u{0456}\u{0441}\u{0442}\u{044C}" } else { "Changed rate" },
+            "skip_step" => if is_ua { "\u{041F}\u{0440}\u{043E}\u{043F}\u{0443}\u{0441}\u{043A} \u{043A}\u{0440}\u{043E}\u{043A}\u{0443}" } else { "Skipped step" },
+            _ => if is_ua { "\u{0417}\u{043C}\u{0456}\u{043D}\u{0430}" } else { "Change" },
         };
         let field = if ch.field.is_empty() {
-            if is_ua { "параметр" } else { "field" }
+            if is_ua { "\u{043F}\u{0430}\u{0440}\u{0430}\u{043C}\u{0435}\u{0442}\u{0440}" } else { "field" }
         } else {
             ch.field.as_str()
         };
         lines.push(if is_ua {
             format!(
-                "#{} [{}] крок {}: {}: {:.1} -> {:.1} (Δ{:+.1})",
+                "#{} [{}] \u{043A}\u{0440}\u{043E}\u{043A} {}: {}: {:.1} -> {:.1} (\u{0394}{:+.1})",
                 idx + 1,
                 uptime_label(ch.ts_ms.max(0) as u64),
                 ch.step.max(0),
@@ -918,7 +1282,7 @@ fn build_change_diff_text(detail: &HistoryDetail, is_ua: bool) -> String {
             )
         } else {
             format!(
-                "#{} [{}] step {}: {}: {:.1} -> {:.1} (Δ{:+.1})",
+                "#{} [{}] step {}: {}: {:.1} -> {:.1} (\u{041E}\"{:+.1})",
                 idx + 1,
                 uptime_label(ch.ts_ms.max(0) as u64),
                 ch.step.max(0),
@@ -939,17 +1303,17 @@ fn build_change_diff_text(detail: &HistoryDetail, is_ua: bool) -> String {
 fn build_step_and_change_text(detail: &HistoryDetail, is_ua: bool) -> String {
     let base = build_step_plan_actual_text(detail, is_ua);
     let changes = build_change_diff_text(detail, is_ua);
-    if changes == "N/A" || changes == "Н/Д" {
+    if changes == "N/A" || changes == "\u{041D}/\u{0414}" {
         return base;
     }
-    if base == "N/A" || base == "Н/Д" {
+    if base == "N/A" || base == "\u{041D}/\u{0414}" {
         if is_ua {
-            return format!("Зміни під час випалу:\n{}", changes);
+            return format!("\u{0417}\u{043C}\u{0456}\u{043D}\u{0438} \u{043F}\u{0456}\u{0434} \u{0447}\u{0430}\u{0441} \u{0432}\u{0438}\u{043F}\u{0430}\u{043B}\u{0443}:\n{}", changes);
         }
         return format!("Changes during firing:\n{}", changes);
     }
     if is_ua {
-        format!("{}\n\nЗміни під час випалу:\n{}", base, changes)
+        format!("{}\n\n\u{0417}\u{043C}\u{0456}\u{043D}\u{0438} \u{043F}\u{0456}\u{0434} \u{0447}\u{0430}\u{0441} \u{0432}\u{0438}\u{043F}\u{0430}\u{043B}\u{0443}:\n{}", base, changes)
     } else {
         format!("{}\n\nChanges during firing:\n{}", base, changes)
     }
@@ -959,7 +1323,7 @@ fn fault_status_label(ok: bool, is_ua: bool) -> String {
     if ok {
         "OK".to_string()
     } else if is_ua {
-        "ЗБІЙ".to_string()
+        "\u{0417}\u{0411}\u{0406}\u{0419}".to_string()
     } else {
         "FAULT".to_string()
     }
@@ -1013,7 +1377,7 @@ fn fault_title_from_fields(code: &str, message: &str, action: &str, is_ua: bool)
     let trimmed = candidate.trim();
     if trimmed.is_empty() {
         if is_ua {
-            "Невідома помилка".to_string()
+            "\u{041D}\u{0435}\u{0432}\u{0456}\u{0434}\u{043E}\u{043C}\u{0430} \u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430}".to_string()
         } else {
             "Unknown fault".to_string()
         }
@@ -1027,19 +1391,33 @@ fn format_uptime_label(seconds: u64, is_ua: bool) -> String {
     let hours = (seconds % 86_400) / 3_600;
     let mins = (seconds % 3_600) / 60;
     if is_ua {
-        format!("{}д {}г {}хв", days, hours, mins)
+        format!("{}\u{0434} {}\u{0433} {}\u{0445}\u{0432}", days, hours, mins)
     } else {
         format!("{}d {}h {}m", days, hours, mins)
     }
 }
 
-fn format_heap_label(bytes: u32, is_ua: bool) -> String {
-    let kb = bytes as f32 / 1024.0;
-    if is_ua {
-        format!("{:.0} КБ вільно", kb)
+fn format_bytes_short(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let b = bytes as f64;
+    if b >= GB {
+        format!("{:.2} GB", b / GB)
+    } else if b >= MB {
+        format!("{:.1} MB", b / MB)
+    } else if b >= KB {
+        format!("{:.0} KB", b / KB)
     } else {
-        format!("{:.0} KB free", kb)
+        format!("{} B", bytes)
     }
+}
+
+fn format_used_total_label(used: u64, total: u64) -> String {
+    if total == 0 {
+        return "N/A".to_string();
+    }
+    format!("{} / {}", format_bytes_short(used), format_bytes_short(total))
 }
 
 fn parse_history_total_heating_minutes() -> i64 {
@@ -1061,21 +1439,10 @@ fn parse_history_total_heating_minutes() -> i64 {
     })
 }
 
-fn format_storage_label(schedule_count: usize, schedules_bytes: u64, is_ua: bool) -> String {
+fn format_storage_label(schedule_count: usize, schedules_bytes: u64, _is_ua: bool) -> String {
     const LITTLEFS_TOTAL_BYTES: u64 = 0x350000;
-    let used_est = schedules_bytes.max(4096);
-    let avg_per_program = if schedule_count > 0 {
-        (used_est / schedule_count as u64).max(4096)
-    } else {
-        8192
-    };
-    let free_bytes = LITTLEFS_TOTAL_BYTES.saturating_sub(used_est);
-    let free_programs = (free_bytes / avg_per_program) as i64;
-    if is_ua {
-        format!("{} програм • ще ~{}", schedule_count, free_programs.max(0))
-    } else {
-        format!("{} programs • ~{} more", schedule_count, free_programs.max(0))
-    }
+    let used = schedules_bytes.min(LITTLEFS_TOTAL_BYTES);
+    format!("{} ({})", format_used_total_label(used, LITTLEFS_TOTAL_BYTES), schedule_count)
 }
 
 fn update_controller_info_ui(ui: &AppWindow, state: &SlintKilnState, is_ua: bool) {
@@ -1091,7 +1458,12 @@ fn update_controller_info_ui(ui: &AppWindow, state: &SlintKilnState, is_ua: bool
     } else {
         String::from("--")
     };
-    let heap = unsafe { slint_bridge_get_free_heap_bytes() };
+    let heap_free = unsafe { slint_bridge_get_free_heap_bytes() } as u64;
+    let heap_total = unsafe { slint_bridge_get_total_heap_bytes() } as u64;
+    let heap_used = heap_total.saturating_sub(heap_free);
+    let ram_free = unsafe { slint_bridge_get_free_psram_bytes() } as u64;
+    let ram_total = unsafe { slint_bridge_get_total_psram_bytes() } as u64;
+    let ram_used = ram_total.saturating_sub(ram_free);
     let uptime_s = unsafe { slint_bridge_get_uptime_seconds() };
 
     let schedules = load_schedules();
@@ -1100,26 +1472,34 @@ fn update_controller_info_ui(ui: &AppWindow, state: &SlintKilnState, is_ua: bool
 
     let total_heating_minutes = parse_history_total_heating_minutes().max(0);
     let heating_label = if is_ua {
-        format!("{:.1} год", total_heating_minutes as f32 / 60.0)
+                    format!("{:.1} \u{0433}\u{043E}\u{0434}", total_heating_minutes as f32 / 60.0)
     } else {
         format!("{:.1} h", total_heating_minutes as f32 / 60.0)
     };
 
-    let chip_temp = if is_ua { "Н/Д" } else { "N/A" };
+    let mut chip_temp_c: f32 = 0.0;
+    let chip_temp = if unsafe { slint_bridge_get_chip_temp_c(&mut chip_temp_c as *mut f32) } {
+        format!("{:.1} \u{00B0}C", chip_temp_c)
+    } else if is_ua {
+        "\u{041D}/\u{0414}".to_string()
+    } else {
+        "N/A".to_string()
+    };
     let pzem = if state.pzem_ok {
         if is_ua {
-            format!("OK • {:.0} В", state.pzem_voltage.max(0.0))
+            format!("OK | {:.0} \u{0412}", state.pzem_voltage.max(0.0))
         } else {
-            format!("OK • {:.0} V", state.pzem_voltage.max(0.0))
+            format!("OK | {:.0} V", state.pzem_voltage.max(0.0))
         }
     } else if is_ua {
-        "Немає зв'язку".to_string()
+        "\u{041D}\u{0435}\u{043C}\u{0430}\u{0454} \u{0437}\u{0432}'\u{044F}\u{0437}\u{043A}\u{0443}".to_string()
     } else {
         "No link".to_string()
     };
 
     ui.set_controller_info_fw(fw.into());
-    ui.set_controller_info_heap(format_heap_label(heap, is_ua).into());
+    ui.set_controller_info_heap(format_used_total_label(heap_used, heap_total).into());
+    ui.set_controller_info_ram(format_used_total_label(ram_used, ram_total).into());
     ui.set_controller_info_storage(storage.into());
     ui.set_controller_info_device_id(device_id.into());
     ui.set_controller_info_uptime(format_uptime_label(uptime_s, is_ua).into());
@@ -1129,97 +1509,157 @@ fn update_controller_info_ui(ui: &AppWindow, state: &SlintKilnState, is_ua: bool
 }
 
 fn load_fault_log_items(is_ua: bool) -> Vec<FaultLogPreviewCard> {
-    let mut combined = String::new();
+    let mut entries: Vec<(u64, FaultLogPreviewCard)> = Vec::new();
+    let label_action = if is_ua { "\u{0414}\u{0456}\u{044F}" } else { "Action" };
+    let label_source = if is_ua { "\u{0414}\u{0436}\u{0435}\u{0440}\u{0435}\u{043B}\u{043E}" } else { "Source" };
+    let label_code = if is_ua { "\u{041A}\u{043E}\u{0434}" } else { "Code" };
+    let label_message = if is_ua { "\u{041F}\u{043E}\u{0432}\u{0456}\u{0434}\u{043E}\u{043C}\u{043B}\u{0435}\u{043D}\u{043D}\u{044F}" } else { "Message" };
+    let label_timestamp = if is_ua { "\u{0427}\u{0430}\u{0441}" } else { "Timestamp" };
+    let label_event = if is_ua { "\u{041F}\u{043E}\u{0434}\u{0456}\u{044F}" } else { "Event" };
+
     for path in ["/littlefs/logs/audit.log", "/littlefs/logs/audit.log.1"] {
-        if let Ok(data) = std::fs::read_to_string(path) {
-            if !data.trim().is_empty() {
-                if !combined.is_empty() {
-                    combined.push('\n');
+        let Ok(data) = std::fs::read_to_string(path) else { continue };
+        for line in data.lines().filter(|line| !line.trim().is_empty()) {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
+                let ok = value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
+                let action = value.get("action").and_then(|v| v.as_str()).unwrap_or("");
+                let source = value.get("source").and_then(|v| v.as_str()).unwrap_or("");
+                let code = value.get("code").and_then(|v| v.as_str()).unwrap_or("");
+                let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("");
+                let ts_ms = value.get("ts_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+                let kind = value.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+
+                let fault_like = !ok
+                    || action.contains("fault")
+                    || code.contains("fault")
+                    || code.contains("sensor")
+                    || message.contains("fault")
+                    || message.contains("Sensor")
+                    || message.contains("sensor")
+                    || kind == "autotune";
+                if !fault_like {
+                    continue;
                 }
-                combined.push_str(&data);
+
+                let title = fault_title_from_fields(code, message, action, is_ua);
+                let mut subtitle_parts = Vec::new();
+                let mut detail_parts = Vec::new();
+                if !action.is_empty() {
+                    let translated = translate_command_message(action, is_ua);
+                    subtitle_parts.push(translated.clone());
+                    detail_parts.push(format!("{}: {}", label_action, translated));
+                }
+                if !source.is_empty() {
+                    let src = source.to_uppercase();
+                    subtitle_parts.push(src.clone());
+                    detail_parts.push(format!("{}: {}", label_source, src));
+                }
+                if !code.is_empty() && code != "ok" {
+                    let translated = translate_command_message(code, is_ua);
+                    subtitle_parts.push(translated.clone());
+                    detail_parts.push(format!("{}: {}", label_code, translated));
+                }
+                if !message.is_empty() && message != "ok" && message != "settings_changed" {
+                    let translated = translate_fault_reason(message, is_ua);
+                    subtitle_parts.push(translated.clone());
+                    detail_parts.push(format!("{}: {}", label_message, translated));
+                }
+                if ts_ms > 0 {
+                    let ts = uptime_label(ts_ms);
+                    subtitle_parts.push(ts.clone());
+                    detail_parts.push(format!("{}: {}", label_timestamp, ts));
+                }
+
+                entries.push((
+                    ts_ms,
+                    FaultLogPreviewCard {
+                        title: truncate_preview(title, 44).into(),
+                        status: fault_status_label(ok, is_ua).into(),
+                        subtitle: truncate_preview(subtitle_parts.join(" | "), 76).into(),
+                        details: detail_parts.join("\n").into(),
+                    },
+                ));
+            } else {
+                entries.push((
+                    0,
+                    FaultLogPreviewCard {
+                        title: truncate_preview(line.trim().to_string(), 44).into(),
+                        status: if is_ua { "\u{0417}\u{0411}\u{0406}\u{0419}".into() } else { "FAULT".into() },
+                        subtitle: "".into(),
+                        details: line.trim().to_string().into(),
+                    },
+                ));
             }
         }
     }
-    if combined.trim().is_empty() {
-        return vec![FaultLogPreviewCard {
-            title: (if is_ua { "Логи помилок поки порожні." } else { "Fault logs are empty." }).into(),
-            status: "".into(),
-            subtitle: "".into(),
-        }];
-    }
-    let mut cards = Vec::new();
-    for line in combined.lines().rev().filter(|line| !line.trim().is_empty()) {
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
-            let ok = value.get("ok").and_then(|v| v.as_bool()).unwrap_or(false);
-            let action = value.get("action").and_then(|v| v.as_str()).unwrap_or("");
-            let source = value.get("source").and_then(|v| v.as_str()).unwrap_or("");
-            let code = value.get("code").and_then(|v| v.as_str()).unwrap_or("");
-            let message = value.get("message").and_then(|v| v.as_str()).unwrap_or("");
-            let ts_ms = value.get("ts_ms").and_then(|v| v.as_u64()).unwrap_or(0);
-            let kind = value.get("kind").and_then(|v| v.as_str()).unwrap_or("");
 
-            let fault_like = !ok
-                || action.contains("fault")
-                || code.contains("fault")
-                || code.contains("sensor")
-                || message.contains("fault")
-                || message.contains("Sensor")
-                || message.contains("sensor")
-                || kind == "autotune";
+    for path in ["/littlefs/logs/events.log", "/littlefs/logs/events.log.1"] {
+        let Ok(data) = std::fs::read_to_string(path) else { continue };
+        for line in data.lines().filter(|line| !line.trim().is_empty()) {
+            let mut parts = line.trim().splitn(3, ' ');
+            let ts_ms = parts.next().and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+            let event_type = parts.next().unwrap_or("").trim();
+            let message = parts.next().unwrap_or("").trim();
+            if event_type.is_empty() {
+                continue;
+            }
+
+            let event_type_upper = event_type.to_ascii_uppercase();
+            let message_lower = message.to_ascii_lowercase();
+            let fault_like = event_type_upper == "FAULT"
+                || event_type_upper == "FAULT_CLEAR"
+                || event_type_upper == "RECOVERY_RESUME"
+                || event_type_upper == "RECOVERY_ABORT"
+                || event_type_upper.contains("FAULT")
+                || message_lower.contains("fault")
+                || message_lower.contains("sensor");
             if !fault_like {
                 continue;
             }
 
-            let title = fault_title_from_fields(code, message, action, is_ua);
-
+            let ok = event_type_upper == "FAULT_CLEAR" || event_type_upper == "RECOVERY_RESUME";
+            let title = fault_title_from_fields(event_type, message, event_type, is_ua);
             let mut subtitle_parts = Vec::new();
-            if !action.is_empty() {
-                subtitle_parts.push(translate_command_message(action, is_ua));
-            }
-            if !source.is_empty() {
-                subtitle_parts.push(source.to_uppercase());
-            }
-            if !code.is_empty() && code != "ok" {
-                subtitle_parts.push(translate_command_message(code, is_ua));
-            }
-            if !message.is_empty() && message != "ok" && message != "settings_changed" {
-                subtitle_parts.push(translate_fault_reason(message, is_ua));
+            let mut detail_parts = Vec::new();
+            subtitle_parts.push(event_type_upper.clone());
+            detail_parts.push(format!("{}: {}", label_event, event_type_upper));
+            if !message.is_empty() {
+                let translated = translate_fault_reason(message, is_ua);
+                subtitle_parts.push(translated.clone());
+                detail_parts.push(format!("{}: {}", label_message, translated));
             }
             if ts_ms > 0 {
-                subtitle_parts.push(uptime_label(ts_ms));
+                let ts = uptime_label(ts_ms);
+                subtitle_parts.push(ts.clone());
+                detail_parts.push(format!("{}: {}", label_timestamp, ts));
             }
 
-            cards.push(FaultLogPreviewCard {
-                title: truncate_preview(title, 44).into(),
-                status: fault_status_label(ok, is_ua).into(),
-                subtitle: truncate_preview(subtitle_parts.join(" • "), 76).into(),
-            });
-            if cards.len() >= 3 {
-                break;
-            }
-        } else {
-            cards.push(FaultLogPreviewCard {
-                title: truncate_preview(line.trim().to_string(), 44).into(),
-                status: if is_ua { "ЗБІЙ".into() } else { "FAULT".into() },
-                subtitle: "".into(),
-            });
-            if cards.len() >= 3 {
-                break;
-            }
+            entries.push((
+                ts_ms,
+                FaultLogPreviewCard {
+                    title: truncate_preview(title, 44).into(),
+                    status: fault_status_label(ok, is_ua).into(),
+                    subtitle: truncate_preview(subtitle_parts.join(" | "), 76).into(),
+                    details: detail_parts.join("\n").into(),
+                },
+            ));
         }
     }
 
+    entries.sort_by(|a, b| b.0.cmp(&a.0));
+    let cards: Vec<FaultLogPreviewCard> = entries.into_iter().map(|(_, card)| card).collect();
+
     if cards.is_empty() {
         vec![FaultLogPreviewCard {
-            title: (if is_ua { "Логи помилок поки порожні." } else { "Fault logs are empty." }).into(),
+            title: (if is_ua { "\u{041B}\u{043E}\u{0433}\u{0438} \u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043E}\u{043A} \u{043F}\u{043E}\u{043A}\u{0438} \u{043F}\u{043E}\u{0440}\u{043E}\u{0436}\u{043D}\u{0456}." } else { "Fault logs are empty." }).into(),
             status: "".into(),
             subtitle: "".into(),
+            details: "".into(),
         }]
     } else {
         cards
     }
 }
-
 fn schedule_to_row(schedule: &ScheduleFile, selected: bool) -> ScheduleRow {
     let steps_count = schedule.steps_count.unwrap_or(schedule.steps.len() as i32);
     ScheduleRow {
@@ -1302,6 +1742,73 @@ fn running_segment_target(schedule: &ScheduleFile, step_index: i32, fallback: i3
     schedule_effective_target_for_step(&schedule.steps, step_index as usize, fallback)
 }
 
+fn is_hold_step(step: &ScheduleStepFile) -> bool {
+    step.step_type.eq_ignore_ascii_case("hold")
+}
+
+fn estimate_remaining_minutes(
+    schedule: &ScheduleFile,
+    current_step: i32,
+    current_temp_c: f32,
+    time_remaining_min: i32,
+) -> (i32, i32) {
+    if schedule.steps.is_empty() || current_step < 0 {
+        return (-1, -1);
+    }
+    let idx = (current_step as usize).min(schedule.steps.len().saturating_sub(1));
+
+    let future_holds_sum: i32 = schedule
+        .steps
+        .iter()
+        .skip(idx + 1)
+        .filter(|s| is_hold_step(s))
+        .map(|s| s.hold_time.unwrap_or(0).max(0))
+        .sum();
+
+    let mut step_remaining = -1_i32;
+    let mut total_remaining = 0.0_f32;
+    let mut sim_temp = if current_temp_c.is_finite() { current_temp_c } else { 0.0 };
+
+    for (i, step) in schedule.steps.iter().enumerate().skip(idx) {
+        if is_hold_step(step) {
+            let hold_full = step.hold_time.unwrap_or(0).max(0);
+            let hold_rem = if i == idx && time_remaining_min >= 0 {
+                (time_remaining_min - future_holds_sum).clamp(0, hold_full)
+            } else {
+                hold_full
+            };
+            if i == idx {
+                step_remaining = hold_rem;
+            }
+            total_remaining += hold_rem as f32;
+            continue;
+        }
+
+        let target_c = step
+            .target
+            .unwrap_or_else(|| sim_temp.round() as i32) as f32;
+        // Program step rate is stored/displayed as degC/hour.
+        let rate_c_per_hour = step.rate.unwrap_or(0).max(0) as f32;
+        let safe_rate_h = if rate_c_per_hour.is_finite() && rate_c_per_hour > 0.01 {
+            rate_c_per_hour
+        } else {
+            9999.0
+        };
+
+        let from_temp = if i == idx { sim_temp } else { sim_temp };
+        let ramp_rem = (((target_c - from_temp).abs() * 60.0) / safe_rate_h).ceil().max(0.0) as i32;
+        let step_rem = ramp_rem;
+
+        if i == idx {
+            step_remaining = step_rem;
+        }
+        total_remaining += step_rem as f32;
+        sim_temp = target_c;
+    }
+
+    (step_remaining.max(0), total_remaining.ceil().max(0.0) as i32)
+}
+
 fn apply_runtime_step_delta(old_steps: &[ScheduleStepFile], new_steps: &[ScheduleStepFile], step_index: usize) {
     if old_steps.is_empty() || new_steps.is_empty() || step_index >= old_steps.len() || step_index >= new_steps.len() {
         return;
@@ -1350,7 +1857,8 @@ fn make_safe_id(name: &str) -> String {
 }
 
 fn normalize_schedule_name(input: &str) -> String {
-    let trimmed = input.trim();
+    let repaired = repair_mojibake_ua(input);
+    let trimmed = repaired.trim();
     if trimmed.is_empty() {
         return String::new();
     }
@@ -1370,6 +1878,77 @@ fn normalize_schedule_name(input: &str) -> String {
     out.trim_matches('_').to_string()
 }
 
+fn repair_mojibake_ua(input: &str) -> String {
+    let s = input.trim();
+    if s.is_empty() {
+        return String::new();
+    }
+
+    let suspicious = [
+        '\u{0402}', '\u{0403}', '\u{0409}', '\u{040A}', '\u{040B}', '\u{040C}', '\u{040F}',
+        '\u{0452}', '\u{0453}', '\u{0459}', '\u{045A}', '\u{045B}', '\u{045C}', '\u{045F}',
+        '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}', '\u{2020}', '\u{2030}',
+    ];
+
+    let has_latin_mojibake = s.contains('\u{00D0}') || s.contains('\u{00D1}') || s.contains('\u{00C3}') || s.contains('\u{00C2}') || s.contains('\u{FFFD}');
+    let has_legacy_markers = s.contains("\u{0413}\u{0452}") || s.contains("\u{0413}\u{2018}");
+    if !s.chars().any(|c| suspicious.contains(&c)) && !has_legacy_markers && !has_latin_mojibake {
+        return s.to_string();
+    }
+
+    if has_latin_mojibake {
+        let mut bytes = Vec::with_capacity(s.len());
+        for ch in s.chars() {
+            let cp = ch as u32;
+            if cp > 0xFF {
+                bytes.clear();
+                break;
+            }
+            bytes.push(cp as u8);
+        }
+        if !bytes.is_empty() {
+            if let Ok(decoded) = std::str::from_utf8(&bytes) {
+                let decoded = decoded.trim();
+                if !decoded.is_empty() {
+                    let marker_count = decoded
+                        .chars()
+                        .filter(|c| *c == '\u{00D0}' || *c == '\u{00D1}' || *c == '\u{00C3}' || *c == '\u{00C2}' || *c == '\u{FFFD}')
+                        .count();
+                    let decoded_cyr = decoded.chars().filter(|c| ('\u{0400}'..='\u{04FF}').contains(c)).count();
+                    if marker_count == 0 && decoded_cyr > 0 {
+                        return decoded.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    let (bytes, _, had_errors) = WINDOWS_1251.encode(s);
+    if had_errors {
+        return s.to_string();
+    }
+    let Ok(decoded) = std::str::from_utf8(bytes.as_ref()) else {
+        return s.to_string();
+    };
+    let decoded = decoded.trim();
+    if decoded.is_empty() {
+        return s.to_string();
+    }
+
+    let decoded_cyr = decoded.chars().filter(|c| ('\u{0400}'..='\u{04FF}').contains(c)).count();
+    let source_cyr = s.chars().filter(|c| ('\u{0400}'..='\u{04FF}').contains(c)).count();
+
+    if decoded_cyr >= source_cyr / 2 {
+        decoded.to_string()
+    } else {
+        s.to_string()
+    }
+}
+
+fn sanitize_display_text(input: &str) -> String {
+    let repaired = repair_mojibake_ua(input);
+    repaired.replace('\u{FFFD}', "").trim().to_string()
+}
 fn make_unique_schedule_name(schedules: &[ScheduleFile], base_name: &str) -> String {
     let base = normalize_schedule_name(base_name);
     let mut max_index: u32 = 0;
@@ -1414,13 +1993,14 @@ fn parse_wifi_scan_rows(json: &str) -> Vec<WifiNetworkRow> {
         .collect()
 }
 
-const CONTROLLER_AP_SSID: &str = "TRAE_KILN_SETUP";
+const CONTROLLER_AP_SSID_FALLBACK: &str = "TRAE_KILN_SETUP";
+const CONTROLLER_AP_PORTAL_URL: &str = "http://192.168.4.1";
 
-fn wifi_qr_payload(wifi_ok: bool, server_url: &str) -> String {
+fn wifi_qr_payload(wifi_ok: bool, server_url: &str, ap_ssid: &str) -> String {
     if wifi_ok {
         server_url.to_string()
     } else {
-        format!("WIFI:T:nopass;S:{};;", CONTROLLER_AP_SSID)
+        format!("WIFI:T:nopass;S:{};;", ap_ssid)
     }
 }
 
@@ -1471,21 +2051,56 @@ fn refresh_editor_model(ui: &AppWindow, state: &AppState) {
     ui.set_editor_steps(ModelRc::new(VecModel::from(state.editor_steps.clone())));
 }
 
-fn format_minutes_label(total_minutes: i32, is_ua: bool) -> String {
+fn format_minutes_label(total_minutes: i32, _is_ua: bool) -> String {
     let mins = total_minutes.max(0);
     let hours = mins / 60;
     let rem = mins % 60;
     if hours > 0 {
-        if is_ua {
-            format!("{} год {} хв", hours, rem)
-        } else {
-            format!("{}h {}m", hours, rem)
-        }
-    } else if is_ua {
-        format!("{} хв", rem)
+        format!("{}h {}m", hours, rem)
     } else {
-        format!("{} min", rem)
+        format!("{}m", rem)
     }
+}
+
+fn format_axis_hour_minute_label(total_minutes: i32, _is_ua: bool) -> String {
+    let mins = total_minutes.max(0);
+    let hours = mins / 60;
+    let rem = mins % 60;
+    if rem == 0 {
+        format!("{}h", hours)
+    } else {
+        format!("{}h {}m", hours, rem)
+    }
+}
+
+fn build_dynamic_tick_minutes(points: &[(f32, f32)], max_ticks: usize) -> Vec<i32> {
+    let mut values: Vec<i32> = points
+        .iter()
+        .map(|(h, _)| (*h * 60.0).round().max(0.0) as i32)
+        .collect();
+    values.sort_unstable();
+    values.dedup();
+
+    if values.is_empty() {
+        return vec![0];
+    }
+    if values.len() <= max_ticks || max_ticks < 2 {
+        return values;
+    }
+
+    let stride = ((values.len() + max_ticks - 1) / max_ticks).max(1);
+    let mut reduced: Vec<i32> = Vec::with_capacity(max_ticks);
+    let mut i = 0usize;
+    while i < values.len() {
+        reduced.push(values[i]);
+        i += stride;
+    }
+    if let Some(&last) = values.last() {
+        if reduced.last().copied() != Some(last) {
+            reduced.push(last);
+        }
+    }
+    reduced
 }
 
 #[allow(dead_code)]
@@ -1519,7 +2134,9 @@ fn detect_timestamp_seconds_divisor(data: &[HistorySample]) -> f32 {
 }
 
 fn sample_graph_line(rects: &mut Vec<ScheduleGraphRect>, x0: i32, y0: i32, x1: i32, y1: i32, color: Color) {
-    let steps = (x1 - x0).abs().max((y1 - y0).abs()).clamp(1, 64);
+    // Keep the line visually continuous for long ramps/holds.
+    // The previous cap (64) produced dotted-looking long segments.
+    let steps = (x1 - x0).abs().max((y1 - y0).abs()).clamp(1, 2048);
     for i in 0..=steps {
         let t = i as f32 / steps as f32;
         let x = (x0 as f32 + (x1 - x0) as f32 * t).round() as i32;
@@ -1550,37 +2167,133 @@ fn downsample_graph_points(points: &[(f32, f32)], max_points: usize) -> Vec<(f32
     out
 }
 
-fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
-    const GRAPH_W: i32 = 422;
-    const GRAPH_H: i32 = 182;
-    const START_TEMP_C: f32 = 25.0;
-    const MIN_PEAK_TEMP_C: f32 = 100.0;
-    const PLAN_COLOR: Color = Color::from_rgb_u8(0x60, 0xA5, 0xFA);
-    const ACTUAL_COLOR: Color = Color::from_rgb_u8(0x10, 0xB9, 0x81);
+fn build_planned_points_from_schedule(
+    schedule: &ScheduleFile,
+    start_temp_c: f32,
+) -> Vec<(f32, f32)> {
+    let mut points: Vec<(f32, f32)> = vec![(0.0, start_temp_c.max(0.0))];
+    let mut current_time_h = 0.0f32;
+    let mut current_temp_c = start_temp_c.max(0.0);
 
-    let clear_graph = || {
+    for step in &schedule.steps {
+        let target_c = step.target.unwrap_or(current_temp_c.round() as i32) as f32;
+        let rate_c_per_hour = step.rate.unwrap_or(0).abs() as f32;
+        let hold_minutes = step.hold_time.unwrap_or(0).max(0) as f32;
+
+        let diff = (target_c - current_temp_c).abs();
+        let ramp_duration_h = diff / if rate_c_per_hour > 0.0 { rate_c_per_hour } else { 100.0 };
+        current_time_h += ramp_duration_h;
+        current_temp_c = target_c.max(0.0);
+        points.push((current_time_h, current_temp_c));
+
+        if hold_minutes > 0.0 {
+            current_time_h += hold_minutes / 60.0;
+            points.push((current_time_h, current_temp_c));
+        }
+    }
+
+    points
+}
+
+fn find_schedule_for_history<'a>(name: &str, schedules: &'a [ScheduleFile]) -> Option<&'a ScheduleFile> {
+    let normalized_name = normalize_schedule_name(name);
+    if normalized_name.is_empty() {
+        return None;
+    }
+    schedules.iter().find(|s| normalize_schedule_name(&s.name) == normalized_name)
+}
+
+fn apply_schedule_graph_zoom(ui: &AppWindow, zoom_level: i32) {
+    let level = zoom_level.clamp(0, 2);
+    let is_p4_profile = ui.get_board_profile_id() == 1;
+    // Larger zoom levels allocate more space to the plot rectangle.
+    let (x, w, h) = if is_p4_profile {
+        match level {
+            1 => (62, 656, 315),
+            2 => (50, 670, 324),
+            _ => (72, 642, 304),
+        }
+    } else {
+        match level {
+            1 => (32, 434, 212),
+            2 => (26, 440, 218),
+            _ => (40, 426, 206),
+        }
+    };
+    ui.set_schedule_graph_zoom_level(level);
+    ui.set_schedule_graph_plot_x_px(x);
+    ui.set_schedule_graph_plot_w_px(w);
+    ui.set_schedule_graph_plot_h_px(h);
+}
+
+fn set_schedule_graph_tip(ui: &AppWindow, graph_w: i32, graph_h: i32, point: &GraphTapPoint) {
+    let display_w = unsafe { slint_bridge_get_display_width() }.max(1) as f32;
+    let display_h = unsafe { slint_bridge_get_display_height() }.max(1) as f32;
+    let density = (display_w / 480.0).min(display_h / 320.0).max(1.0);
+    let char_px = (6.8_f32 * density).ceil() as i32;
+    let line_h_temp = (14.0_f32 * density).ceil() as i32;
+    let line_h_time = (13.0_f32 * density).ceil() as i32;
+    let pad_x = (8.0_f32 * density).ceil() as i32;
+    let pad_y = (6.0_f32 * density).ceil() as i32;
+    let gap = (4.0_f32 * density).ceil() as i32;
+
+    let max_chars = point
+        .temp_label
+        .chars()
+        .count()
+        .max(point.time_label.chars().count()) as i32;
+    let mut tip_w = (max_chars * char_px + pad_x * 2).clamp(124, graph_w.saturating_sub(4).max(124));
+    if tip_w > graph_w {
+        tip_w = graph_w.max(80);
+    }
+
+    let avail_chars = ((tip_w - pad_x * 2) / char_px).max(1);
+    let temp_lines = ((point.temp_label.chars().count() as i32 + avail_chars - 1) / avail_chars).max(1);
+    let time_lines = ((point.time_label.chars().count() as i32 + avail_chars - 1) / avail_chars).max(1);
+    let tip_h = (pad_y + temp_lines * line_h_temp + gap + time_lines * line_h_time + pad_y)
+        .clamp(46, graph_h.saturating_sub(4).max(46));
+
+    ui.set_schedule_graph_tip_w_px(tip_w);
+    ui.set_schedule_graph_tip_h_px(tip_h);
+    let tip_x = (point.x + 8).clamp(0, (graph_w - tip_w).max(0));
+    let tip_y = (point.y - tip_h - 8).clamp(0, (graph_h - tip_h).max(0));
+    ui.set_schedule_graph_tip_x_px(tip_x);
+    ui.set_schedule_graph_tip_y_px(tip_y);
+    ui.set_schedule_graph_tip_temp(point.temp_label.as_str().into());
+    ui.set_schedule_graph_tip_time(point.time_label.as_str().into());
+    ui.set_schedule_graph_tip_visible(true);
+}
+
+fn refresh_schedule_graph_model(ui: &AppWindow, state: &mut AppState) {
+    let graph_w = ui.get_schedule_graph_plot_w_px().max(120);
+    let graph_h = ui.get_schedule_graph_plot_h_px().max(120);
+    const START_TEMP_C: f32 = 0.0;
+    const MIN_PEAK_TEMP_C: f32 = 100.0;
+
+    let mut clear_graph = || {
+        state.graph_points.clear();
         ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(Vec::<ScheduleGraphRect>::new())));
         ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(Vec::<ScheduleGraphMarker>::new())));
+        ui.set_schedule_graph_points(ModelRc::new(VecModel::from(Vec::<ScheduleGraphPoint>::new())));
         ui.set_schedule_graph_peak_temp(0);
         ui.set_schedule_graph_mid_temp(0);
         ui.set_schedule_graph_half_label("0 min".into());
         ui.set_schedule_graph_total_label("0 min".into());
+        ui.set_schedule_graph_tip_visible(false);
     };
 
     let draw_series = |rects: &mut Vec<ScheduleGraphRect>,
-                       markers: &mut Vec<ScheduleGraphMarker>,
                        points: &[(f32, f32)],
                        map_x: &dyn Fn(f32) -> i32,
                        map_y: &dyn Fn(f32) -> i32,
-                       color: Color,
-                       add_point_markers: bool| {
+                       color: Color| {
         for window in points.windows(2) {
             let (start_h, start_temp_c) = window[0];
             let (end_h, end_temp_c) = window[1];
-            let x0 = map_x(start_h).clamp(0, GRAPH_W - 1);
-            let y0 = map_y(start_temp_c).clamp(0, GRAPH_H - 1);
-            let x1 = map_x(end_h).clamp(0, GRAPH_W - 1);
-            let y1 = map_y(end_temp_c).clamp(0, GRAPH_H - 1);
+            let x0 = map_x(start_h).clamp(0, graph_w - 1);
+            let y0 = map_y(start_temp_c).clamp(0, graph_h - 1);
+            let x1 = map_x(end_h).clamp(0, graph_w - 1);
+            let y1 = map_y(end_temp_c).clamp(0, graph_h - 1);
 
             if y0 == y1 {
                 rects.push(ScheduleGraphRect {
@@ -1594,20 +2307,6 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
                 sample_graph_line(rects, x0, y0, x1, y1, color);
             }
         }
-
-        if add_point_markers {
-            let marker_step = (points.len() / 10).max(1);
-            for (idx, (hour, temp_c)) in points.iter().enumerate() {
-                if idx % marker_step == 0 || idx + 1 == points.len() {
-                    markers.push(ScheduleGraphMarker {
-                        x: map_x(*hour).clamp(0, GRAPH_W - 1),
-                        y: map_y(*temp_c).clamp(0, GRAPH_H - 1),
-                        label: "".into(),
-                        color: color.into(),
-                    });
-                }
-            }
-        }
     };
 
     if let Some(history_id) = state.history_graph_id.as_deref() {
@@ -1615,43 +2314,91 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
             clear_graph();
             return;
         };
-        if detail.data.is_empty() {
+        if detail.data.is_empty() && detail.planned.is_empty() && detail.actual.is_empty() {
             clear_graph();
             return;
         }
 
         let first_ts = detail.data.first().map(|p| p.timestamp).unwrap_or(0);
         let ts_divisor = detect_timestamp_seconds_divisor(&detail.data);
-        let raw_planned_points: Vec<(f32, f32)> = detail
-            .data
-            .iter()
-            .map(|p| ((((p.timestamp - first_ts).max(0) as f32) / ts_divisor) / 3600.0, p.target.max(0.0)))
-            .collect();
-        let raw_actual_points: Vec<(f32, f32)> = detail
-            .data
-            .iter()
-            .map(|p| ((((p.timestamp - first_ts).max(0) as f32) / ts_divisor) / 3600.0, p.temp.max(0.0)))
-            .collect();
+        let start_temp_from_data = detail.data.first().map(|p| p.temp).unwrap_or(START_TEMP_C);
+        let planned_from_schedule = find_schedule_for_history(&detail.summary.schedule_name, &state.schedules)
+            .map(|s| build_planned_points_from_schedule(s, start_temp_from_data))
+            .unwrap_or_default();
+        let (raw_planned_points, raw_actual_points): (Vec<(f32, f32)>, Vec<(f32, f32)>) = if !detail.data.is_empty() {
+            let planned = if planned_from_schedule.len() > 1 {
+                planned_from_schedule
+            } else {
+                detail
+                    .data
+                    .iter()
+                    .map(|p| ((((p.timestamp - first_ts).max(0) as f32) / ts_divisor) / 3600.0, p.target.max(0.0)))
+                    .collect()
+            };
+            let actual = detail
+                .data
+                .iter()
+                .map(|p| ((((p.timestamp - first_ts).max(0) as f32) / ts_divisor) / 3600.0, p.temp.max(0.0)))
+                .collect();
+            (planned, actual)
+        } else {
+            let planned = if planned_from_schedule.len() > 1 {
+                planned_from_schedule
+            } else {
+                detail
+                    .planned
+                    .iter()
+                    .filter(|p| p.t.is_finite() && p.temp.is_finite())
+                    .map(|p| {
+                        let hour = if p.timestamp > 0 {
+                            ((p.timestamp as f32) / 3600.0).max(0.0)
+                        } else {
+                            (p.t / 60.0).max(0.0)
+                        };
+                        (hour, p.temp.max(0.0))
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let actual = detail
+                .actual
+                .iter()
+                .filter(|p| p.t.is_finite() && p.temp.is_finite())
+                .map(|p| {
+                    let hour = if p.timestamp > 0 {
+                        ((p.timestamp as f32) / 3600.0).max(0.0)
+                    } else {
+                        (p.t / 60.0).max(0.0)
+                    };
+                    (hour, p.temp.max(0.0))
+                })
+                .collect::<Vec<_>>();
+            (planned, actual)
+        };
         let mut raw_actual_points = raw_actual_points;
         if detail.summary.duration > 0 {
-            let max_actual_h = (detail.summary.duration as f32 / 60.0).max(0.0) + 1.0 / 60.0;
+            let max_actual_h = (detail.summary.duration as f32 / 3600.0).max(0.0) + 1.0 / 60.0;
             raw_actual_points.retain(|(h, _)| *h <= max_actual_h);
         }
-        let mut step_end_points: Vec<(f32, f32)> = Vec::new();
-        if !raw_planned_points.is_empty() {
-            for i in 1..raw_planned_points.len() {
-                let prev_target = raw_planned_points[i - 1].1;
-                let target = raw_planned_points[i].1;
-                if (target - prev_target).abs() >= 0.5 {
-                    step_end_points.push(raw_planned_points[i - 1]);
-                }
-            }
-            if let Some(last) = raw_planned_points.last().copied() {
-                step_end_points.push(last);
+        let mut planned_points: Vec<(f32, f32)> = Vec::new();
+        for (i, point) in raw_planned_points.iter().copied().enumerate() {
+            let prev = if i > 0 { Some(raw_planned_points[i - 1]) } else { None };
+            let next = if i + 1 < raw_planned_points.len() {
+                Some(raw_planned_points[i + 1])
+            } else {
+                None
+            };
+            let first_or_last = i == 0 || i + 1 == raw_planned_points.len();
+            let y_changed_from_prev = prev.map(|p| (point.1 - p.1).abs() >= 0.1).unwrap_or(false);
+            let y_changed_to_next = next.map(|p| (p.1 - point.1).abs() >= 0.1).unwrap_or(false);
+            // Keep both sides of breakpoints so hold shelves keep exact start/end.
+            if first_or_last || y_changed_from_prev || y_changed_to_next {
+                planned_points.push(point);
             }
         }
+        if planned_points.is_empty() {
+            planned_points = raw_planned_points.clone();
+        }
 
-        let planned_points = downsample_graph_points(&raw_planned_points, 120);
         let actual_points = downsample_graph_points(&raw_actual_points, 120);
 
         let last_hour = planned_points
@@ -1664,8 +2411,8 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
             .map(|(_, t)| *t)
             .fold(0.0_f32, f32::max)
             .max(actual_points.iter().map(|(_, t)| *t).fold(0.0_f32, f32::max));
-        let total_minutes = if detail.summary.duration > 0 {
-            detail.summary.duration as i32
+        let _total_minutes = if detail.summary.duration > 0 {
+            duration_seconds_to_minutes(detail.summary.duration)
         } else {
             (last_hour * 60.0).ceil().max(1.0) as i32
         };
@@ -1674,9 +2421,9 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
 
         // Keep labels outside the plotted area: reserve paddings like in web chart.
         let plot_left = 19i32;
-        let plot_right = (GRAPH_W - 6).max(plot_left + 1);
+        let plot_right = (graph_w - 6).max(plot_left + 1);
         let plot_top = 8i32;
-        let plot_bottom = (GRAPH_H - 18).max(plot_top + 1);
+        let plot_bottom = (graph_h - 24).max(plot_top + 1);
         let plot_w = (plot_right - plot_left).max(1) as f32;
         let plot_h = (plot_bottom - plot_top).max(1) as f32;
         let x_scale = if last_hour <= 0.0 { 0.0 } else { plot_w / last_hour };
@@ -1684,73 +2431,102 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
         let map_x = |hour: f32| -> i32 { plot_left + (hour * x_scale).round() as i32 };
         let map_y = |temp_c: f32| -> i32 { plot_bottom - (temp_c * y_scale).round() as i32 };
 
-        let mut rects: Vec<ScheduleGraphRect> = Vec::new();
-        let mut markers: Vec<ScheduleGraphMarker> = Vec::new();
-        draw_series(&mut rects, &mut markers, &planned_points, &map_x, &map_y, PLAN_COLOR, false);
-        draw_series(&mut rects, &mut markers, &actual_points, &map_x, &map_y, ACTUAL_COLOR, false);
+        let target_line = Color::from_rgb_u8(0x63, 0x66, 0xF1);
+        let target_point = Color::from_rgb_u8(0x81, 0x8C, 0xF8);
+        let actual_line = Color::from_rgb_u8(0x10, 0xB9, 0x81);
+        let actual_fill = Color::from_argb_u8(0x1A, 0x10, 0xB9, 0x81);
 
-        // Add labels only for key "step end" points to avoid overlaps.
-        let unit_label = match state.temp_unit {
-            TempUnit::C => "°C",
-            TempUnit::F => "°F",
-        };
-        if !step_end_points.is_empty() {
-            let max_labels = 4usize;
-            let stride = (step_end_points.len() / max_labels).max(1);
-            let mut selected_indices: Vec<usize> = Vec::new();
-            let mut last_labeled_x: Option<i32> = None;
-            let mut i = 0usize;
-            while i < step_end_points.len() {
-                selected_indices.push(i);
-                let (hour, temp_c) = step_end_points[i];
-                let x = map_x(hour).clamp(0, GRAPH_W - 1);
-                let y = map_y(temp_c).clamp(0, GRAPH_H - 1);
-                let can_label = last_labeled_x.map(|px| (x - px).abs() >= 42).unwrap_or(true);
-                let temp_label = format!(
-                    "{}{}",
-                    temp_to_display_i32(temp_c.round() as i32, state.temp_unit),
-                    unit_label
-                );
-                if can_label {
-                    markers.push(ScheduleGraphMarker {
-                        x,
-                        y,
-                        label: temp_label.into(),
-                        color: PLAN_COLOR.into(),
-                    });
-                    last_labeled_x = Some(x);
-                }
-                i += stride;
+        let mut rects: Vec<ScheduleGraphRect> = Vec::new();
+        let mut axis_markers: Vec<ScheduleGraphMarker> = Vec::new();
+        let mut point_markers: Vec<ScheduleGraphPoint> = Vec::new();
+        state.graph_points.clear();
+
+        for window in actual_points.windows(2) {
+            let (start_h, start_temp_c) = window[0];
+            let (end_h, end_temp_c) = window[1];
+            let x0 = map_x(start_h).clamp(plot_left, plot_right);
+            let y0 = map_y(start_temp_c).clamp(plot_top, plot_bottom);
+            let x1 = map_x(end_h).clamp(plot_left, plot_right);
+            let y1 = map_y(end_temp_c).clamp(plot_top, plot_bottom);
+            if x0 == x1 {
+                let y = y0.min(y1);
+                rects.push(ScheduleGraphRect { x: x0, y, width: 1, height: (plot_bottom - y + 1).max(1), color: actual_fill.into() });
+                continue;
             }
-            if let Some(last_idx) = step_end_points.len().checked_sub(1) {
-                if !selected_indices.contains(&last_idx) {
-                    let (hour, temp_c) = step_end_points[last_idx];
-                    let x = map_x(hour).clamp(0, GRAPH_W - 1);
-                    let y = map_y(temp_c).clamp(0, GRAPH_H - 1);
-                    let can_label = last_labeled_x.map(|px| (x - px).abs() >= 36).unwrap_or(true);
-                    if can_label {
-                        markers.push(ScheduleGraphMarker {
-                            x,
-                            y,
-                            label: format!(
-                                "{}{}",
-                                temp_to_display_i32(temp_c.round() as i32, state.temp_unit),
-                                unit_label
-                            )
-                            .into(),
-                            color: PLAN_COLOR.into(),
-                        });
-                    }
-                }
+            for x in x0.min(x1)..=x0.max(x1) {
+                let t = (x - x0) as f32 / (x1 - x0) as f32;
+                let y = ((y0 as f32 + (y1 - y0) as f32 * t).round() as i32).clamp(plot_top, plot_bottom);
+                rects.push(ScheduleGraphRect { x, y, width: 1, height: (plot_bottom - y + 1).max(1), color: actual_fill.into() });
             }
         }
 
+        draw_series(&mut rects, &actual_points, &map_x, &map_y, actual_line);
+
+        for window in planned_points.windows(2) {
+            let (sh, st) = window[0];
+            let (eh, et) = window[1];
+            let x0 = map_x(sh).clamp(0, graph_w - 1);
+            let y0 = map_y(st).clamp(0, graph_h - 1);
+            let x1 = map_x(eh).clamp(0, graph_w - 1);
+            let y1 = map_y(et).clamp(0, graph_h - 1);
+            let steps = (x1 - x0).abs().max((y1 - y0).abs()).clamp(1, 96);
+            for i in 0..=steps {
+                // Dash pattern 5 on / 5 off
+                if (i / 5) % 2 != 0 {
+                    continue;
+                }
+                let t = i as f32 / steps as f32;
+                let x = (x0 as f32 + (x1 - x0) as f32 * t).round() as i32;
+                let y = (y0 as f32 + (y1 - y0) as f32 * t).round() as i32;
+                rects.push(ScheduleGraphRect { x: (x - 1).max(0), y: (y - 1).max(0), width: 3, height: 3, color: target_line.into() });
+            }
+        }
+
+        let unit_label = match state.temp_unit {
+            TempUnit::C => "\u{00B0}C",
+            TempUnit::F => "\u{00B0}F",
+        };
+        for (hour, temp_c) in planned_points.iter().copied() {
+            let x = map_x(hour).clamp(0, graph_w - 1);
+            let y = map_y(temp_c).clamp(0, graph_h - 1);
+            let temp_label = format!("{}{}", temp_to_display_i32(temp_c.round() as i32, state.temp_unit), unit_label);
+            let time_label = format_axis_hour_minute_label((hour * 60.0).round().max(0.0) as i32, ui.get_is_ua());
+            point_markers.push(ScheduleGraphPoint {
+                x,
+                y,
+                temp_label: temp_label.as_str().into(),
+                time_label: time_label.as_str().into(),
+                color: target_point.into(),
+            });
+            state.graph_points.push(GraphTapPoint {
+                x,
+                y,
+                temp_label,
+                time_label,
+            });
+        }
+
+        let start_minutes = 0_i32;
+        let end_minutes = (last_hour * 60.0).round().max(0.0) as i32;
+        for minutes in [start_minutes, end_minutes] {
+            let hour = (minutes as f32) / 60.0;
+            let x = map_x(hour).clamp(plot_left, plot_right);
+            axis_markers.push(ScheduleGraphMarker {
+                x,
+                y: plot_bottom + 2,
+                label: format_axis_hour_minute_label(minutes, ui.get_is_ua()).into(),
+                color: Color::from_rgb_u8(0x71, 0x71, 0x7A).into(),
+            });
+        }
+
         ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
-        ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(markers)));
+        ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(axis_markers)));
+        ui.set_schedule_graph_points(ModelRc::new(VecModel::from(point_markers)));
         ui.set_schedule_graph_peak_temp(peak_display);
         ui.set_schedule_graph_mid_temp(temp_to_display_i32((peak_scale_c * 0.5).round() as i32, state.temp_unit));
-        ui.set_schedule_graph_half_label(format_minutes_label((total_minutes / 2).max(0), ui.get_is_ua()).into());
-        ui.set_schedule_graph_total_label(format_minutes_label(total_minutes, ui.get_is_ua()).into());
+        ui.set_schedule_graph_half_label(format_axis_hour_minute_label(0, ui.get_is_ua()).into());
+        ui.set_schedule_graph_total_label(format_axis_hour_minute_label((last_hour * 60.0).round().max(0.0) as i32, ui.get_is_ua()).into());
+        ui.set_schedule_graph_tip_visible(false);
         return;
     }
 
@@ -1787,50 +2563,124 @@ fn refresh_schedule_graph_model(ui: &AppWindow, state: &AppState) {
         }
     }
 
-    let total_minutes = (current_time_h * 60.0).ceil().max(1.0) as i32;
+    let _total_minutes = (current_time_h * 60.0).ceil().max(1.0) as i32;
     let peak_display = temp_to_display_i32(peak_temp_c.max(MIN_PEAK_TEMP_C) as i32, state.temp_unit);
     let peak_scale_c = peak_temp_c.max(MIN_PEAK_TEMP_C);
 
-    let x_scale = if current_time_h <= 0.0 {
-        0.0
-    } else {
-        (GRAPH_W - 1) as f32 / current_time_h
-    };
-    let y_scale = if peak_scale_c <= 0.0 {
-        0.0
-    } else {
-        (GRAPH_H - 1) as f32 / peak_scale_c
-    };
+    // Keep the schedule graph geometry aligned with the web editor chart:
+    // we reserve paddings so labels/ticks stay outside the plotted area.
+    let plot_left = 19i32;
+    let plot_right = (graph_w - 6).max(plot_left + 1);
+    let plot_top = 8i32;
+    let plot_bottom = (graph_h - 24).max(plot_top + 1);
+    let plot_w = (plot_right - plot_left).max(1) as f32;
+    let plot_h = (plot_bottom - plot_top).max(1) as f32;
 
-    let map_x = |hour: f32| -> i32 { (hour * x_scale).round() as i32 };
-    let map_y = |temp_c: f32| -> i32 { GRAPH_H - 1 - (temp_c * y_scale).round() as i32 };
+    let x_scale = if current_time_h <= 0.0 { 0.0 } else { plot_w / current_time_h };
+    let y_scale = if peak_scale_c <= 0.0 { 0.0 } else { plot_h / peak_scale_c };
+
+    let map_x = |hour: f32| -> i32 { plot_left + (hour * x_scale).round() as i32 };
+    let map_y = |temp_c: f32| -> i32 { plot_bottom - (temp_c * y_scale).round() as i32 };
+
+    let profile_line_color = Color::from_rgb_u8(0x10, 0xB9, 0x81);
+    let profile_fill_color = Color::from_argb_u8(0x1A, 0x10, 0xB9, 0x81);
+    let point_color = Color::from_rgb_u8(0x81, 0x8C, 0xF8);
 
     let mut rects: Vec<ScheduleGraphRect> = Vec::new();
-    let mut marker_rows: Vec<ScheduleGraphMarker> = Vec::new();
-    draw_series(&mut rects, &mut marker_rows, &points, &map_x, &map_y, PLAN_COLOR, true);
+    let mut axis_markers: Vec<ScheduleGraphMarker> = Vec::new();
+    let mut point_markers: Vec<ScheduleGraphPoint> = Vec::new();
+    state.graph_points.clear();
 
-    let unit_label = match state.temp_unit {
-        TempUnit::C => "°C",
-        TempUnit::F => "°F",
-    };
-    for (idx, (hour, temp_c)) in points.iter().enumerate() {
-        if idx == 0 && points.len() > 1 {
+    for window in points.windows(2) {
+        let (start_h, start_temp_c) = window[0];
+        let (end_h, end_temp_c) = window[1];
+        let x0 = map_x(start_h).clamp(plot_left, plot_right);
+        let y0 = map_y(start_temp_c).clamp(plot_top, plot_bottom);
+        let x1 = map_x(end_h).clamp(plot_left, plot_right);
+        let y1 = map_y(end_temp_c).clamp(plot_top, plot_bottom);
+        if x0 == x1 {
+            let y = y0.min(y1);
+            rects.push(ScheduleGraphRect {
+                x: x0,
+                y,
+                width: 1,
+                height: (plot_bottom - y + 1).max(1),
+                color: profile_fill_color.into(),
+            });
             continue;
         }
-        let x = map_x(*hour).clamp(0, GRAPH_W - 1);
-        let y = map_y(*temp_c).clamp(0, GRAPH_H - 1);
-        let temp_label = format!("{}{}", temp_to_display_i32(temp_c.round() as i32, state.temp_unit), unit_label);
-        let time_label = format_minutes_label((hour * 60.0).round().max(0.0) as i32, ui.get_is_ua());
-        marker_rows.push(ScheduleGraphMarker { x, y, label: temp_label.into(), color: PLAN_COLOR.into() });
-        marker_rows.push(ScheduleGraphMarker { x, y: GRAPH_H - 1, label: time_label.into(), color: PLAN_COLOR.into() });
+        for x in x0.min(x1)..=x0.max(x1) {
+            let t = (x - x0) as f32 / (x1 - x0) as f32;
+            let y = ((y0 as f32 + (y1 - y0) as f32 * t).round() as i32).clamp(plot_top, plot_bottom);
+            rects.push(ScheduleGraphRect {
+                x,
+                y,
+                width: 1,
+                height: (plot_bottom - y + 1).max(1),
+                color: profile_fill_color.into(),
+            });
+        }
+    }
+
+    draw_series(
+        &mut rects,
+        &points,
+        &map_x,
+        &map_y,
+        profile_line_color,
+    );
+
+    let unit_label = match state.temp_unit {
+        TempUnit::C => "\u{00B0}C",
+        TempUnit::F => "\u{00B0}F",
+    };
+    for (hour, temp_c) in points.iter().copied() {
+        let x = map_x(hour).clamp(0, graph_w - 1);
+        let y = map_y(temp_c).clamp(0, graph_h - 1);
+
+        let temp_label = format!(
+            "{}{}",
+            temp_to_display_i32(temp_c.round() as i32, state.temp_unit),
+            unit_label
+        );
+        let time_label = format_axis_hour_minute_label((hour * 60.0).round().max(0.0) as i32, ui.get_is_ua());
+        point_markers.push(ScheduleGraphPoint {
+            x,
+            y,
+            temp_label: temp_label.as_str().into(),
+            time_label: time_label.as_str().into(),
+            color: point_color.into(),
+        });
+        state.graph_points.push(GraphTapPoint {
+            x,
+            y,
+            temp_label,
+            time_label,
+        });
+    }
+
+    let tick_minutes = build_dynamic_tick_minutes(&points, 8);
+    for minutes in tick_minutes {
+        let hour = (minutes as f32) / 60.0;
+        let x = map_x(hour).clamp(plot_left, plot_right);
+        axis_markers.push(ScheduleGraphMarker {
+            x,
+            y: plot_bottom + 2,
+            label: format_axis_hour_minute_label(minutes, ui.get_is_ua()).into(),
+            color: Color::from_rgb_u8(0x71, 0x71, 0x7A).into(),
+        });
     }
 
     ui.set_schedule_graph_rects(ModelRc::new(VecModel::from(rects)));
-    ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(marker_rows)));
+    ui.set_schedule_graph_markers(ModelRc::new(VecModel::from(axis_markers)));
+    ui.set_schedule_graph_points(ModelRc::new(VecModel::from(point_markers)));
     ui.set_schedule_graph_peak_temp(peak_display);
     ui.set_schedule_graph_mid_temp(temp_to_display_i32((peak_scale_c * 0.5).round() as i32, state.temp_unit));
-    ui.set_schedule_graph_half_label(format_minutes_label((total_minutes / 2).max(0), ui.get_is_ua()).into());
-    ui.set_schedule_graph_total_label(format_minutes_label(total_minutes, ui.get_is_ua()).into());
+    ui.set_schedule_graph_half_label(format_axis_hour_minute_label(0, ui.get_is_ua()).into());
+    ui.set_schedule_graph_total_label(
+        format_axis_hour_minute_label((current_time_h * 60.0).round().max(0.0) as i32, ui.get_is_ua()).into(),
+    );
+    ui.set_schedule_graph_tip_visible(false);
 }
 
 fn c_buf_to_string(buf: &[u8]) -> String {
@@ -1838,19 +2688,31 @@ fn c_buf_to_string(buf: &[u8]) -> String {
     String::from_utf8_lossy(&buf[..nul]).trim().to_string()
 }
 
+fn is_thermocouple_disconnected(reason: &str) -> bool {
+    let lower = reason.to_ascii_lowercase();
+    lower.contains("sensor open")
+        || lower.contains("sensor nan/open")
+        || lower.contains("sensor comm/no-data")
+        || lower.contains("sensor open fault")
+        || lower.contains("thermocouple not initialized")
+        || lower.contains("thermocouple read timeout")
+}
+
 fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppState) {
     let status_label = if state.fault_active {
         "ERROR"
     } else {
         match state.status {
-        1 => "PREHEAT",
-        2 => "RAMP",
-        3 => "HOLD",
-        4 => "COOL",
-        5 => "COMPLETE",
-        6 => "ERROR",
-        7 => "TUNING",
-        _ => "IDLE",
+            // Keep mapping aligned with firmware enum KilnStatus:
+            // 0=IDLE, 1=RUNNING, 2=HOLD, 3=COOLING, 4=COMPLETE, 5=FAULT, 6=PAUSED, 7=TUNING
+            1 => "RUNNING",
+            2 => "HOLD",
+            3 => "COOLING",
+            4 => "COMPLETE",
+            5 => "FAULT",
+            6 => "PAUSED",
+            7 => "TUNING",
+            _ => "IDLE",
         }
     };
     let is_idle = !state.is_firing;
@@ -1862,7 +2724,7 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
             app_state.display_temp_c = state.current_temp;
             app_state.display_temp_valid = true;
         } else {
-            const ALPHA: f32 = 0.25;
+            const ALPHA: f32 = 0.55;
             const DEAD_BAND_C: f32 = 0.12;
             let prev = app_state.display_temp_c;
             let blended = prev * (1.0 - ALPHA) + state.current_temp * ALPHA;
@@ -1873,71 +2735,145 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
         app_state.display_temp_valid = false;
     }
 
+    let mut fault_reason = c_buf_to_string(&state.fault_reason);
+    if fault_reason.is_empty() {
+        fault_reason = c_buf_to_string(&state.error_msg);
+    }
+    let is_ua = ui.get_is_ua();
+    let thermocouple_disconnected =
+        is_thermocouple_disconnected(&fault_reason) && (!state.current_temp.is_finite() || state.fault_active);
+
     let shown_temp = temp_to_display(shown_temp_c, unit);
-    ui.set_temp(shown_temp);
-    ui.set_temp_label(format!("{:.1}", shown_temp).into());
-    let target_display = temp_to_display(state.target_temp, unit);
-    ui.set_target(target_display.round() as i32);
+    // Avoid frequent micro-updates that cause visible refresh pulses on some MIPI panels.
+    if (ui.get_temp() - shown_temp).abs() > 0.15 {
+        ui.set_temp(shown_temp);
+    }
+    if thermocouple_disconnected {
+        let next_temp_label = "--.-".to_string();
+        let next_hint = if is_ua {
+            "\u{0422}\u{0435}\u{0440}\u{043C}\u{043E}\u{043F}\u{0430}\u{0440}\u{0430} \u{043D}\u{0435} \u{043F}\u{0456}\u{0434}\u{043A}\u{043B}\u{044E}\u{0447}\u{0435}\u{043D}\u{0430}".to_string()
+        } else {
+            "Thermocouple not connected".to_string()
+        };
+        if ui.get_temp_label().to_string() != next_temp_label && (ui.get_temp() - shown_temp).abs() > 0.15 {
+            ui.set_temp_label(next_temp_label.into());
+        }
+        if ui.get_temp_hint().to_string() != next_hint {
+            ui.set_temp_hint(next_hint.into());
+        }
+    } else {
+        let next_temp_label = format!("{:.1}", shown_temp);
+        if ui.get_temp_label().to_string() != next_temp_label && (ui.get_temp() - shown_temp).abs() > 0.15 {
+            ui.set_temp_label(next_temp_label.into());
+        }
+        if !ui.get_temp_hint().is_empty() {
+            ui.set_temp_hint("".into());
+        }
+    }
     let fallback_target = state.target_temp.round() as i32;
-    let segment_target = if let Some(idx) = app_state.selected_index {
+    let selected_schedule_target = if let Some(idx) = app_state.selected_index {
         if let Some(schedule) = app_state.schedules.get(idx) {
-            running_segment_target(schedule, state.current_step, fallback_target)
+            schedule_effective_target_for_step(&schedule.steps, 0, fallback_target)
         } else {
             fallback_target
         }
     } else {
         fallback_target
     };
-    ui.set_active_segment_target(temp_to_display_i32(segment_target, unit));
-    ui.set_status_label(status_label.into());
-    ui.set_is_idle(is_idle);
-    ui.set_step_index(state.current_step as i32);
-    ui.set_total_steps(state.total_steps as i32);
-    ui.set_time_remaining(format_minutes_to_hm(state.time_remaining).into());
-
-    let mut fault_reason = c_buf_to_string(&state.fault_reason);
-    if fault_reason.is_empty() {
-        fault_reason = c_buf_to_string(&state.error_msg);
+    let ui_target_c = if is_idle { selected_schedule_target } else { fallback_target };
+    let next_target = temp_to_display_i32(ui_target_c, unit);
+    if ui.get_target() != next_target {
+        ui.set_target(next_target);
     }
+    let segment_target = if let Some(idx) = app_state.selected_index {
+        if let Some(schedule) = app_state.schedules.get(idx) {
+            let step_for_target = if is_idle { 0 } else { state.current_step };
+            running_segment_target(schedule, step_for_target, selected_schedule_target)
+        } else {
+            selected_schedule_target
+        }
+    } else {
+        selected_schedule_target
+    };
+    let next_segment_target = temp_to_display_i32(segment_target, unit);
+    if ui.get_active_segment_target() != next_segment_target {
+        ui.set_active_segment_target(next_segment_target);
+    }
+    if ui.get_status_label().to_string() != status_label {
+        ui.set_status_label(status_label.into());
+    }
+    if ui.get_is_idle() != is_idle {
+        ui.set_is_idle(is_idle);
+    }
+    if ui.get_step_index() != state.current_step as i32 {
+        ui.set_step_index(state.current_step as i32);
+    }
+    if ui.get_total_steps() != state.total_steps as i32 {
+        ui.set_total_steps(state.total_steps as i32);
+    }
+    let next_time_remaining = format_minutes_to_hm(state.time_remaining);
+    if ui.get_time_remaining().to_string() != next_time_remaining {
+        ui.set_time_remaining(next_time_remaining.into());
+    }
+    let (step_remaining_min, firing_remaining_min) = if let Some(idx) = app_state.selected_index {
+        if let Some(schedule) = app_state.schedules.get(idx) {
+            estimate_remaining_minutes(schedule, state.current_step, state.current_temp, state.time_remaining)
+        } else {
+            (-1, state.time_remaining)
+        }
+    } else {
+        (-1, state.time_remaining)
+    };
+    let next_step_time_remaining = format_minutes_to_hm(step_remaining_min);
+    if ui.get_step_time_remaining().to_string() != next_step_time_remaining {
+        ui.set_step_time_remaining(next_step_time_remaining.into());
+    }
+    let next_firing_time_remaining = format_minutes_to_hm(firing_remaining_min);
+    if ui.get_firing_time_remaining().to_string() != next_firing_time_remaining {
+        ui.set_firing_time_remaining(next_firing_time_remaining.into());
+    }
+
     let prev_fault_active = ui.get_fault_active();
     if !state.fault_active {
-        ui.set_fault_popup_hidden(false);
+        if ui.get_fault_popup_hidden() {
+            ui.set_fault_popup_hidden(false);
+        }
     } else if !prev_fault_active {
-        ui.set_fault_popup_hidden(false);
+        if ui.get_fault_popup_hidden() {
+            ui.set_fault_popup_hidden(false);
+        }
     }
-    ui.set_fault_active(state.fault_active);
-    let is_ua = ui.get_is_ua();
-    ui.set_fault_reason(translate_fault_reason(&fault_reason, is_ua).into());
+    if ui.get_fault_active() != state.fault_active {
+        ui.set_fault_active(state.fault_active);
+    }
+    let next_fault_reason = translate_fault_reason(&fault_reason, is_ua);
+    if ui.get_fault_reason().to_string() != next_fault_reason {
+        ui.set_fault_reason(next_fault_reason.into());
+    }
 
     let wifi_ok = unsafe { slint_bridge_wifi_is_connected() };
-    ui.set_wifi_ok(wifi_ok);
+    if ui.get_header_wifi_ok() != wifi_ok {
+        ui.set_header_wifi_ok(wifi_ok);
+    }
 
-    let mut raw_url = vec![0 as c_char; 96];
-    let server_url = if unsafe { slint_bridge_wifi_server_url_copy(raw_url.as_mut_ptr(), raw_url.len() as i32) } {
-        unsafe { CStr::from_ptr(raw_url.as_ptr()) }.to_string_lossy().into_owned()
-    } else {
-        "http://192.168.4.1".to_string()
-    };
-    ui.set_wifi_server_url(server_url.into());
-    let initial_max_temp_c = unsafe { slint_bridge_get_user_max_temp_c() };
-    let initial_max_temp_c = if initial_max_temp_c.is_finite() {
-        initial_max_temp_c.clamp(100.0, 1300.0)
-    } else {
-        1300.0
-    };
-    ui.set_schedule_target_max_c(temp_to_display(initial_max_temp_c, unit).round() as i32);
-    let initial_autotune_target_c = unsafe { slint_bridge_get_autotune_target_c() };
-    if initial_autotune_target_c.is_finite() {
-        ui.set_autotune_target_c(temp_to_display(initial_autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32);
+    // Avoid global redraw side-effects on non-Wi-Fi screens:
+    // keep the heavyweight Wi-Fi model in sync only when Wi-Fi UI is actually visible.
+    if (ui.get_view() == View::Settings && ui.get_settings_page() == "wifi") || ui.get_wifi_qr_visible() {
+        if ui.get_wifi_ok() != wifi_ok {
+            ui.set_wifi_ok(wifi_ok);
+        }
+        let mut raw_url = vec![0 as c_char; 96];
+        let server_url = if unsafe { slint_bridge_wifi_server_url_copy(raw_url.as_mut_ptr(), raw_url.len() as i32) } {
+            unsafe { CStr::from_ptr(raw_url.as_ptr()) }.to_string_lossy().into_owned()
+        } else {
+            "http://192.168.4.1".to_string()
+        };
+        let old_url = ui.get_wifi_server_url().to_string();
+        if old_url != server_url {
+            ui.set_wifi_server_url(server_url.into());
+        }
     }
-    let initial_offset_c = unsafe { slint_bridge_get_temperature_offset_c() };
-    if initial_offset_c.is_finite() {
-        ui.set_thermocouple_offset(delta_temp_to_display_i32(initial_offset_c, unit));
-    }
-    let initial_wattage = unsafe { slint_bridge_get_kiln_wattage() };
-    if initial_wattage > 0 {
-        ui.set_kiln_wattage(initial_wattage);
-    }
+    // Keep hot-path updates lightweight: settings values are refreshed elsewhere.
 
     let pzem_ok = state.pzem_ok && state.pzem_voltage.is_finite() && state.pzem_current.is_finite() && state.pzem_power.is_finite();
     let power_label = if pzem_ok {
@@ -1957,28 +2893,48 @@ fn apply_state_to_ui(ui: &AppWindow, state: SlintKilnState, app_state: &mut AppS
     };
     let phase_label = if state.is_firing {
         if pzem_ok && state.pzem_current > 0.20 {
-            if is_ua { "Фаза: OK".to_string() } else { "Phase: OK".to_string() }
+            if is_ua { "\u{0424}\u{0430}\u{0437}\u{0430}: OK".to_string() } else { "Phase: OK".to_string() }
         } else {
-            if is_ua { "Фаза: НІ".to_string() } else { "Phase: NO".to_string() }
+            if is_ua { "\u{0424}\u{0430}\u{0437}\u{0430}: \u{041D}\u{0406}".to_string() } else { "Phase: NO".to_string() }
         }
     } else {
-        if is_ua { "Фаза: --".to_string() } else { "Phase: --".to_string() }
+        if is_ua { "\u{0424}\u{0430}\u{0437}\u{0430}: --".to_string() } else { "Phase: --".to_string() }
     };
-    ui.set_pzem_power_label(power_label.into());
-    ui.set_pzem_current_label(current_label.into());
-    ui.set_pzem_voltage_label(voltage_label.into());
-    ui.set_pzem_phase_label(phase_label.into());
-    ui.set_standby_power_watts(state.pzem_power.round().max(0.0) as i32);
+    if ui.get_pzem_power_label().to_string() != power_label {
+        ui.set_pzem_power_label(power_label.into());
+    }
+    if ui.get_pzem_current_label().to_string() != current_label {
+        ui.set_pzem_current_label(current_label.into());
+    }
+    if ui.get_pzem_voltage_label().to_string() != voltage_label {
+        ui.set_pzem_voltage_label(voltage_label.into());
+    }
+    if ui.get_pzem_phase_label().to_string() != phase_label {
+        ui.set_pzem_phase_label(phase_label.into());
+    }
+    let next_standby_power = state.pzem_power.round().max(0.0) as i32;
+    if ui.get_standby_power_watts() != next_standby_power {
+        ui.set_standby_power_watts(next_standby_power);
+    }
 }
 
 fn apply_command_result_to_ui(ui: &AppWindow, cmd: SlintCommandResult, is_ua: bool) {
+    let action = c_buf_to_string(&cmd.action).to_lowercase();
+    if action == "start" || action == "stop" || cmd.ok {
+        // Keep success path redraw-minimal on NewP4:
+        // for start/stop and other successful commands rely on state widgets update only.
+        if ui.get_command_feedback_visible() {
+            ui.set_command_feedback_visible(false);
+        }
+        return;
+    }
+
     let mut message = c_buf_to_string(&cmd.message);
     if message.is_empty() {
         message = if cmd.ok { "ok".to_string() } else { "error".to_string() };
     }
     message = translate_command_message(&message, is_ua);
-    let action = c_buf_to_string(&cmd.action);
-    let prefix = if is_ua { "Команда" } else { "Command" };
+    let prefix = if is_ua { "\u{041A}\u{043E}\u{043C}\u{0430}\u{043D}\u{0434}\u{0430}" } else { "Command" };
     let label = if action.is_empty() {
         format!("{}: {}", prefix, message)
     } else {
@@ -1993,6 +2949,37 @@ fn state_poll() -> SlintKilnState {
     let mut out = SlintKilnState::default();
     unsafe { slint_bridge_get_state(&mut out as *mut SlintKilnState) };
     out
+}
+
+fn state_changed_for_ui(prev: SlintKilnState, cur: SlintKilnState) -> bool {
+    let prev_cur_t = prev.current_temp.round() as i32;
+    let cur_cur_t = cur.current_temp.round() as i32;
+    let prev_tgt_t = prev.target_temp.round() as i32;
+    let cur_tgt_t = cur.target_temp.round() as i32;
+    if prev_cur_t != cur_cur_t || prev_tgt_t != cur_tgt_t {
+        return true;
+    }
+    if prev.status != cur.status
+        || prev.is_firing != cur.is_firing
+        || prev.time_remaining != cur.time_remaining
+        || prev.current_step != cur.current_step
+        || prev.total_steps != cur.total_steps
+        || prev.fault_active != cur.fault_active
+        || prev.pzem_ok != cur.pzem_ok
+    {
+        return true;
+    }
+    let prev_v = prev.pzem_voltage.round() as i32;
+    let cur_v = cur.pzem_voltage.round() as i32;
+    let prev_i = (prev.pzem_current * 10.0).round() as i32;
+    let cur_i = (cur.pzem_current * 10.0).round() as i32;
+    let prev_p = prev.pzem_power.round() as i32;
+    let cur_p = cur.pzem_power.round() as i32;
+    if prev_v != cur_v || prev_i != cur_i || prev_p != cur_p {
+        return true;
+    }
+
+    prev.error_msg != cur.error_msg || prev.fault_reason != cur.fault_reason
 }
 
 const CALIB_STEPS: usize = 9;
@@ -2034,15 +3021,15 @@ fn calib_target_for_step(step: u8) -> (i32, i32) {
 
 fn calib_hint_for_step(is_ua: bool, step: u8) -> &'static str {
     match (is_ua, step) {
-        (true, 0) => "Торкніться точки (верх-ліворуч)",
-        (true, 1) => "Торкніться точки (верх-центр)",
-        (true, 2) => "Торкніться точки (верх-праворуч)",
-        (true, 3) => "Торкніться точки (центр-ліворуч)",
-        (true, 4) => "Торкніться точки (центр)",
-        (true, 5) => "Торкніться точки (центр-праворуч)",
-        (true, 6) => "Торкніться точки (низ-ліворуч)",
-        (true, 7) => "Торкніться точки (низ-центр)",
-        (true, 8) => "Торкніться точки (низ-праворуч)",
+        (true, 0) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{0432}\u{0435}\u{0440}\u{0445}-\u{043B}\u{0456}\u{0432}\u{043E}\u{0440}\u{0443}\u{0447})",
+        (true, 1) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{0432}\u{0435}\u{0440}\u{0445}-\u{0446}\u{0435}\u{043D}\u{0442}\u{0440})",
+        (true, 2) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{0432}\u{0435}\u{0440}\u{0445}-\u{043F}\u{0440}\u{0430}\u{0432}\u{043E}\u{0440}\u{0443}\u{0447})",
+        (true, 3) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{0446}\u{0435}\u{043D}\u{0442}\u{0440}-\u{043B}\u{0456}\u{0432}\u{043E}\u{0440}\u{0443}\u{0447})",
+        (true, 4) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{0446}\u{0435}\u{043D}\u{0442}\u{0440})",
+        (true, 5) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{0446}\u{0435}\u{043D}\u{0442}\u{0440}-\u{043F}\u{0440}\u{0430}\u{0432}\u{043E}\u{0440}\u{0443}\u{0447})",
+        (true, 6) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{043D}\u{0438}\u{0437}-\u{043B}\u{0456}\u{0432}\u{043E}\u{0440}\u{0443}\u{0447})",
+        (true, 7) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{043D}\u{0438}\u{0437}-\u{0446}\u{0435}\u{043D}\u{0442}\u{0440})",
+        (true, 8) => "\u{0422}\u{043E}\u{0440}\u{043A}\u{043D}\u{0456}\u{0442}\u{044C}\u{0441}\u{044F} \u{0442}\u{043E}\u{0447}\u{043A}\u{0438} (\u{043D}\u{0438}\u{0437}-\u{043F}\u{0440}\u{0430}\u{0432}\u{043E}\u{0440}\u{0443}\u{0447})",
         (false, 0) => "Tap the dot (top-left)",
         (false, 1) => "Tap the dot (top-middle)",
         (false, 2) => "Tap the dot (top-right)",
@@ -2258,27 +3245,43 @@ pub extern "C" fn slint_ui_run() {
         slint_bridge_display_init();
     }
 
-    let window = MinimalSoftwareWindow::new(RepaintBufferType::ReusedBuffer);
-
+    let board_profile_id = unsafe { slint_bridge_get_board_profile() } as i32;
+    // IMPORTANT: call the WindowAdapter::set_size() implementation so the renderer sees the correct size.
+    let physical_w = unsafe { slint_bridge_get_display_width() }.max(1);
+    let physical_h = unsafe { slint_bridge_get_display_height() }.max(1);
+    let is_new_p4_display = board_profile_id == 1 || physical_w >= 800 || physical_h >= 480;
+    // Stable path: keep a reused software buffer and push complete frame with draw_bitmap.
+    let repaint_type = RepaintBufferType::ReusedBuffer;
+    let window = MinimalSoftwareWindow::new(repaint_type);
     slint::platform::set_platform(Box::new(EspPlatform {
         window: window.clone(),
         start: Instant::now(),
     }))
     .expect("set_platform failed");
 
-    // IMPORTANT: call the WindowAdapter::set_size() implementation so the renderer sees the correct size.
+    // For the NewP4 we render at the panel's native resolution (800x480) without relying on Slint's HiDPI scale
+    // factor. This keeps display coordinates and touch coordinates 1:1 and avoids "letterboxing" artifacts when our
+    // platform backend forwards raw pixel coordinates to the driver.
+    let ui_scale: f32 = 1.0;
+    let logical_w = physical_w;
+    let logical_h = physical_h;
+
+    let _ = window.dispatch_event(WindowEvent::ScaleFactorChanged { scale_factor: ui_scale });
     // The MinimalSoftwareWindow also has a convenience `set_size()` method, but that does not update the adapter size.
     slint::platform::WindowAdapter::set_size(
         window.as_ref(),
-        slint::PhysicalSize::new(480, 320).into(),
+        slint::PhysicalSize::new(physical_w as u32, physical_h as u32).into(),
     );
 
     let ui = AppWindow::new().expect("Failed to create UI");
+    ui.set_board_profile_id(board_profile_id);
+    ui.set_board_display_w(logical_w);
+    ui.set_board_display_h(logical_h);
     ui.window().show().unwrap_or(());
     ui.set_boot_splash_visible(true);
     {
         let ui_weak = ui.as_weak();
-        Timer::single_shot(Duration::from_millis(2200), move || {
+        Timer::single_shot(Duration::from_millis(3500), move || {
             if let Some(ui) = ui_weak.upgrade() {
                 ui.set_boot_splash_visible(false);
             }
@@ -2307,14 +3310,14 @@ pub extern "C" fn slint_ui_run() {
     if init_brightness > 100 { init_brightness = 100; }
     ui.set_display_brightness(init_brightness);
     ui.set_ui_dim(((100 - init_brightness).clamp(0, 100) as f32) / 100.0);
-    ui.set_temp_unit_label(match temp_unit { TempUnit::C => "°C", TempUnit::F => "°F" }.into());
-    ui.set_rate_unit_label(match temp_unit { TempUnit::C => "°C/h", TempUnit::F => "°F/h" }.into());
-    ui.set_rate_unit_label_min(match temp_unit { TempUnit::C => "°C/min", TempUnit::F => "°F/min" }.into());
+    ui.set_temp_unit_label(match temp_unit { TempUnit::C => "\u{00B0}C", TempUnit::F => "\u{00B0}F" }.into());
+    ui.set_rate_unit_label(match temp_unit { TempUnit::C => "\u{00B0}C/h", TempUnit::F => "\u{00B0}F/h" }.into());
+    ui.set_rate_unit_label_min(match temp_unit { TempUnit::C => "\u{00B0}C/min", TempUnit::F => "\u{00B0}F/min" }.into());
     ui.set_wifi_networks(ModelRc::new(VecModel::from(Vec::<WifiNetworkRow>::new())));
-    ui.set_wifi_qr_image(build_qr_image(&format!("WIFI:T:nopass;S:{};;", CONTROLLER_AP_SSID)));
+    ui.set_wifi_qr_image(build_qr_image(&wifi_qr_payload(false, "", CONTROLLER_AP_SSID_FALLBACK)));
     ui.set_wifi_qr_hint(
         if lang_is_ua {
-            "Відскануйте, щоб підключитися до Wi‑Fi контролера"
+            "\u{0412}\u{0456}\u{0434}\u{0441}\u{043A}\u{0430}\u{043D}\u{0443}\u{0439}\u{0442}\u{0435}, \u{0449}\u{043E}\u{0431} \u{043F}\u{0456}\u{0434}\u{043A}\u{043B}\u{044E}\u{0447}\u{0438}\u{0442}\u{0438}\u{0441}\u{044F} \u{0434}\u{043E} Wi-Fi \u{043A}\u{043E}\u{043D}\u{0442}\u{0440}\u{043E}\u{043B}\u{0435}\u{0440}\u{0430}"
         } else {
             "Scan to join controller Wi-Fi"
         }
@@ -2326,6 +3329,8 @@ pub extern "C" fn slint_ui_run() {
         selected_index: None,
         editing_index: None,
         graph_index: None,
+        graph_zoom_level: 0,
+        graph_points: Vec::new(),
         history_graph_id: None,
         history_detail_id: None,
         editor_steps: Vec::new(),
@@ -2335,6 +3340,7 @@ pub extern "C" fn slint_ui_run() {
         time_format,
         date_format,
     };
+    apply_schedule_graph_zoom(&ui, state.graph_zoom_level);
 
     if !state.schedules.is_empty() {
         state.selected_index = Some(0);
@@ -2363,15 +3369,47 @@ pub extern "C" fn slint_ui_run() {
     let clear_fault_inflight = Rc::new(RefCell::new(false));
     let kb_key_last = Rc::new(RefCell::new((String::new(), Instant::now() - Duration::from_secs(5))));
     let wifi_scan_in_progress = Rc::new(RefCell::new(false));
+    let wifi_connect_pending_deadline = Rc::new(RefCell::new(None::<Instant>));
+    let wifi_connect_target_ssid = Rc::new(RefCell::new(String::new()));
+    let render_suppress_until = Rc::new(RefCell::new(Instant::now()));
+    let command_feedback_until = Rc::new(RefCell::new(Instant::now()));
+    let fault_log_cache: Rc<RefCell<Vec<FaultLogPreviewCard>>> = Rc::new(RefCell::new(Vec::new()));
+    // 0=none, 1=start tap, 2=stop tap, 3=stop confirm, 4=wifi got ip, 5=cmd start, 6=cmd stop
+    let render_reason = Rc::new(RefCell::new((0u8, Instant::now() - Duration::from_secs(5))));
 
     {
         let ui_weak = ui_weak.clone();
         let app_state = app_state.clone();
         ui.on_open_library(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
+            // Defensive: ensure no modal/overlay is left active when navigating.
+            ui.set_standby_visible(false);
+            ui.set_boot_splash_visible(false);
+            ui.set_fault_log_detail_visible(false);
+            ui.set_show_stop_confirm(false);
+            ui.set_show_skip_confirm(false);
+            ui.set_show_running_edit_confirm(false);
+            ui.set_show_touch_confirm(false);
+            ui.set_delete_confirm_visible(false);
+            ui.set_kb_visible(false);
+            ui.set_command_feedback_visible(false);
             ui.set_view(View::Schedules);
             let state = app_state.borrow();
             refresh_schedule_model(&ui, &state);
+            // Guardrail: if the schedule list is empty (load failure or storage not ready),
+            // don't leave the user on a dead/blank page with no actionable UI.
+            if ui.get_schedules().row_count() == 0 {
+                ui.set_command_feedback(
+                    if ui.get_is_ua() {
+                        "\u{041D}\u{0435}\u{043C}\u{0430}\u{0454} \u{043F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C} \u{0430}\u{0431}\u{043E} \u{043D}\u{0435} \u{0432}\u{0434}\u{0430}\u{043B}\u{043E}\u{0441}\u{044F} \u{0437}\u{0430}\u{0432}\u{0430}\u{043D}\u{0442}\u{0430}\u{0436}\u{0438}\u{0442}\u{0438}".into()
+                    } else {
+                        "No programs found / load failed".into()
+                    }
+                );
+                ui.set_command_feedback_ok(false);
+                ui.set_command_feedback_visible(true);
+                ui.set_view(View::Dashboard);
+            }
         });
     }
 
@@ -2431,11 +3469,38 @@ pub extern "C" fn slint_ui_run() {
 
     {
         let ui_weak = ui_weak.clone();
+        let fault_log_cache = fault_log_cache.clone();
         ui.on_open_fault_logs(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
-            ui.set_fault_log_items(ModelRc::new(VecModel::from(load_fault_log_items(ui.get_is_ua()))));
+            let items = load_fault_log_items(ui.get_is_ua());
+            *fault_log_cache.borrow_mut() = items.clone();
+            ui.set_fault_log_items(ModelRc::new(VecModel::from(items)));
+            ui.set_fault_log_detail_visible(false);
             ui.set_settings_page("fault_logs".into());
             ui.set_view(View::Settings);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let fault_log_cache = fault_log_cache.clone();
+        ui.on_open_fault_log_detail(move |index| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            let idx = index as usize;
+            let cache = fault_log_cache.borrow();
+            let Some(item) = cache.get(idx) else { return; };
+            ui.set_fault_log_detail_title(item.title.clone());
+            ui.set_fault_log_detail_status(item.status.clone());
+            ui.set_fault_log_detail_text(item.details.clone());
+            ui.set_fault_log_detail_visible(true);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        ui.on_close_fault_log_detail(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            ui.set_fault_log_detail_visible(false);
         });
     }
 
@@ -2455,7 +3520,9 @@ pub extern "C" fn slint_ui_run() {
                 ui.set_selected_schedule_name(schedule.name.clone().into());
                 ui.set_selected_steps_count(schedule_steps_count(&schedule));
                 ui.set_schedule_graph_back_to_history(false);
-                refresh_schedule_graph_model(&ui, &state);
+                state.graph_zoom_level = 0;
+                apply_schedule_graph_zoom(&ui, state.graph_zoom_level);
+                refresh_schedule_graph_model(&ui, &mut state);
                 ui.set_view(View::ScheduleGraph);
             }
         });
@@ -2475,18 +3542,85 @@ pub extern "C" fn slint_ui_run() {
             ui.set_schedule_graph_back_to_history(true);
             if let Some(detail) = detail {
                 let title = if detail.summary.schedule_name.is_empty() {
-                    if ui.get_is_ua() { "Випал" } else { "Firing" }
+                    if ui.get_is_ua() { "\u{0412}\u{0438}\u{043F}\u{0430}\u{043B}" } else { "Firing" }
                 } else {
                     detail.summary.schedule_name.as_str()
                 };
                 ui.set_selected_schedule_name(title.into());
                 ui.set_selected_steps_count(detail.summary.total_steps.max(0) as i32);
             } else {
-                ui.set_selected_schedule_name((if ui.get_is_ua() { "Випал" } else { "Firing" }).into());
+                ui.set_selected_schedule_name((if ui.get_is_ua() { "\u{0412}\u{0438}\u{043F}\u{0430}\u{043B}" } else { "Firing" }).into());
                 ui.set_selected_steps_count(0);
             }
-            refresh_schedule_graph_model(&ui, &state);
+            apply_schedule_graph_zoom(&ui, state.graph_zoom_level);
+            refresh_schedule_graph_model(&ui, &mut state);
             ui.set_view(View::ScheduleGraph);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_schedule_graph_zoom_in(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            if !ui.get_schedule_graph_back_to_history() {
+                return;
+            }
+            let mut state = app_state.borrow_mut();
+            state.graph_zoom_level = (state.graph_zoom_level + 1).clamp(0, 2);
+            apply_schedule_graph_zoom(&ui, state.graph_zoom_level);
+            refresh_schedule_graph_model(&ui, &mut state);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_schedule_graph_zoom_out(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            if !ui.get_schedule_graph_back_to_history() {
+                return;
+            }
+            let mut state = app_state.borrow_mut();
+            state.graph_zoom_level = (state.graph_zoom_level - 1).clamp(0, 2);
+            apply_schedule_graph_zoom(&ui, state.graph_zoom_level);
+            refresh_schedule_graph_model(&ui, &mut state);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_schedule_graph_zoom_reset(move || {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            if !ui.get_schedule_graph_back_to_history() {
+                return;
+            }
+            let mut state = app_state.borrow_mut();
+            state.graph_zoom_level = 0;
+            apply_schedule_graph_zoom(&ui, state.graph_zoom_level);
+            refresh_schedule_graph_model(&ui, &mut state);
+        });
+    }
+
+    {
+        let ui_weak = ui_weak.clone();
+        let app_state = app_state.clone();
+        ui.on_schedule_graph_point_tapped(move |index| {
+            let Some(ui) = ui_weak.upgrade() else { return; };
+            if index < 0 {
+                ui.set_schedule_graph_tip_visible(false);
+                return;
+            }
+            let state = app_state.borrow();
+            let idx = index as usize;
+            let Some(point) = state.graph_points.get(idx) else {
+                ui.set_schedule_graph_tip_visible(false);
+                return;
+            };
+            let graph_w = ui.get_schedule_graph_plot_w_px().max(120);
+            let graph_h = ui.get_schedule_graph_plot_h_px().max(120);
+            set_schedule_graph_tip(&ui, graph_w, graph_h, point);
         });
     }
 
@@ -2508,74 +3642,62 @@ pub extern "C" fn slint_ui_run() {
             state.history_detail_id = id;
             if let Some(detail) = detail {
                 let title = if detail.summary.schedule_name.is_empty() {
-                    if ui.get_is_ua() { "Випал" } else { "Firing" }
+                    if ui.get_is_ua() { "\u{0412}\u{0438}\u{043F}\u{0430}\u{043B}" } else { "Firing" }
                 } else {
                     detail.summary.schedule_name.as_str()
                 };
                 ui.set_history_detail_title(title.into());
                 ui.set_history_detail_status(history_status_label(&detail.summary.status, ui.get_is_ua()).into());
-                let duration_label = format_minutes_label(detail.summary.duration.max(0) as i32, ui.get_is_ua());
+                let duration_label = format_minutes_label(duration_seconds_to_minutes(detail.summary.duration), ui.get_is_ua());
                 ui.set_history_detail_duration(duration_label.into());
                 ui.set_history_detail_steps(detail.summary.total_steps.max(0).to_string().into());
                 let energy_kwh = compute_energy_kwh(&detail);
                 let energy_label = if energy_kwh > 0.0 {
                     if ui.get_is_ua() {
-                        format!("{:.2} кВт·год", energy_kwh)
+                        format!("{:.2} \u{043A}\u{0412}\u{0442}\u{00B7}\u{0433}\u{043E}\u{0434}", energy_kwh)
                     } else {
                         format!("{:.2} kWh", energy_kwh)
                     }
                 } else if ui.get_is_ua() {
-                    "-- кВт·год".to_string()
+                    "-- \u{043A}\u{0412}\u{0442}\u{00B7}\u{0433}\u{043E}\u{0434}".to_string()
                 } else {
                     "-- kWh".to_string()
                 };
                 ui.set_history_detail_energy(energy_label.into());
                 let step_label = if detail.summary.total_steps > 0 && detail.summary.duration > 0 {
-                    let avg = (detail.summary.duration as f32 / detail.summary.total_steps as f32).round() as i32;
+                    let avg = ((detail.summary.duration as f32 / 60.0) / detail.summary.total_steps as f32).round() as i32;
                     if ui.get_is_ua() {
-                        format!("≈{} хв/крок", avg)
+                        format!("\u{2248}{} \u{0445}\u{0432}/\u{043A}\u{0440}\u{043E}\u{043A}", avg)
                     } else {
-                        format!("≈{} min/step", avg)
+                        format!("\u{2248}{} min/step", avg)
                     }
                 } else {
-                    if ui.get_is_ua() { "-- хв/крок" } else { "-- min/step" }.to_string()
+                    if ui.get_is_ua() { "-- \u{0445}\u{0432}/\u{043A}\u{0440}\u{043E}\u{043A}" } else { "-- min/step" }.to_string()
                 };
                 ui.set_history_detail_step_durations(step_label.into());
 
-                ui.set_history_detail_program_name(title.into());
-                ui.set_history_detail_start_time(
-                    if !detail.summary.start_time.is_empty() {
-                        detail.summary.start_time.clone()
-                    } else if ui.get_is_ua() {
-                        "Н/Д".to_string()
-                    } else {
-                        "N/A".to_string()
-                    }
-                    .into(),
-                );
-                ui.set_history_detail_end_time(
-                    if !detail.summary.end_time.is_empty() {
-                        detail.summary.end_time.clone()
-                    } else if ui.get_is_ua() {
-                        "Н/Д".to_string()
-                    } else {
-                        "N/A".to_string()
-                    }
-                    .into(),
-                );
-                ui.set_history_detail_status_verbose(history_status_verbose(&detail.summary, ui.get_is_ua()).into());
+                let text_fallback = if ui.get_is_ua() { "\u{041D}/\u{0414}" } else { "N/A" };
+                ui.set_history_detail_program_name(ui_clean_text(title, text_fallback).into());
+                let start_label = history_start_label_from_summary(&detail.summary, ui.get_is_ua())
+                    .unwrap_or_else(|| text_fallback.to_string());
+                ui.set_history_detail_start_time(ui_clean_text(&start_label, text_fallback).into());
+                let end_label = history_end_label_from_summary(&detail.summary, ui.get_is_ua())
+                    .unwrap_or_else(|| text_fallback.to_string());
+                ui.set_history_detail_end_time(ui_clean_text(&end_label, text_fallback).into());
+                let status_verbose = history_status_verbose(&detail.summary, ui.get_is_ua());
+                ui.set_history_detail_status_verbose(ui_clean_text(&status_verbose, "--").into());
                 let cost_label = if detail.summary.cost > 0.0 {
                     if ui.get_is_ua() {
-                        format!("{:.2} грн", detail.summary.cost)
+                        format!("{:.2} \u{0433}\u{0440}\u{043D}", detail.summary.cost)
                     } else {
                         format!("{:.2} UAH", detail.summary.cost)
                     }
                 } else if ui.get_is_ua() {
-                    "Н/Д (тариф не задано)".to_string()
+                    "\u{041D}/\u{0414} (\u{0442}\u{0430}\u{0440}\u{0438}\u{0444} \u{043D}\u{0435} \u{0437}\u{0430}\u{0434}\u{0430}\u{043D}\u{043E})".to_string()
                 } else {
                     "N/A (tariff not set)".to_string()
                 };
-                ui.set_history_detail_energy_cost(cost_label.into());
+                ui.set_history_detail_energy_cost(ui_clean_text(&cost_label, "--").into());
                 let peak_power = detail
                     .data
                     .iter()
@@ -2588,16 +3710,16 @@ pub extern "C" fn slint_ui_run() {
                     .fold(detail.summary.peak_current.max(0.0), f32::max);
                 let max_load = if peak_power > 0.0 || peak_current > 0.0 {
                     if ui.get_is_ua() {
-                        format!("{:.0} Вт / {:.1} A", peak_power, peak_current)
+                        format!("{:.0} \u{0412}\u{0442} / {:.1} A", peak_power, peak_current)
                     } else {
                         format!("{:.0} W / {:.1} A", peak_power, peak_current)
                     }
                 } else if ui.get_is_ua() {
-                    "Н/Д".to_string()
+                    "\u{041D}/\u{0414}".to_string()
                 } else {
                     "N/A".to_string()
                 };
-                ui.set_history_detail_max_load(max_load.into());
+                ui.set_history_detail_max_load(ui_clean_text(&max_load, "--").into());
                 let peak_temp = detail
                     .data
                     .iter()
@@ -2606,22 +3728,24 @@ pub extern "C" fn slint_ui_run() {
                 let peak_temp_label = if peak_temp > 0.0 {
                     format!("{:.1}{}", peak_temp, ui.get_temp_unit_label())
                 } else if ui.get_is_ua() {
-                    "Н/Д".to_string()
+                    "\u{041D}/\u{0414}".to_string()
                 } else {
                     "N/A".to_string()
                 };
-                ui.set_history_detail_peak_temp(peak_temp_label.into());
-                ui.set_history_detail_voltage_stability(compute_voltage_stability(&detail, ui.get_is_ua()).into());
-                ui.set_history_detail_step_plan_actual(build_step_and_change_text(&detail, ui.get_is_ua()).into());
+                ui.set_history_detail_peak_temp(ui_clean_text(&peak_temp_label, "--").into());
+                let voltage_stability = compute_voltage_stability(&detail, ui.get_is_ua());
+                ui.set_history_detail_voltage_stability(ui_clean_text(&voltage_stability, "--").into());
+                let step_plan_actual = build_step_and_change_text(&detail, ui.get_is_ua());
+                ui.set_history_detail_step_plan_actual(ui_clean_multiline(&step_plan_actual, "--").into());
             } else if let Some(summary) = summary_fallback {
                 let title = if summary.schedule_name.is_empty() {
-                    if ui.get_is_ua() { "Випал" } else { "Firing" }
+                    if ui.get_is_ua() { "\u{0412}\u{0438}\u{043F}\u{0430}\u{043B}" } else { "Firing" }
                 } else {
                     summary.schedule_name.as_str()
                 };
                 ui.set_history_detail_title(title.into());
                 ui.set_history_detail_status(history_status_label(&summary.status, ui.get_is_ua()).into());
-                ui.set_history_detail_duration(format_minutes_label(summary.duration.max(0) as i32, ui.get_is_ua()).into());
+                ui.set_history_detail_duration(format_minutes_label(duration_seconds_to_minutes(summary.duration), ui.get_is_ua()).into());
                 ui.set_history_detail_steps(summary.total_steps.max(0).to_string().into());
                 let energy_kwh = if summary.energy_kwh > 0.0 {
                     summary.energy_kwh
@@ -2632,38 +3756,44 @@ pub extern "C" fn slint_ui_run() {
                 };
                 let energy_label = if energy_kwh > 0.0 {
                     if ui.get_is_ua() {
-                        format!("{:.2} кВт·год", energy_kwh)
+                        format!("{:.2} \u{043A}\u{0412}\u{0442}\u{00B7}\u{0433}\u{043E}\u{0434}", energy_kwh)
                     } else {
                         format!("{:.2} kWh", energy_kwh)
                     }
                 } else if ui.get_is_ua() {
-                    "Н/Д".to_string()
+                    "\u{041D}/\u{0414}".to_string()
                 } else {
                     "N/A".to_string()
                 };
                 ui.set_history_detail_energy(energy_label.into());
                 let step_label = if summary.total_steps > 0 && summary.duration > 0 {
-                    let avg = (summary.duration as f32 / summary.total_steps as f32).round() as i32;
+                    let avg = ((summary.duration as f32 / 60.0) / summary.total_steps as f32).round() as i32;
                     if ui.get_is_ua() {
-                        format!("≈{} хв/крок", avg)
+                        format!("\u{2248}{} \u{0445}\u{0432}/\u{043A}\u{0440}\u{043E}\u{043A}", avg)
                     } else {
-                        format!("≈{} min/step", avg)
+                        format!("\u{2248}{} min/step", avg)
                     }
                 } else if ui.get_is_ua() {
-                    "Н/Д".to_string()
+                    "\u{041D}/\u{0414}".to_string()
                 } else {
                     "N/A".to_string()
                 };
                 ui.set_history_detail_step_durations(step_label.into());
-                ui.set_history_detail_program_name(title.into());
-                ui.set_history_detail_start_time(if !summary.start_time.is_empty() { summary.start_time.clone() } else if ui.get_is_ua() { "Н/Д".to_string() } else { "N/A".to_string() }.into());
-                ui.set_history_detail_end_time(if !summary.end_time.is_empty() { summary.end_time.clone() } else if ui.get_is_ua() { "Н/Д".to_string() } else { "N/A".to_string() }.into());
-                ui.set_history_detail_status_verbose(history_status_verbose(&summary, ui.get_is_ua()).into());
+                let text_fallback = if ui.get_is_ua() { "\u{041D}/\u{0414}" } else { "N/A" };
+                ui.set_history_detail_program_name(ui_clean_text(title, text_fallback).into());
+                let start_label = history_start_label_from_summary(&summary, ui.get_is_ua())
+                    .unwrap_or_else(|| text_fallback.to_string());
+                ui.set_history_detail_start_time(ui_clean_text(&start_label, text_fallback).into());
+                let end_label = history_end_label_from_summary(&summary, ui.get_is_ua())
+                    .unwrap_or_else(|| text_fallback.to_string());
+                ui.set_history_detail_end_time(ui_clean_text(&end_label, text_fallback).into());
+                let status_verbose = history_status_verbose(&summary, ui.get_is_ua());
+                ui.set_history_detail_status_verbose(ui_clean_text(&status_verbose, "--").into());
                 ui.set_history_detail_energy_cost(
                     if summary.cost > 0.0 {
-                        if ui.get_is_ua() { format!("{:.2} грн", summary.cost) } else { format!("{:.2} UAH", summary.cost) }
+                        if ui.get_is_ua() { format!("{:.2} \u{0433}\u{0440}\u{043D}", summary.cost) } else { format!("{:.2} UAH", summary.cost) }
                     } else if ui.get_is_ua() {
-                        "Н/Д (тариф не задано)".to_string()
+                        "\u{041D}/\u{0414} (\u{0442}\u{0430}\u{0440}\u{0438}\u{0444} \u{043D}\u{0435} \u{0437}\u{0430}\u{0434}\u{0430}\u{043D}\u{043E})".to_string()
                     } else {
                         "N/A (tariff not set)".to_string()
                     }
@@ -2671,35 +3801,35 @@ pub extern "C" fn slint_ui_run() {
                 );
                 let max_load = if summary.peak_power > 0.0 || summary.peak_current > 0.0 {
                     if ui.get_is_ua() {
-                        format!("{:.0} Вт / {:.1} A", summary.peak_power.max(0.0), summary.peak_current.max(0.0))
+                        format!("{:.0} \u{0412}\u{0442} / {:.1} A", summary.peak_power.max(0.0), summary.peak_current.max(0.0))
                     } else {
                         format!("{:.0} W / {:.1} A", summary.peak_power.max(0.0), summary.peak_current.max(0.0))
                     }
                 } else if ui.get_is_ua() {
-                    "Н/Д".to_string()
+                    "\u{041D}/\u{0414}".to_string()
                 } else {
                     "N/A".to_string()
                 };
-                ui.set_history_detail_max_load(max_load.into());
+                ui.set_history_detail_max_load(ui_clean_text(&max_load, "--").into());
                 ui.set_history_detail_peak_temp(
                     if summary.peak_temp > 0.0 {
                         format!("{:.1}{}", summary.peak_temp, ui.get_temp_unit_label())
                     } else if ui.get_is_ua() {
-                        "Н/Д".to_string()
+                        "\u{041D}/\u{0414}".to_string()
                     } else {
                         "N/A".to_string()
                     }
                     .into(),
                 );
-                ui.set_history_detail_voltage_stability((if ui.get_is_ua() { "Н/Д" } else { "N/A" }).into());
-                ui.set_history_detail_step_plan_actual((if ui.get_is_ua() { "Н/Д" } else { "N/A" }).into());
+                ui.set_history_detail_voltage_stability((if ui.get_is_ua() { "\u{041D}/\u{0414}" } else { "N/A" }).into());
+                ui.set_history_detail_step_plan_actual((if ui.get_is_ua() { "\u{041D}/\u{0414}" } else { "N/A" }).into());
             } else {
-                ui.set_history_detail_title((if ui.get_is_ua() { "Випал" } else { "Firing" }).into());
+                ui.set_history_detail_title((if ui.get_is_ua() { "\u{0412}\u{0438}\u{043F}\u{0430}\u{043B}" } else { "Firing" }).into());
                 ui.set_history_detail_status("--".into());
                 ui.set_history_detail_duration("--".into());
                 ui.set_history_detail_steps("--".into());
-                ui.set_history_detail_energy(if ui.get_is_ua() { "-- кВт·год" } else { "-- kWh" }.into());
-                ui.set_history_detail_step_durations(if ui.get_is_ua() { "-- хв/крок" } else { "-- min/step" }.into());
+                ui.set_history_detail_energy(if ui.get_is_ua() { "-- \u{043A}\u{0412}\u{0442}\u{00B7}\u{0433}\u{043E}\u{0434}" } else { "-- kWh" }.into());
+                ui.set_history_detail_step_durations(if ui.get_is_ua() { "-- \u{0445}\u{0432}/\u{043A}\u{0440}\u{043E}\u{043A}" } else { "-- min/step" }.into());
                 ui.set_history_detail_program_name("--".into());
                 ui.set_history_detail_start_time("--".into());
                 ui.set_history_detail_end_time("--".into());
@@ -2716,11 +3846,18 @@ pub extern "C" fn slint_ui_run() {
 
     {
         let ui_weak = ui_weak.clone();
+        let fault_log_cache = fault_log_cache.clone();
         ui.on_toggle_language(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let is_ua = !ui.get_is_ua();
             ui.set_is_ua(is_ua);
             unsafe { slint_bridge_set_language_is_ua(is_ua) };
+            if ui.get_settings_page().to_string() == "fault_logs" {
+                let items = load_fault_log_items(is_ua);
+                *fault_log_cache.borrow_mut() = items.clone();
+                ui.set_fault_log_items(ModelRc::new(VecModel::from(items)));
+                ui.set_fault_log_detail_visible(false);
+            }
         });
     }
 
@@ -2910,37 +4047,98 @@ pub extern "C" fn slint_ui_run() {
         let ui_weak = ui_weak.clone();
         let app_state = app_state.clone();
         let start_cooldown_at = start_cooldown_at.clone();
+        let render_suppress_until = render_suppress_until.clone();
+        let command_feedback_until = command_feedback_until.clone();
+        let render_reason = render_reason.clone();
         ui.on_start_firing(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
-            {
-                let mut last = start_cooldown_at.borrow_mut();
+            *render_reason.borrow_mut() = (1u8, Instant::now());
+            if ui.get_fault_active() {
+                let msg = if ui.get_is_ua() {
+                    "Активна помилка. Спочатку скиньте помилку".to_string()
+                } else {
+                    "Active fault. Clear fault first".to_string()
+                };
+                if !ui.get_command_feedback_visible() || ui.get_command_feedback().to_string() != msg {
+                    ui.set_command_feedback(msg.into());
+                    ui.set_command_feedback_ok(false);
+                    ui.set_command_feedback_visible(true);
+                    if let Ok(mut until) = command_feedback_until.try_borrow_mut() {
+                        *until = Instant::now() + Duration::from_millis(2600);
+                    }
+                }
+                return;
+            }
+            if let Ok(mut last) = start_cooldown_at.try_borrow_mut() {
                 if last.elapsed() < Duration::from_millis(700) {
                     return;
                 }
                 *last = Instant::now();
             }
-            let state = app_state.borrow();
-            if let Some(idx) = state.selected_index {
-                if let Some(schedule) = state.schedules.get(idx) {
-                    if let Ok(json) = serde_json::to_string(schedule) {
-                        if let Ok(c_json) = CString::new(json) {
-                            unsafe {
-                                let _ = slint_bridge_start_schedule_json(c_json.as_ptr());
-                            }
+            let schedule_json: Option<String> = {
+                if let Ok(state) = app_state.try_borrow() {
+                    state
+                        .selected_index
+                        .and_then(|idx| state.schedules.get(idx))
+                        .and_then(|schedule| serde_json::to_string(schedule).ok())
+                } else {
+                    None
+                }
+            };
+
+            if let Some(json) = schedule_json {
+                if let Ok(c_json) = CString::new(json) {
+                    let started = unsafe { slint_bridge_start_schedule_json(c_json.as_ptr()) };
+                    if started {
+                        if let Ok(mut until) = render_suppress_until.try_borrow_mut() {
+                            *until = Instant::now();
                         }
                     }
-                    ui.set_view(View::Dashboard);
-                    return;
+                    if !started {
+                        ui.set_command_feedback(
+                            if ui.get_is_ua() {
+                                "\u{041D}\u{0435} \u{0432}\u{0434}\u{0430}\u{043B}\u{043E}\u{0441}\u{044F} \u{043F}\u{043E}\u{0447}\u{0430}\u{0442}\u{0438} \u{0432}\u{0438}\u{043F}\u{0430}\u{043B}. \u{041F}\u{0435}\u{0440}\u{0435}\u{0432}\u{0456}\u{0440} \u{0441}\u{0442}\u{0430}\u{043D} \u{0442}\u{0435}\u{0440}\u{043C}\u{043E}\u{043F}\u{0430}\u{0440}\u{0438}/\u{043F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0438}".into()
+                            } else {
+                                "Start failed. Check thermocouple/fault state".into()
+                            }
+                        );
+                        ui.set_command_feedback_ok(false);
+                        ui.set_command_feedback_visible(true);
+                        if let Ok(mut until) = command_feedback_until.try_borrow_mut() {
+                            *until = Instant::now() + Duration::from_millis(4200);
+                        }
+                    }
+                }
+            } else {
+                ui.set_command_feedback(
+                    if ui.get_is_ua() {
+                        "\u{041D}\u{0435} \u{0432}\u{0438}\u{0431}\u{0440}\u{0430}\u{043D}\u{043E} \u{043F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0443} \u{0430}\u{0431}\u{043E} \u{043A}\u{0440}\u{043E}\u{043A}\u{0438}".into()
+                    } else {
+                        "No program/steps selected".into()
+                    }
+                );
+                ui.set_command_feedback_ok(false);
+                ui.set_command_feedback_visible(true);
+                if let Ok(mut until) = command_feedback_until.try_borrow_mut() {
+                    *until = Instant::now() + Duration::from_millis(3200);
                 }
             }
-            ui.set_view(View::Schedules);
         });
     }
 
     {
         let ui_weak = ui_weak.clone();
+        let stop_cooldown_at = stop_cooldown_at.clone();
+        let render_reason = render_reason.clone();
         ui.on_stop_firing(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
+            *render_reason.borrow_mut() = (2u8, Instant::now());
+            {
+                let last = stop_cooldown_at.borrow();
+                if last.elapsed() < Duration::from_millis(500) {
+                    return;
+                }
+            }
             ui.set_show_stop_confirm(true);
         });
     }
@@ -2981,8 +4179,10 @@ pub extern "C" fn slint_ui_run() {
     {
         let ui_weak = ui_weak.clone();
         let stop_cooldown_at = stop_cooldown_at.clone();
+        let render_reason = render_reason.clone();
         ui.on_stop_confirm(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
+            *render_reason.borrow_mut() = (3u8, Instant::now());
             {
                 let mut last = stop_cooldown_at.borrow_mut();
                 if last.elapsed() < Duration::from_millis(500) {
@@ -3160,7 +4360,7 @@ pub extern "C" fn slint_ui_run() {
         ui.on_new_schedule(move || {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let mut state = app_state.borrow_mut();
-            let base_name = if ui.get_is_ua() { "Нова_програма" } else { "New_Program" };
+            let base_name = if ui.get_is_ua() { "\u{041D}\u{043E}\u{0432}\u{0430}_\u{043F}\u{0440}\u{043E}\u{0433}\u{0440}\u{0430}\u{043C}\u{0430}" } else { "New_Program" };
             let name = make_unique_schedule_name(&state.schedules, base_name);
             let id = make_safe_id(&name);
             state.graph_index = None;
@@ -3337,6 +4537,9 @@ pub extern "C" fn slint_ui_run() {
         let ui_weak = ui_weak.clone();
         let app_state = app_state.clone();
         let kb_key_last = kb_key_last.clone();
+        let wifi_connect_pending_deadline = wifi_connect_pending_deadline.clone();
+        let wifi_connect_target_ssid = wifi_connect_target_ssid.clone();
+        let command_feedback_until = command_feedback_until.clone();
         ui.on_kb_key(move |key| {
             let Some(ui) = ui_weak.upgrade() else { return; };
             let key = key.to_string();
@@ -3382,11 +4585,59 @@ pub extern "C" fn slint_ui_run() {
                             let ssid = ui.get_wifi_selected_ssid().to_string();
                             let ssid_trimmed = ssid.trim();
                             if !ssid_trimmed.is_empty() {
+                                unsafe { slint_bridge_wifi_disconnect(); }
                                 if let (Ok(c_ssid), Ok(c_pass)) = (CString::new(ssid_trimmed), CString::new(candidate)) {
-                                    unsafe {
-                                        let _ = slint_bridge_wifi_connect(c_ssid.as_ptr(), c_pass.as_ptr());
+                                    let started = unsafe { slint_bridge_wifi_connect(c_ssid.as_ptr(), c_pass.as_ptr()) };
+                                    if started {
+                                        *wifi_connect_target_ssid.borrow_mut() = ssid_trimmed.to_string();
+                                        *wifi_connect_pending_deadline.borrow_mut() = Some(Instant::now() + Duration::from_secs(18));
+                                        ui.set_command_feedback(
+                                            if ui.get_is_ua() {
+                                                "\u{041F}\u{0456}\u{0434}\u{043A}\u{043B}\u{044E}\u{0447}\u{0435}\u{043D}\u{043D}\u{044F} \u{0434}\u{043E} Wi-Fi...".into()
+                                            } else {
+                                                "Connecting to Wi-Fi...".into()
+                                            }
+                                        );
+                                        ui.set_command_feedback_ok(true);
+                                        ui.set_command_feedback_visible(true);
+                                        *command_feedback_until.borrow_mut() = Instant::now() + Duration::from_millis(3000);
+                                    } else {
+                                        *wifi_connect_pending_deadline.borrow_mut() = None;
+                                        ui.set_command_feedback(
+                                            if ui.get_is_ua() {
+                                                "\u{041D}\u{0435} \u{0432}\u{0434}\u{0430}\u{043B}\u{043E}\u{0441}\u{044F} \u{0437}\u{0430}\u{043F}\u{0443}\u{0441}\u{0442}\u{0438}\u{0442}\u{0438} \u{043F}\u{0456}\u{0434}\u{043A}\u{043B}\u{044E}\u{0447}\u{0435}\u{043D}\u{043D}\u{044F}".into()
+                                            } else {
+                                                "Failed to start Wi-Fi connection".into()
+                                            }
+                                        );
+                                        ui.set_command_feedback_ok(false);
+                                        ui.set_command_feedback_visible(true);
+                                        *command_feedback_until.borrow_mut() = Instant::now() + Duration::from_millis(4200);
                                     }
+                                } else {
+                                    *wifi_connect_pending_deadline.borrow_mut() = None;
+                                    ui.set_command_feedback(
+                                        if ui.get_is_ua() {
+                                            "\u{041D}\u{0435}\u{043A}\u{043E}\u{0440}\u{0435}\u{043A}\u{0442}\u{043D}\u{0456} \u{0434}\u{0430}\u{043D}\u{0456} Wi-Fi".into()
+                                        } else {
+                                            "Invalid Wi-Fi credentials data".into()
+                                        }
+                                    );
+                                    ui.set_command_feedback_ok(false);
+                                    ui.set_command_feedback_visible(true);
+                                    *command_feedback_until.borrow_mut() = Instant::now() + Duration::from_millis(4200);
                                 }
+                            } else {
+                                ui.set_command_feedback(
+                                    if ui.get_is_ua() {
+                                        "\u{0421}\u{043F}\u{043E}\u{0447}\u{0430}\u{0442}\u{043A}\u{0443} \u{043E}\u{0431}\u{0435}\u{0440}\u{0456}\u{0442}\u{044C} Wi-Fi \u{043C}\u{0435}\u{0440}\u{0435}\u{0436}\u{0443}".into()
+                                    } else {
+                                        "Select Wi-Fi network first".into()
+                                    }
+                                );
+                                ui.set_command_feedback_ok(false);
+                                ui.set_command_feedback_visible(true);
+                                *command_feedback_until.borrow_mut() = Instant::now() + Duration::from_millis(3000);
                             }
                         }
                         ui.set_kb_visible(false);
@@ -3602,7 +4853,15 @@ pub extern "C" fn slint_ui_run() {
         });
     }
 
-    let mut line_buffer = vec![Rgb565Pixel::default(); 480];
+    let line_pixels = usize::max(physical_w as usize, 1);
+    let frame_pixels = usize::max((physical_w as usize).saturating_mul(physical_h as usize), 1);
+    let mut line_buffer = vec![Rgb565Pixel::default(); line_pixels];
+    let mut frame_buffer = vec![Rgb565Pixel::default(); frame_pixels];
+    // Use full-frame buffering to avoid visible top-to-bottom redraw on state transitions.
+    let use_full_frame_flush = true;
+    // NewP4: avoid direct DPI framebuffer submit path; use stable draw_bitmap pipeline.
+    let allow_p4_direct_framebuffer = !is_new_p4_display;
+    let force_p4_no_blit_fallback = false;
     let mut last_touch = false;
     let mut debug_pressed = false;
     let mut debug_x_i32: i32 = 0;
@@ -3617,17 +4876,31 @@ pub extern "C" fn slint_ui_run() {
     let mut locked_scroll_x: i32 = 0;
     let mut have_last_sent = false;
     let mut last_state_update = Instant::now();
+    let mut sta_got_ip_guard_until = Instant::now();
+    let mut wifi_transition_guard_until = Instant::now();
+    let mut heavy_ui_guard_until = Instant::now();
+    let mut last_sta_got_ip_ms: u64 = 0;
+    let mut last_touch_dbg_x: i32 = i32::MIN;
+    let mut last_touch_dbg_y: i32 = i32::MIN;
+    let mut last_touch_dbg_pressed: bool = false;
+    let mut last_wifi_ok_value: Option<bool> = None;
     let mut last_ui_heartbeat = Instant::now();
     let mut last_clock_update = Instant::now();
     let mut last_controller_info_update = Instant::now() - Duration::from_secs(10);
     let mut last_settings_sync = Instant::now() - Duration::from_secs(10);
+    let mut last_polled_state = SlintKilnState::default();
+    let mut has_last_polled_state = false;
     let mut last_schedules_revision = unsafe { slint_bridge_get_schedules_revision() };
     let mut last_command_result_revision = unsafe { slint_bridge_get_command_result_revision() };
-    let mut command_feedback_until = Instant::now();
     let mut last_qr_payload = String::new();
     let mut last_touch_activity = Instant::now();
-    let frame_budget = Duration::from_millis(1000 / UI_TARGET_FPS);
-    let mut next_frame_at = Instant::now() + frame_budget;
+    let target_fps = UI_TARGET_FPS;
+    let frame_budget = if target_fps > 0 {
+        Some(Duration::from_millis(1000 / target_fps))
+    } else {
+        None
+    };
+    let mut next_frame_at = Instant::now();
 
     loop {
         slint::platform::update_timers_and_animations();
@@ -3670,17 +4943,75 @@ pub extern "C" fn slint_ui_run() {
         if command_revision != 0 && command_revision != last_command_result_revision {
             let mut cmd = SlintCommandResult::default();
             if unsafe { slint_bridge_copy_command_result(&mut cmd as *mut SlintCommandResult) } {
+                let action = c_buf_to_string(&cmd.action);
+                if action == "start" || action == "stop" {
+                    heavy_ui_guard_until = Instant::now() + Duration::from_millis(220);
+                    *render_reason.borrow_mut() = (if action == "start" { 5u8 } else { 6u8 }, Instant::now());
+                }
                 if let Some(ui) = ui_weak.upgrade() {
                     apply_command_result_to_ui(&ui, cmd, ui.get_is_ua());
                 }
-                command_feedback_until = Instant::now() + Duration::from_millis(2600);
+                *command_feedback_until.borrow_mut() = Instant::now() + Duration::from_millis(2600);
             }
             last_command_result_revision = command_revision;
         }
-        if Instant::now() > command_feedback_until {
+        if Instant::now() > *command_feedback_until.borrow() {
             if let Some(ui) = ui_weak.upgrade() {
                 if ui.get_command_feedback_visible() {
                     ui.set_command_feedback_visible(false);
+                }
+            }
+        }
+        if let Some(ui) = ui_weak.upgrade() {
+            let wifi_now_ok = unsafe { slint_bridge_wifi_is_connected() };
+            if last_wifi_ok_value != Some(wifi_now_ok) {
+                if ui.get_header_wifi_ok() != wifi_now_ok {
+                    ui.set_header_wifi_ok(wifi_now_ok);
+                }
+                let wifi_ui_visible =
+                    (ui.get_view() == View::Settings && ui.get_settings_page() == "wifi")
+                    || ui.get_wifi_qr_visible();
+                if wifi_ui_visible && ui.get_wifi_ok() != wifi_now_ok {
+                    ui.set_wifi_ok(wifi_now_ok);
+                }
+                last_wifi_ok_value = Some(wifi_now_ok);
+            }
+            let pending_deadline = *wifi_connect_pending_deadline.borrow();
+            if let Some(deadline) = pending_deadline {
+                if wifi_now_ok {
+                    let ssid = wifi_connect_target_ssid.borrow().clone();
+                    ui.set_command_feedback(
+                        if ui.get_is_ua() {
+                            if ssid.is_empty() {
+                                "\u{041F}\u{0456}\u{0434}\u{043A}\u{043B}\u{044E}\u{0447}\u{0435}\u{043D}\u{043E} \u{0434}\u{043E} Wi-Fi".into()
+                            } else {
+                                format!("\u{041F}\u{0456}\u{0434}\u{043A}\u{043B}\u{044E}\u{0447}\u{0435}\u{043D}\u{043E}: {}", ssid).into()
+                            }
+                        } else {
+                            if ssid.is_empty() {
+                                "Connected to Wi-Fi".into()
+                            } else {
+                                format!("Connected: {}", ssid).into()
+                            }
+                        }
+                    );
+                    ui.set_command_feedback_ok(true);
+                    ui.set_command_feedback_visible(true);
+                    ui.set_wifi_picker_visible(false);
+                    *command_feedback_until.borrow_mut() = Instant::now() + Duration::from_millis(3200);
+                    *wifi_connect_pending_deadline.borrow_mut() = None;
+                } else if Instant::now() >= deadline {
+                    ui.set_command_feedback(
+                        if ui.get_is_ua() {
+                            "\u{041D}\u{0435}\u{0432}\u{0456}\u{0440}\u{043D}\u{0438}\u{0439} \u{043F}\u{0430}\u{0440}\u{043E}\u{043B}\u{044C} \u{0430}\u{0431}\u{043E} \u{043D}\u{0435} \u{0432}\u{0434}\u{0430}\u{043B}\u{043E}\u{0441}\u{044F} \u{043F}\u{0456}\u{0434}\u{043A}\u{043B}\u{044E}\u{0447}\u{0438}\u{0442}\u{0438}\u{0441}\u{044F}".into()
+                        } else {
+                            "Wrong password or failed to connect".into()
+                        }
+                    );
+                    ui.set_command_feedback_ok(false);
+                    ui.set_command_feedback_visible(true);
+                    *command_feedback_until.borrow_mut() = Instant::now() + Duration::from_millis(4200);
+                    *wifi_connect_pending_deadline.borrow_mut() = None;
                 }
             }
         }
@@ -3695,19 +5026,33 @@ pub extern "C" fn slint_ui_run() {
         let mut y: u16 = 0;
         let mut z: u16 = 0;
         let raw_pressed = unsafe {
-            if calib_active {
+            if calib_active || is_new_p4_display {
                 display_driver_touch_probe_raw(&mut x, &mut y, &mut z)
             } else {
                 display_driver_touch_probe(&mut x, &mut y, &mut z)
             }
         };
+        if is_new_p4_display && raw_pressed {
+            // NewP4 GT911 reports portrait coordinates (480x800). Convert to the UI landscape space (800x480).
+            let px = x.min(479) as i32;
+            let py = y.min(799) as i32;
+            x = (799 - py).clamp(0, 799) as u16;
+            y = px.clamp(0, 479) as u16;
+        }
         let pressed = raw_pressed;
 
         if let Some(ui) = ui_weak.upgrade() {
-            ui.set_touch_x(x as i32);
-            ui.set_touch_y(y as i32);
-            ui.set_touch_z(z as i32);
-            ui.set_touch_pressed(pressed);
+            // Keep raw touch telemetry updates only for calibration view.
+            // Updating these properties on every tap in normal UI causes extra full redraws.
+            if ui.get_view() == View::Calibration {
+                let tx = x as i32;
+                let ty = y as i32;
+                let tz = z as i32;
+                if ui.get_touch_x() != tx { ui.set_touch_x(tx); }
+                if ui.get_touch_y() != ty { ui.set_touch_y(ty); }
+                if ui.get_touch_z() != tz { ui.set_touch_z(tz); }
+                if ui.get_touch_pressed() != pressed { ui.set_touch_pressed(pressed); }
+            }
             if !calib_active && ui.get_view() == View::Calibration {
                 ui.set_view(View::Dashboard);
             }
@@ -3734,6 +5079,7 @@ pub extern "C" fn slint_ui_run() {
                 && !ui.get_show_stop_confirm()
                 && !ui.get_show_skip_confirm()
                 && !ui.get_show_running_edit_confirm()
+                && ui.get_board_profile_id() != 1
                 && last_touch_activity.elapsed() >= Duration::from_millis(STANDBY_TIMEOUT_MS)
             {
                 ui.set_standby_visible(true);
@@ -3781,9 +5127,9 @@ pub extern "C" fn slint_ui_run() {
                 calib.active = false;
                 if let Some(ui) = ui_weak.upgrade() {
                     if ok {
-                        ui.set_calib_hint(if ui.get_is_ua() { "Готово" } else { "Done" }.into());
+                        ui.set_calib_hint(if ui.get_is_ua() { "\u{0413}\u{043E}\u{0442}\u{043E}\u{0432}\u{043E}" } else { "Done" }.into());
                     } else {
-                        ui.set_calib_hint(if ui.get_is_ua() { "Помилка калібрування" } else { "Calibration failed" }.into());
+                        ui.set_calib_hint(if ui.get_is_ua() { "\u{041F}\u{043E}\u{043C}\u{0438}\u{043B}\u{043A}\u{0430} \u{043A}\u{0430}\u{043B}\u{0456}\u{0431}\u{0440}\u{0443}\u{0432}\u{0430}\u{043D}\u{043D}\u{044F}" } else { "Calibration failed" }.into());
                     }
                     ui.set_view(View::Dashboard);
                 }
@@ -3820,7 +5166,8 @@ pub extern "C" fn slint_ui_run() {
                 filtered_y = yi;
             }
 
-            if z >= TOUCH_DEBUG_MIN_Z {
+            let debug_min_z = if is_new_p4_display { 0 } else { TOUCH_DEBUG_MIN_Z };
+            if z >= debug_min_z {
                 let (dbg_x, dbg_y) = if have_last_sent {
                     (last_sent_x, last_sent_y)
                 } else {
@@ -3838,7 +5185,7 @@ pub extern "C" fn slint_ui_run() {
                     debug_last_update = now;
                 }
             }
-            debug_pressed = pressed && z >= TOUCH_DEBUG_MIN_Z;
+            debug_pressed = pressed && z >= debug_min_z;
 
             let mut send_x_i32 = filtered_x;
             if !calib_active && active_view == View::Settings {
@@ -3850,7 +5197,8 @@ pub extern "C" fn slint_ui_run() {
             let send_y = filtered_y as u16;
             last_x = send_x;
             last_y = send_y;
-            let pos = slint::LogicalPosition::new(send_x as f32, send_y as f32);
+            // Touch coordinates arrive in physical pixels; convert to Slint logical coordinates when scaling is used.
+            let pos = slint::LogicalPosition::new((send_x as f32) / ui_scale, (send_y as f32) / ui_scale);
             if !last_touch {
                 let _ = window.dispatch_event(WindowEvent::PointerPressed { position: pos, button: PointerEventButton::Left });
                 let _ = window.dispatch_event(WindowEvent::PointerMoved { position: pos });
@@ -3868,7 +5216,7 @@ pub extern "C" fn slint_ui_run() {
                 }
             }
         } else if last_touch {
-            let pos = slint::LogicalPosition::new(last_x as f32, last_y as f32);
+            let pos = slint::LogicalPosition::new((last_x as f32) / ui_scale, (last_y as f32) / ui_scale);
             let _ = window.dispatch_event(WindowEvent::PointerReleased { position: pos, button: PointerEventButton::Left });
             have_last_sent = false;
         }
@@ -3878,28 +5226,68 @@ pub extern "C" fn slint_ui_run() {
         }
 
         if let Some(ui) = ui_weak.upgrade() {
-            ui.set_touch_debug_x(debug_x_i32);
-            ui.set_touch_debug_y(debug_y_i32);
-            ui.set_touch_debug_pressed(debug_pressed);
+            if ui.get_view() == View::Calibration {
+                if debug_x_i32 != last_touch_dbg_x {
+                    ui.set_touch_debug_x(debug_x_i32);
+                    last_touch_dbg_x = debug_x_i32;
+                }
+                if debug_y_i32 != last_touch_dbg_y {
+                    ui.set_touch_debug_y(debug_y_i32);
+                    last_touch_dbg_y = debug_y_i32;
+                }
+                if debug_pressed != last_touch_dbg_pressed {
+                    ui.set_touch_debug_pressed(debug_pressed);
+                    last_touch_dbg_pressed = debug_pressed;
+                }
+            }
         }
 
         // Status update
-        if last_state_update.elapsed() >= Duration::from_millis(500) {
+        if last_state_update.elapsed() >= Duration::from_millis(UI_STATE_APPLY_PERIOD_MS) {
             last_state_update = Instant::now();
+            let got_ip_ms = unsafe { slint_bridge_wifi_last_got_ip_ms() };
+            if got_ip_ms != 0 && got_ip_ms != last_sta_got_ip_ms {
+                last_sta_got_ip_ms = got_ip_ms;
+                *render_reason.borrow_mut() = (4u8, Instant::now());
+                sta_got_ip_guard_until = Instant::now() + Duration::from_millis(120);
+                wifi_transition_guard_until = Instant::now() + Duration::from_millis(300);
+                heavy_ui_guard_until = Instant::now() + Duration::from_millis(180);
+                if let Ok(mut until) = render_suppress_until.try_borrow_mut() {
+                    *until = Instant::now();
+                }
+            }
             let s = state_poll();
-            {
-                let mut state = app_state.borrow_mut();
-                apply_state_to_ui(&ui, s, &mut state);
+            let should_apply_state = !has_last_polled_state || state_changed_for_ui(last_polled_state, s);
+            let in_wifi_transition_dashboard =
+                Instant::now() < wifi_transition_guard_until && ui.get_view() == View::Dashboard;
+            if in_wifi_transition_dashboard || Instant::now() < heavy_ui_guard_until {
+                // During short STA_GOT_IP transition, keep dashboard stable and only let
+                // Wi-Fi icon update via the lightweight path above.
+                last_polled_state = s;
+                has_last_polled_state = true;
+            } else if should_apply_state && Instant::now() >= sta_got_ip_guard_until {
+                {
+                    let mut state = app_state.borrow_mut();
+                    apply_state_to_ui(&ui, s, &mut state);
+                }
+                last_polled_state = s;
+                has_last_polled_state = true;
             }
             let max_temp = unsafe { slint_bridge_get_user_max_temp_c() };
             if max_temp.is_finite() {
                 let unit = app_state.borrow().temp_unit;
-                ui.set_schedule_target_max_c(temp_to_display(max_temp.clamp(100.0, 1300.0), unit).round() as i32);
+                let max_disp = temp_to_display(max_temp.clamp(100.0, 1300.0), unit).round() as i32;
+                if ui.get_schedule_target_max_c() != max_disp {
+                    ui.set_schedule_target_max_c(max_disp);
+                }
             }
             let autotune_target_c = unsafe { slint_bridge_get_autotune_target_c() };
             if autotune_target_c.is_finite() {
                 let unit = app_state.borrow().temp_unit;
-                ui.set_autotune_target_c(temp_to_display(autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32);
+                let autotune_disp = temp_to_display(autotune_target_c.clamp(100.0, 1200.0), unit).round() as i32;
+                if ui.get_autotune_target_c() != autotune_disp {
+                    ui.set_autotune_target_c(autotune_disp);
+                }
             }
             if ui.get_settings_page() == "autotune" && last_settings_sync.elapsed() >= Duration::from_secs(3) {
                 last_settings_sync = Instant::now();
@@ -3914,30 +5302,62 @@ pub extern "C" fn slint_ui_run() {
                 }
                 let max_temp = unsafe { slint_bridge_get_user_max_temp_c() };
                 if max_temp.is_finite() {
-                    ui.set_schedule_target_max_c(temp_to_display(max_temp.clamp(100.0, 1300.0), unit).round() as i32);
+                    let max_disp = temp_to_display(max_temp.clamp(100.0, 1300.0), unit).round() as i32;
+                    if ui.get_schedule_target_max_c() != max_disp {
+                        ui.set_schedule_target_max_c(max_disp);
+                    }
                 }
             }
+            if (ui.get_view() == View::Settings && ui.get_settings_page() == "wifi") || ui.get_wifi_qr_visible() {
             let wifi_ok = ui.get_wifi_ok();
             let url = ui.get_wifi_server_url().to_string();
-            let qr_payload = wifi_qr_payload(wifi_ok, &url);
+            let mut raw_ap_ssid = [0 as c_char; 64];
+            let ap_ssid = if unsafe { slint_bridge_wifi_ap_ssid_copy(raw_ap_ssid.as_mut_ptr(), raw_ap_ssid.len() as i32) } {
+                unsafe { CStr::from_ptr(raw_ap_ssid.as_ptr()) }
+                    .to_string_lossy()
+                    .trim()
+                    .to_string()
+            } else {
+                CONTROLLER_AP_SSID_FALLBACK.to_string()
+            };
+            let ap_ssid = if ap_ssid.is_empty() {
+                CONTROLLER_AP_SSID_FALLBACK.to_string()
+            } else {
+                ap_ssid
+            };
+            let ap_ssid = if ap_ssid.starts_with("TRAE_KILN_SETUP") {
+                ap_ssid
+            } else {
+                CONTROLLER_AP_SSID_FALLBACK.to_string()
+            };
+            let qr_payload = wifi_qr_payload(wifi_ok, &url, &ap_ssid);
             if qr_payload != last_qr_payload {
                 last_qr_payload = qr_payload.clone();
                 ui.set_wifi_qr_image(build_qr_image(&qr_payload));
                 if wifi_ok {
                     let hint = if ui.get_is_ua() {
-                        format!("Відкрити веб-інтерфейс: {}", url)
+                        format!("\u{0412}\u{0456}\u{0434}\u{043A}\u{0440}\u{0438}\u{0442}\u{0438} \u{0432}\u{0435}\u{0431}-\u{0456}\u{043D}\u{0442}\u{0435}\u{0440}\u{0444}\u{0435}\u{0439}\u{0441}: {}", url)
                     } else {
                         format!("Open web interface: {}", url)
                     };
                     ui.set_wifi_qr_hint(hint.into());
                 } else {
                     let hint = if ui.get_is_ua() {
-                        format!("1) Скануйте QR ({}), 2) відкрийте http://192.168.4.1", CONTROLLER_AP_SSID)
+                        format!(
+                            "1) Скануйте QR і підключіться до {}, 2) captive portal відкриє Wi-Fi manager (або відкрийте {})",
+                            ap_ssid,
+                            CONTROLLER_AP_PORTAL_URL
+                        )
                     } else {
-                        format!("1) Scan QR ({}), 2) open http://192.168.4.1", CONTROLLER_AP_SSID)
+                        format!(
+                            "1) Scan QR to join {}, 2) captive portal should open Wi-Fi manager (or open {})",
+                            ap_ssid,
+                            CONTROLLER_AP_PORTAL_URL
+                        )
                     };
                     ui.set_wifi_qr_hint(hint.into());
                 }
+            }
             }
 
             let schedules_revision = unsafe { slint_bridge_get_schedules_revision() };
@@ -3998,20 +5418,178 @@ pub extern "C" fn slint_ui_run() {
         }
 
         // Render
-        window.draw_if_needed(|renderer| {
-            let buffer = DisplayLineBuffer {
-                line_buffer: &mut line_buffer,
-            };
-            renderer.render_by_line(buffer);
-        });
+        if use_full_frame_flush {
+            let frame_start = Instant::now();
+            let mut had_updates = false;
+            let mut used_direct_fb = false;
+            let mut dirty_min_x = i32::MAX;
+            let mut dirty_min_y = i32::MAX;
+            let mut dirty_max_x = -1;
+            let mut dirty_max_y = -1;
+            let mut submit_w: i32 = 0;
+            let mut submit_h: i32 = 0;
+            window.draw_if_needed(|renderer| {
+                if allow_p4_direct_framebuffer && is_new_p4_display {
+                    let mut p4_fb_ptr: *mut u16 = core::ptr::null_mut();
+                    let mut p4_fb_w: i32 = 0;
+                    let mut p4_fb_h: i32 = 0;
+                    let direct_ok = unsafe {
+                        display_driver_p4_begin_frame(&mut p4_fb_ptr, &mut p4_fb_w, &mut p4_fb_h)
+                            && !p4_fb_ptr.is_null()
+                            && p4_fb_w > 0
+                            && p4_fb_h > 0
+                    };
+                    if direct_ok {
+                        used_direct_fb = true;
+                        let fb_pixels = (p4_fb_w as usize).saturating_mul(p4_fb_h as usize).max(1);
+                        let fb_slice = unsafe { std::slice::from_raw_parts_mut(p4_fb_ptr, fb_pixels) };
+                        let buffer = P4RotatedLineBuffer {
+                            line_buffer: &mut line_buffer,
+                            frame_buffer: fb_slice,
+                            frame_width: p4_fb_w as usize,
+                            src_width: physical_w as usize,
+                            src_height: physical_h as usize,
+                            had_updates: &mut had_updates,
+                            dirty_min_x: &mut dirty_min_x,
+                            dirty_min_y: &mut dirty_min_y,
+                            dirty_max_x: &mut dirty_max_x,
+                            dirty_max_y: &mut dirty_max_y,
+                        };
+                        renderer.render_by_line(buffer);
+                        return;
+                    }
+                    // On NewP4 never mix direct-framebuffer and fallback blit paths in the same run:
+                    // mixed submit modes can produce visible flash/overdraw during state transitions.
+                    return;
+                }
+                let buffer = BufferedDisplayLineBuffer {
+                    line_buffer: &mut line_buffer,
+                    frame_buffer: &mut frame_buffer,
+                    frame_width: physical_w as usize,
+                    had_updates: &mut had_updates,
+                    dirty_min_x: &mut dirty_min_x,
+                    dirty_min_y: &mut dirty_min_y,
+                    dirty_max_x: &mut dirty_max_x,
+                    dirty_max_y: &mut dirty_max_y,
+                };
+                renderer.render_by_line(buffer);
+            });
+            if had_updates {
+                if used_direct_fb {
+                    let x1 = dirty_min_x.clamp(0, physical_w.saturating_sub(1));
+                    let y1 = dirty_min_y.clamp(0, physical_h.saturating_sub(1));
+                    let x2 = dirty_max_x.clamp(0, physical_w.saturating_sub(1));
+                    let y2 = dirty_max_y.clamp(0, physical_h.saturating_sub(1));
+                    if x2 >= x1 && y2 >= y1 {
+                        let w = x2 - x1 + 1;
+                        let h = y2 - y1 + 1;
+                        submit_w = w;
+                        submit_h = h;
+                        unsafe {
+                            let _ = display_driver_p4_present_frame_region(x1, y1, w, h);
+                        }
+                    } else {
+                        // Nothing dirty in this frame; keep backbuffer and skip submit.
+                        unsafe { display_driver_p4_cancel_frame(); }
+                    }
+                } else {
+                    if force_p4_no_blit_fallback {
+                        return;
+                    }
+                    let x1 = dirty_min_x.clamp(0, physical_w.saturating_sub(1));
+                    let y1 = dirty_min_y.clamp(0, physical_h.saturating_sub(1));
+                    let x2 = dirty_max_x.clamp(0, physical_w.saturating_sub(1));
+                    let y2 = dirty_max_y.clamp(0, physical_h.saturating_sub(1));
+                    if x2 >= x1 && y2 >= y1 {
+                        let w = x2 - x1 + 1;
+                        let h = y2 - y1 + 1;
+                        submit_w = w;
+                        submit_h = h;
+                        if x1 == 0 && y1 == 0 && w == physical_w && h == physical_h {
+                            // Full-frame dirty region: avoid extra temporary region allocation/copy.
+                            unsafe {
+                                let _ = display_driver_blit_rgb565(
+                                    0,
+                                    0,
+                                    physical_w,
+                                    physical_h,
+                                    frame_buffer.as_ptr() as *const u16,
+                                );
+                            }
+                        } else {
+                            let src_w = physical_w as usize;
+                            let rw = w as usize;
+                            let rh = h as usize;
+                            let mut region: Vec<Rgb565Pixel> = vec![Rgb565Pixel::default(); rw.saturating_mul(rh)];
+                            for row in 0..rh {
+                                let src_row = (y1 as usize).saturating_add(row);
+                                let src_start = src_row.saturating_mul(src_w).saturating_add(x1 as usize);
+                                let src_end = src_start.saturating_add(rw);
+                                let dst_start = row.saturating_mul(rw);
+                                let dst_end = dst_start.saturating_add(rw);
+                                if src_end <= frame_buffer.len() && dst_end <= region.len() {
+                                    region[dst_start..dst_end].copy_from_slice(&frame_buffer[src_start..src_end]);
+                                }
+                            }
+                            unsafe {
+                                let _ = display_driver_blit_rgb565(
+                                    x1,
+                                    y1,
+                                    w,
+                                    h,
+                                    region.as_ptr() as *const u16,
+                                );
+                            }
+                        }
+                    }
+                }
+                let frame_ms = frame_start.elapsed().as_millis();
+                let (reason, reason_at) = *render_reason.borrow();
+                if reason != 0 && reason_at.elapsed() <= Duration::from_millis(900) {
+                    let reason_label = match reason {
+                        1 => "start_tap",
+                        2 => "stop_tap",
+                        3 => "stop_confirm",
+                        4 => "wifi_got_ip",
+                        5 => "cmd_start",
+                        6 => "cmd_stop",
+                        _ => "unknown",
+                    };
+                    println!(
+                        "RENDER_PROFILE reason={} frame_ms={} submit={}x{} dirty=({},{})->({},{}) direct={}",
+                        reason_label,
+                        frame_ms,
+                        submit_w,
+                        submit_h,
+                        dirty_min_x,
+                        dirty_min_y,
+                        dirty_max_x,
+                        dirty_max_y,
+                        used_direct_fb
+                    );
+                }
+            } else if used_direct_fb {
+                unsafe { display_driver_p4_cancel_frame(); }
+            }
+        } else {
+            window.draw_if_needed(|renderer| {
+                let buffer = DisplayLineBuffer {
+                    line_buffer: &mut line_buffer,
+                };
+                renderer.render_by_line(buffer);
+            });
+        }
 
         // Keep a stable frame cadence to reduce micro-stutter on MCU rendering.
-        let now = Instant::now();
-        if now < next_frame_at {
-            std::thread::sleep(next_frame_at - now);
-            next_frame_at += frame_budget;
-        } else {
-            next_frame_at = now + frame_budget;
+        if let Some(frame_budget) = frame_budget {
+            let now = Instant::now();
+            if now < next_frame_at {
+                std::thread::sleep(next_frame_at - now);
+                next_frame_at += frame_budget;
+            } else {
+                next_frame_at = now + frame_budget;
+            }
         }
     }
 }
+

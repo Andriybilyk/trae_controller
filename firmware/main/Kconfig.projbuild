@@ -1,0 +1,32 @@
+menu "TRAE Controller Board Profile"
+
+choice TC_BOARD_PROFILE
+    prompt "Target controller board"
+    default TC_BOARD_LEGACY_S3
+    help
+        Select hardware profile. Legacy ESP32-S3 is the current production controller.
+        New ESP32-P4 display module profile is added for gradual migration.
+
+config TC_BOARD_LEGACY_S3
+    bool "Legacy kiln controller (ESP32-S3, 480x320)"
+
+config TC_BOARD_NEW_P4
+    bool "New HMI module (ESP32-P4 + ESP32-C6, 800x480)"
+
+endchoice
+
+config TC_DISPLAY_WIDTH
+    int "Display width in pixels"
+    range 320 1280
+    default 480 if TC_BOARD_LEGACY_S3
+    default 800 if TC_BOARD_NEW_P4
+    default 480
+
+config TC_DISPLAY_HEIGHT
+    int "Display height in pixels"
+    range 240 1280
+    default 320 if TC_BOARD_LEGACY_S3
+    default 480 if TC_BOARD_NEW_P4
+    default 320
+
+endmenu

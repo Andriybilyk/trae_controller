@@ -1,10 +1,12 @@
 #include "drivers/display_driver.h"
 
+#include "config/board_profile.h"
 #include "kiln_config/config.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <cmath>
 #include <vector>
 
@@ -13,16 +15,285 @@
 #include "driver/spi_master.h"
 #include "esp_check.h"
 #include "esp_lcd_io_spi.h"
+#include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_touch.h"
 #include "esp_lcd_touch_xpt2046.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+#include "esp_cache.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "freertos/timers.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 
+#if CONFIG_IDF_TARGET_ESP32P4
+#include "esp_lcd_mipi_dsi.h"
+#include "esp_ldo_regulator.h"
+#include "esp_lcd_st7701.h"
+#include "esp_lcd_touch_gt911.h"
+#include "driver/i2c_master.h"
+#endif
+
 static const char *TAG = "DISPLAY";
+
+#if CONFIG_IDF_TARGET_ESP32P4
+static esp_lcd_dsi_bus_handle_t s_p4_dsi_bus = nullptr;
+static esp_lcd_panel_io_handle_t s_p4_dbi_io = nullptr;
+static esp_lcd_panel_handle_t s_p4_panel = nullptr;
+static i2c_master_bus_handle_t s_p4_touch_i2c_bus = nullptr;
+static std::array<uint16_t *, 3> s_p4_framebuffers{};
+static int s_p4_framebuffer_count = 0;
+static int s_p4_framebuffer_index = 0;
+static uint16_t *s_p4_pending_fb = nullptr;
+static int s_p4_pending_index = -1;
+static size_t s_p4_framebuffer_pixels = 0;
+static bool s_p4_display_ready = false;
+static bool s_p4_backlight_pwm_ready = false;
+static bool s_p4_backlight_runtime_locked = false;
+static constexpr bool kP4RenderTrace = false;
+static bool s_p4_use_framebuffer = false;
+static SemaphoreHandle_t s_p4_refresh_sem = nullptr;
+static SemaphoreHandle_t s_p4_render_sem = nullptr;
+static TickType_t s_p4_last_vsync_warn = 0;
+static constexpr int P4_PANEL_PHYS_W = 480;
+static constexpr int P4_PANEL_PHYS_H = 800;
+static constexpr int P4_UI_LOGICAL_W = 800;
+static constexpr int P4_UI_LOGICAL_H = 480;
+static constexpr int P4_RENDER_W = 800;
+static constexpr int P4_RENDER_H = 480;
+static constexpr int P4_LANDSCAPE_W = 800;
+static constexpr int P4_LANDSCAPE_H = 480;
+static constexpr gpio_num_t P4_BACKLIGHT_GPIO = GPIO_NUM_23;
+static constexpr gpio_num_t P4_BACKLIGHT_GPIO_ALT = GPIO_NUM_NC;
+static constexpr gpio_num_t P4_LCD_RESET_GPIO = GPIO_NUM_5;
+static constexpr gpio_num_t P4_TOUCH_SDA_GPIO = GPIO_NUM_7;
+static constexpr gpio_num_t P4_TOUCH_SCL_GPIO = GPIO_NUM_8;
+static constexpr std::array<uint8_t, 2> P4_GT911_ADDR_CANDIDATES = {0x5D, 0x14};
+static constexpr uint8_t kP4BacklightDefault = 100;
+
+// LEDC PWM fallback (if no I2C backlight driver is present).
+static constexpr ledc_mode_t kP4BacklightMode = LEDC_LOW_SPEED_MODE;
+// Match the known-good reference configuration for this module: TIMER_0 / CHANNEL_0 @ 5kHz, 10-bit.
+// BUZZER uses TIMER_1/CHANNEL_1; FAN uses TIMER_0/CHANNEL_0 on the legacy board, but on NewP4 FAN is invalid/skipped.
+static constexpr ledc_timer_t kP4BacklightTimer = LEDC_TIMER_1;
+static constexpr ledc_channel_t kP4BacklightChannel = LEDC_CHANNEL_2;
+static constexpr ledc_timer_bit_t kP4BacklightDutyRes = LEDC_TIMER_10_BIT; // 0..1023
+static constexpr uint32_t kP4BacklightPwmHz = 20000;
+static constexpr bool kP4BacklightUsePwm = true;
+static constexpr bool kP4ForceBacklightDc = true;
+static constexpr bool kP4BacklightActiveLow = false;
+static constexpr bool kP4BacklightTestPulse = false;
+static constexpr bool kP4BacklightTestUseAlt = false; // false = drive GPIO23, true = drive GPIO26
+static constexpr bool kP4UseFramebuffers = true;
+
+static void p4_i2c_peek_device(i2c_master_bus_handle_t bus, uint8_t addr) {
+    if (!bus) return;
+
+    i2c_device_config_t dev_cfg = {};
+    dev_cfg.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    dev_cfg.device_address = addr;
+    dev_cfg.scl_speed_hz = 400000;
+
+    i2c_master_dev_handle_t dev = nullptr;
+    if (i2c_master_bus_add_device(bus, &dev_cfg, &dev) != ESP_OK || !dev) return;
+
+    // Best-effort register peeks. If device doesn't support this protocol, reads will fail quickly.
+    for (uint8_t reg = 0; reg < 0x08; ++reg) {
+        uint8_t val = 0;
+        const esp_err_t err = i2c_master_transmit_receive(dev, &reg, 1, &val, 1, 10);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "P4 I2C peek addr=0x%02X reg=0x%02X -> 0x%02X", (int)addr, (int)reg, (int)val);
+        }
+    }
+}
+
+static void p4_i2c_identify_known_devices(i2c_master_bus_handle_t bus) {
+    // Addresses observed on this module: 0x14 0x18 0x36 0x5D (GT911).
+    // We peek a few regs on 0x14/0x18/0x36 to identify what they are.
+    p4_i2c_peek_device(bus, 0x14);
+    p4_i2c_peek_device(bus, 0x18);
+    p4_i2c_peek_device(bus, 0x36);
+}
+
+static void p4_i2c_scan(i2c_master_bus_handle_t bus) {
+    if (!bus) return;
+    char found[256] = {0};
+    size_t pos = 0;
+    for (int addr = 0x03; addr <= 0x77; ++addr) {
+        if (i2c_master_probe(bus, addr, 20) == ESP_OK) {
+            const int n = snprintf(found + pos, sizeof(found) - pos, " 0x%02X", addr);
+            if (n > 0) pos = std::min(pos + (size_t)n, sizeof(found) - 1);
+        }
+    }
+    if (pos > 0) {
+        ESP_LOGI(TAG, "P4 I2C scan (GPIO7/8):%s", found);
+    } else {
+        ESP_LOGW(TAG, "P4 I2C scan (GPIO7/8): no devices found");
+    }
+}
+
+// JC4880P443 (ST7701) init sequence from known-good bring-up.
+static const st7701_lcd_init_cmd_t s_jc4880p443_init_cmds[] = {
+    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x13}, 5, 0},
+    {0xEF, (uint8_t[]){0x08}, 1, 0},
+    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x10}, 5, 0},
+    {0xC0, (uint8_t[]){0x63, 0x00}, 2, 0},
+    {0xC1, (uint8_t[]){0x0D, 0x02}, 2, 0},
+    {0xC2, (uint8_t[]){0x10, 0x08}, 2, 0},
+    {0xCC, (uint8_t[]){0x10}, 1, 0},
+    {0xB0, (uint8_t[]){0x80, 0x09, 0x53, 0x0C, 0xD0, 0x07, 0x0C, 0x09, 0x09, 0x28, 0x06, 0xD4, 0x13, 0x69, 0x2B, 0x71}, 16, 0},
+    {0xB1, (uint8_t[]){0x80, 0x94, 0x5A, 0x10, 0xD3, 0x06, 0x0A, 0x08, 0x08, 0x25, 0x03, 0xD3, 0x12, 0x66, 0x6A, 0x0D}, 16, 0},
+    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x11}, 5, 0},
+    {0xB0, (uint8_t[]){0x5D}, 1, 0},
+    {0xB1, (uint8_t[]){0x58}, 1, 0},
+    {0xB2, (uint8_t[]){0x87}, 1, 0},
+    {0xB3, (uint8_t[]){0x80}, 1, 0},
+    {0xB5, (uint8_t[]){0x4E}, 1, 0},
+    {0xB7, (uint8_t[]){0x85}, 1, 0},
+    {0xB8, (uint8_t[]){0x21}, 1, 0},
+    {0xB9, (uint8_t[]){0x10, 0x1F}, 2, 0},
+    {0xBB, (uint8_t[]){0x03}, 1, 0},
+    {0xBC, (uint8_t[]){0x00}, 1, 0},
+    {0xC1, (uint8_t[]){0x78}, 1, 0},
+    {0xC2, (uint8_t[]){0x78}, 1, 0},
+    {0xD0, (uint8_t[]){0x88}, 1, 0},
+    {0xE0, (uint8_t[]){0x00, 0x3A, 0x02}, 3, 0},
+    {0xE1, (uint8_t[]){0x04, 0xA0, 0x00, 0xA0, 0x05, 0xA0, 0x00, 0xA0, 0x00, 0x40, 0x40}, 11, 0},
+    {0xE2, (uint8_t[]){0x30, 0x00, 0x40, 0x40, 0x32, 0xA0, 0x00, 0xA0, 0x00, 0xA0, 0x00, 0xA0, 0x00}, 13, 0},
+    {0xE3, (uint8_t[]){0x00, 0x00, 0x33, 0x33}, 4, 0},
+    {0xE4, (uint8_t[]){0x44, 0x44}, 2, 0},
+    {0xE5, (uint8_t[]){0x09, 0x2E, 0xA0, 0xA0, 0x0B, 0x30, 0xA0, 0xA0, 0x05, 0x2A, 0xA0, 0xA0, 0x07, 0x2C, 0xA0, 0xA0}, 16, 0},
+    {0xE6, (uint8_t[]){0x00, 0x00, 0x33, 0x33}, 4, 0},
+    {0xE7, (uint8_t[]){0x44, 0x44}, 2, 0},
+    {0xE8, (uint8_t[]){0x08, 0x2D, 0xA0, 0xA0, 0x0A, 0x2F, 0xA0, 0xA0, 0x04, 0x29, 0xA0, 0xA0, 0x06, 0x2B, 0xA0, 0xA0}, 16, 0},
+    {0xEB, (uint8_t[]){0x00, 0x00, 0x4E, 0x4E, 0x00, 0x00, 0x00}, 7, 0},
+    {0xEC, (uint8_t[]){0x08, 0x01}, 2, 0},
+    {0xED, (uint8_t[]){0xB0, 0x2B, 0x98, 0xA4, 0x56, 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xF7, 0x65, 0x4A, 0x89, 0xB2, 0x0B}, 16, 0},
+    {0xEF, (uint8_t[]){0x08, 0x08, 0x08, 0x45, 0x3F, 0x54}, 6, 0},
+    {0xFF, (uint8_t[]){0x77, 0x01, 0x00, 0x00, 0x00}, 5, 0},
+    {0x11, (uint8_t[]){0x00}, 1, 120},
+    {0x29, (uint8_t[]){0x00}, 1, 20},
+};
+
+static void p4_backlight_apply_percent(uint8_t percent) {
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(P4_BACKLIGHT_GPIO)) return;
+    percent = (uint8_t)std::clamp<int>(percent, 0, 100);
+    ESP_LOGI(TAG, "P4 BL apply=%u (dc=%d pwm_ready=%d lock=%d)",
+             (unsigned)percent,
+             (int)kP4ForceBacklightDc,
+             (int)s_p4_backlight_pwm_ready,
+             (int)s_p4_backlight_runtime_locked);
+    if (kP4BacklightTestPulse) {
+        const int level = (percent > 0) ? (kP4BacklightActiveLow ? 0 : 1) : (kP4BacklightActiveLow ? 1 : 0);
+        if (kP4BacklightTestUseAlt) {
+            gpio_set_level(P4_BACKLIGHT_GPIO, kP4BacklightActiveLow ? 0 : 1);
+            if (GPIO_IS_VALID_OUTPUT_GPIO(P4_BACKLIGHT_GPIO_ALT)) {
+                gpio_set_level(P4_BACKLIGHT_GPIO_ALT, level);
+            }
+        } else {
+            gpio_set_level(P4_BACKLIGHT_GPIO, level);
+            if (GPIO_IS_VALID_OUTPUT_GPIO(P4_BACKLIGHT_GPIO_ALT)) {
+                gpio_set_level(P4_BACKLIGHT_GPIO_ALT, kP4BacklightActiveLow ? 0 : 1);
+            }
+        }
+        return;
+    }
+    if (kP4ForceBacklightDc) {
+        const int level = (percent > 0) ? (kP4BacklightActiveLow ? 0 : 1) : (kP4BacklightActiveLow ? 1 : 0);
+        gpio_set_level(P4_BACKLIGHT_GPIO, level);
+        if (GPIO_IS_VALID_OUTPUT_GPIO(P4_BACKLIGHT_GPIO_ALT)) {
+            // Keep ALT low/off to avoid unintended drive if connected elsewhere
+            gpio_set_level(P4_BACKLIGHT_GPIO_ALT, kP4BacklightActiveLow ? 1 : 0);
+        }
+        return;
+    }
+
+    if (s_p4_backlight_pwm_ready) {
+        const uint32_t max_duty = (1u << (uint32_t)kP4BacklightDutyRes) - 1u;
+        const uint32_t duty = ((uint32_t)std::clamp<int>(percent, 0, 100) * max_duty) / 100u;
+        (void)ledc_set_duty(kP4BacklightMode, kP4BacklightChannel, duty);
+        (void)ledc_update_duty(kP4BacklightMode, kP4BacklightChannel);
+    } else {
+        const int level = (percent > 0) ? (kP4BacklightActiveLow ? 0 : 1) : (kP4BacklightActiveLow ? 1 : 0);
+        gpio_set_level(P4_BACKLIGHT_GPIO, level);
+        if (GPIO_IS_VALID_OUTPUT_GPIO(P4_BACKLIGHT_GPIO_ALT)) {
+            gpio_set_level(P4_BACKLIGHT_GPIO_ALT, level);
+        }
+    }
+}
+
+static void p4_backlight_init(void) {
+    if (!GPIO_IS_VALID_OUTPUT_GPIO(P4_BACKLIGHT_GPIO)) return;
+    gpio_config_t io = {};
+    io.pin_bit_mask = (1ULL << (uint32_t)P4_BACKLIGHT_GPIO);
+    io.mode = GPIO_MODE_OUTPUT;
+    io.pull_up_en = GPIO_PULLUP_DISABLE;
+    io.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io.intr_type = GPIO_INTR_DISABLE;
+    (void)gpio_config(&io);
+    gpio_set_drive_capability(P4_BACKLIGHT_GPIO, GPIO_DRIVE_CAP_3);
+
+    // Keep the alternate candidate pin OFF unless explicitly testing it.
+    if (GPIO_IS_VALID_OUTPUT_GPIO(P4_BACKLIGHT_GPIO_ALT)) {
+        gpio_config_t io2 = {};
+        io2.pin_bit_mask = (1ULL << (((uint32_t)P4_BACKLIGHT_GPIO_ALT) & 63U));
+        io2.mode = GPIO_MODE_OUTPUT;
+        io2.pull_up_en = GPIO_PULLUP_DISABLE;
+        io2.pull_down_en = GPIO_PULLDOWN_DISABLE;
+        io2.intr_type = GPIO_INTR_DISABLE;
+        (void)gpio_config(&io2);
+        gpio_set_drive_capability(P4_BACKLIGHT_GPIO_ALT, GPIO_DRIVE_CAP_3);
+        gpio_set_level(P4_BACKLIGHT_GPIO_ALT, 0);
+    }
+
+    if (kP4BacklightTestPulse) {
+        s_p4_backlight_pwm_ready = false;
+        gpio_set_level(P4_BACKLIGHT_GPIO, kP4BacklightActiveLow ? 1 : 0);
+        return;
+    }
+    if (kP4ForceBacklightDc) {
+        s_p4_backlight_pwm_ready = false;
+        gpio_set_level(P4_BACKLIGHT_GPIO, kP4BacklightActiveLow ? 1 : 0);
+        return;
+    }
+
+    // PWM mode (reference config).
+    ledc_timer_config_t timer = {};
+    timer.speed_mode = kP4BacklightMode;
+    timer.timer_num = kP4BacklightTimer;
+    timer.duty_resolution = kP4BacklightDutyRes;
+    timer.freq_hz = kP4BacklightPwmHz;
+    timer.clk_cfg = LEDC_AUTO_CLK;
+    if (ledc_timer_config(&timer) != ESP_OK) {
+        s_p4_backlight_pwm_ready = false;
+        gpio_set_level(P4_BACKLIGHT_GPIO, kP4BacklightActiveLow ? 0 : 1);
+        return;
+    }
+
+    ledc_channel_config_t ch = {};
+    ch.speed_mode = kP4BacklightMode;
+    ch.channel = kP4BacklightChannel;
+    ch.timer_sel = kP4BacklightTimer;
+    ch.gpio_num = (int)P4_BACKLIGHT_GPIO;
+    ch.duty = 0;
+    ch.hpoint = 0;
+    if (ledc_channel_config(&ch) != ESP_OK) {
+        s_p4_backlight_pwm_ready = false;
+        gpio_set_level(P4_BACKLIGHT_GPIO, kP4BacklightActiveLow ? 0 : 1);
+        return;
+    }
+    s_p4_backlight_pwm_ready = true;
+    ESP_LOGI(TAG, "P4 backlight PWM ready (timer=%d ch=%d target=%uHz actual=%uHz)",
+             (int)kP4BacklightTimer,
+             (int)kP4BacklightChannel,
+             (unsigned)kP4BacklightPwmHz,
+             (unsigned)ledc_get_freq(kP4BacklightMode, kP4BacklightTimer));
+}
+#endif
 
 static constexpr spi_host_device_t LCD_HOST = SPI2_HOST;
 static constexpr spi_host_device_t TOUCH_HOST = SPI3_HOST;
@@ -103,6 +374,7 @@ static gpio_num_t s_touch_miso = TOUCH_MISO;
 
 static esp_lcd_panel_io_handle_t s_touch_io = nullptr;
 static esp_lcd_touch_handle_t s_touch = nullptr;
+static SemaphoreHandle_t s_touch_mutex = nullptr;
 
 static volatile uint16_t s_touch_last_raw_x = 0;
 static volatile uint16_t s_touch_last_raw_y = 0;
@@ -112,6 +384,163 @@ static volatile uint32_t s_touch_read_cb_count = 0;
 static volatile uint8_t s_touch_last_z1_bytes[3] = {0};
 static volatile uint8_t s_touch_last_x_bytes[3] = {0};
 static volatile uint8_t s_touch_last_y_bytes[3] = {0};
+
+#if CONFIG_IDF_TARGET_ESP32P4
+static bool p4_on_refresh_done(esp_lcd_panel_handle_t panel, esp_lcd_dpi_panel_event_data_t *, void *) {
+    BaseType_t high_task_woken = pdFALSE;
+    if (s_p4_refresh_sem) {
+        xSemaphoreGiveFromISR(s_p4_refresh_sem, &high_task_woken);
+    }
+    if (s_p4_render_sem) {
+        xSemaphoreGiveFromISR(s_p4_render_sem, &high_task_woken);
+    }
+    return high_task_woken == pdTRUE;
+}
+
+static void p4_fill_black_sync(void) {
+    if (!s_p4_panel) return;
+    const int w = P4_PANEL_PHYS_W;
+    const int h = P4_PANEL_PHYS_H;
+    const int strip = 80;
+    uint16_t *black_buf = (uint16_t *)heap_caps_aligned_calloc(
+        64,
+        1,
+        (size_t)w * (size_t)strip * sizeof(uint16_t),
+        MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (!black_buf) return;
+    memset(black_buf, 0, (size_t)w * (size_t)strip * sizeof(uint16_t));
+    for (int y = 0; y < h; y += strip) {
+        const int y_end = (y + strip > h) ? h : (y + strip);
+        (void)esp_lcd_panel_draw_bitmap(s_p4_panel, 0, y, w, y_end, black_buf);
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+    for (int y = 0; y < h; y += strip) {
+        const int y_end = (y + strip > h) ? h : (y + strip);
+        (void)esp_lcd_panel_draw_bitmap(s_p4_panel, 0, y, w, y_end, black_buf);
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
+    heap_caps_free(black_buf);
+}
+
+static esp_err_t p4_display_init(void) {
+    // Power MIPI DSI PHY (required on ESP32-P4).
+    vTaskDelay(pdMS_TO_TICKS(100));
+    esp_ldo_channel_handle_t ldo_mipi_phy = nullptr;
+    esp_ldo_channel_config_t ldo_cfg = {};
+    ldo_cfg.chan_id = 3;
+    ldo_cfg.voltage_mv = 2500;
+    ESP_RETURN_ON_ERROR(esp_ldo_acquire_channel(&ldo_cfg, &ldo_mipi_phy), TAG, "p4 ldo");
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    const int panel_w = P4_PANEL_PHYS_W;
+    const int panel_h = P4_PANEL_PHYS_H;
+
+    esp_lcd_dsi_bus_config_t bus_config = {};
+    bus_config.bus_id = 0;
+    bus_config.num_data_lanes = 2;
+    bus_config.phy_clk_src = MIPI_DSI_PHY_CLK_SRC_DEFAULT;
+    bus_config.lane_bit_rate_mbps = 500;
+    ESP_RETURN_ON_ERROR(esp_lcd_new_dsi_bus(&bus_config, &s_p4_dsi_bus), TAG, "p4 dsi bus");
+
+    esp_lcd_dbi_io_config_t dbi_config = {};
+    dbi_config.virtual_channel = 0;
+    dbi_config.lcd_cmd_bits = 8;
+    dbi_config.lcd_param_bits = 8;
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_dbi(s_p4_dsi_bus, &dbi_config, &s_p4_dbi_io), TAG, "p4 dbi io");
+
+    esp_lcd_dpi_panel_config_t dpi_config = {};
+    dpi_config.virtual_channel = 0;
+    dpi_config.dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT;
+    dpi_config.dpi_clock_freq_mhz = 34;
+    dpi_config.in_color_format = LCD_COLOR_FMT_RGB565;
+    dpi_config.out_color_format = LCD_COLOR_FMT_RGB565;
+    dpi_config.num_fbs = 2;
+    dpi_config.video_timing.h_size = (uint32_t)panel_w;
+    dpi_config.video_timing.v_size = (uint32_t)panel_h;
+    dpi_config.video_timing.hsync_pulse_width = 12;
+    dpi_config.video_timing.hsync_back_porch = 42;
+    dpi_config.video_timing.hsync_front_porch = 42;
+    dpi_config.video_timing.vsync_pulse_width = 2;
+    dpi_config.video_timing.vsync_back_porch = 8;
+    dpi_config.video_timing.vsync_front_porch = 166;
+    dpi_config.flags.disable_lp = 0;
+
+    st7701_vendor_config_t st_cfg = {};
+    st_cfg.init_cmds = s_jc4880p443_init_cmds;
+    st_cfg.init_cmds_size = sizeof(s_jc4880p443_init_cmds) / sizeof(s_jc4880p443_init_cmds[0]);
+    st_cfg.flags.use_mipi_interface = 1;
+    st_cfg.mipi_config.dsi_bus = s_p4_dsi_bus;
+    st_cfg.mipi_config.dpi_config = &dpi_config;
+
+    esp_lcd_panel_dev_config_t panel_cfg = {};
+    panel_cfg.reset_gpio_num = P4_LCD_RESET_GPIO;
+    panel_cfg.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
+    panel_cfg.bits_per_pixel = 16;
+    panel_cfg.vendor_config = &st_cfg;
+
+    esp_err_t err = esp_lcd_new_panel_st7701(s_p4_dbi_io, &panel_cfg, &s_p4_panel);
+    ESP_RETURN_ON_ERROR(err, TAG, "p4 panel create");
+
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(s_p4_panel), TAG, "p4 panel reset");
+    vTaskDelay(pdMS_TO_TICKS(200));
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_init(s_p4_panel), TAG, "p4 panel init");
+    // Some JC4880P4x modules require explicit display brightness/control commands after init.
+    // If omitted, panel can stay black while backlight is on.
+    (void)esp_lcd_panel_io_tx_param(s_p4_dbi_io, 0x53, (uint8_t[]){0x24}, 1); // BCTRL/Display control
+    (void)esp_lcd_panel_io_tx_param(s_p4_dbi_io, 0x51, (uint8_t[]){0xFF}, 1); // Max panel brightness
+    (void)esp_lcd_panel_io_tx_param(s_p4_dbi_io, 0x55, (uint8_t[]){0x00}, 1); // Disable CABC
+    // Avoid visible BL "blink" during init; keep BL stable and just clear the frame.
+    p4_fill_black_sync();
+    (void)esp_lcd_panel_disp_on_off(s_p4_panel, true);
+    s_p4_framebuffer_pixels = 0;
+    s_p4_use_framebuffer = false;
+    s_p4_framebuffer_count = 0;
+    s_p4_framebuffer_index = 0;
+    s_p4_framebuffers = {};
+
+    if (kP4UseFramebuffers) {
+        void *fb0 = nullptr;
+        void *fb1 = nullptr;
+        if (esp_lcd_dpi_panel_get_frame_buffer(s_p4_panel, 2, &fb0, &fb1) == ESP_OK && fb0 && fb1) {
+            s_p4_framebuffers[0] = static_cast<uint16_t *>(fb0);
+            s_p4_framebuffers[1] = static_cast<uint16_t *>(fb1);
+            s_p4_framebuffer_count = 2;
+            s_p4_framebuffer_index = 0;
+            s_p4_framebuffer_pixels = (size_t)P4_PANEL_PHYS_W * (size_t)P4_PANEL_PHYS_H;
+            s_p4_use_framebuffer = true;
+            memset(s_p4_framebuffers[0], 0, s_p4_framebuffer_pixels * sizeof(uint16_t));
+            memset(s_p4_framebuffers[1], 0, s_p4_framebuffer_pixels * sizeof(uint16_t));
+            (void)esp_lcd_panel_draw_bitmap(s_p4_panel, 0, 0, P4_PANEL_PHYS_W, P4_PANEL_PHYS_H, s_p4_framebuffers[0]);
+        }
+    }
+
+    if (!s_p4_refresh_sem) {
+        s_p4_refresh_sem = xSemaphoreCreateBinary();
+    }
+    if (!s_p4_render_sem) {
+        s_p4_render_sem = xSemaphoreCreateBinary();
+    }
+    if (s_p4_refresh_sem) {
+        xSemaphoreGive(s_p4_refresh_sem);
+        esp_lcd_dpi_panel_event_callbacks_t cbs = {};
+        // Use only color-transfer completion as the render fence.
+        // Mixing refresh_done + color_trans_done can release the frame token
+        // too early on some ST7701 MIPI modules and cause visible flashing.
+        cbs.on_color_trans_done = p4_on_refresh_done;
+        (void)esp_lcd_dpi_panel_register_event_callbacks(s_p4_panel, &cbs, nullptr);
+    }
+    if (s_p4_render_sem) {
+        xSemaphoreGive(s_p4_render_sem);
+    }
+    p4_backlight_apply_percent(s_backlight_percent);
+
+    s_p4_display_ready = true;
+
+    ESP_LOGI(TAG, "P4 MIPI panel ready (physical): %dx%d", panel_w, panel_h);
+    return ESP_OK;
+}
+#endif
 
 static void load_mirror_from_nvs() {
     nvs_handle_t h;
@@ -134,6 +563,30 @@ static void load_mirror_from_nvs() {
 }
 
 static void save_mirror_to_nvs() {
+#if CONFIG_IDF_TARGET_ESP32P4
+    // On ESP32-P4, synchronous NVS writes cause visible display flicker.
+    // We defer mirror settings save as they are not performance critical.
+    struct MirrorParams { bool mx, my; int xoff, yoff; };
+    MirrorParams *p = (MirrorParams*)malloc(sizeof(MirrorParams));
+    if (p) {
+        p->mx = s_mirror_x; p->my = s_mirror_y;
+        p->xoff = s_lcd_x_offset; p->yoff = s_lcd_y_offset;
+        xTaskCreate([](void* arg){
+            MirrorParams *p = (MirrorParams*)arg;
+            nvs_handle_t h;
+            if (nvs_open("display", NVS_READWRITE, &h) == ESP_OK) {
+                (void)nvs_set_u8(h, "mx", p->mx ? 1 : 0);
+                (void)nvs_set_u8(h, "my", p->my ? 1 : 0);
+                (void)nvs_set_i32(h, "xoff", (int32_t)p->xoff);
+                (void)nvs_set_i32(h, "yoff", (int32_t)p->yoff);
+                (void)nvs_commit(h);
+                nvs_close(h);
+            }
+            free(p);
+            vTaskDelete(NULL);
+        }, "mirror_save", 2048, p, 2, NULL);
+    }
+#else
     nvs_handle_t h;
     if (nvs_open("display", NVS_READWRITE, &h) != ESP_OK) return;
     (void)nvs_set_u8(h, "mx", s_mirror_x ? 1 : 0);
@@ -142,14 +595,36 @@ static void save_mirror_to_nvs() {
     (void)nvs_set_i32(h, "yoff", (int32_t)s_lcd_y_offset);
     (void)nvs_commit(h);
     nvs_close(h);
+#endif
 }
 
 static void save_backlight_to_nvs() {
+#if CONFIG_IDF_TARGET_ESP32P4
+    // Defer backlight save to avoid flicker during slider adjustment.
+    static uint32_t s_pending_bl = 0xFFFFFFFF;
+    static TimerHandle_t s_bl_timer = nullptr;
+
+    s_pending_bl = s_backlight_percent;
+    if (s_bl_timer == nullptr) {
+        s_bl_timer = xTimerCreate("bl_save", pdMS_TO_TICKS(1000), pdFALSE, nullptr, [](TimerHandle_t){
+            if (s_pending_bl <= 100) {
+                nvs_handle_t h;
+                if (nvs_open("display", NVS_READWRITE, &h) == ESP_OK) {
+                    (void)nvs_set_u8(h, "bl", (uint8_t)s_pending_bl);
+                    (void)nvs_commit(h);
+                    nvs_close(h);
+                }
+            }
+        });
+    }
+    if (s_bl_timer) xTimerReset(s_bl_timer, 0);
+#else
     nvs_handle_t h;
     if (nvs_open("display", NVS_READWRITE, &h) != ESP_OK) return;
     (void)nvs_set_u8(h, "bl", s_backlight_percent);
     (void)nvs_commit(h);
     nvs_close(h);
+#endif
 }
 
 static void load_touch_from_nvs() {
@@ -209,6 +684,41 @@ static void load_touch_from_nvs() {
 }
 
 static void save_touch_to_nvs() {
+#if CONFIG_IDF_TARGET_ESP32P4
+    // On ESP32-P4, synchronous NVS writes (especially blobs) cause visible display flicker.
+    // We defer touch settings save.
+    xTaskCreate([](void*){
+        nvs_handle_t h;
+        if (nvs_open("touch", NVS_READWRITE, &h) == ESP_OK) {
+            (void)nvs_set_u8(h, "mode", (uint8_t)s_touch_spi_mode);
+            (void)nvs_set_u32(h, "hz", (uint32_t)s_touch_spi_hz);
+            (void)nvs_set_u8(h, "swap", (uint8_t)(s_touch_swap_xy ? 1 : 0));
+            (void)nvs_set_u8(h, "mx", (uint8_t)(s_touch_mirror_x ? 1 : 0));
+            (void)nvs_set_u8(h, "my", (uint8_t)(s_touch_mirror_y ? 1 : 0));
+            (void)nvs_set_u8(h, "cal_en", (uint8_t)(s_touch_cal_enabled ? 1 : 0));
+            (void)nvs_set_u16(h, "cal_l", s_touch_cal_left);
+            (void)nvs_set_u16(h, "cal_r", s_touch_cal_right);
+            (void)nvs_set_u16(h, "cal_t", s_touch_cal_top);
+            (void)nvs_set_u16(h, "cal_b", s_touch_cal_bottom);
+            (void)nvs_set_u8(h, "aff_en", (uint8_t)(s_touch_affine_enabled ? 1 : 0));
+            (void)nvs_set_blob(h, "aff_a", &s_touch_affine_a, sizeof(float));
+            (void)nvs_set_blob(h, "aff_b", &s_touch_affine_b, sizeof(float));
+            (void)nvs_set_blob(h, "aff_c", &s_touch_affine_c, sizeof(float));
+            (void)nvs_set_blob(h, "aff_d", &s_touch_affine_d, sizeof(float));
+            (void)nvs_set_blob(h, "aff_e", &s_touch_affine_e, sizeof(float));
+            (void)nvs_set_blob(h, "aff_f", &s_touch_affine_f, sizeof(float));
+            (void)nvs_set_u8(h, "grid_en", (uint8_t)(s_touch_grid_enabled ? 1 : 0));
+            (void)nvs_set_blob(h, "grid_dx", s_touch_grid_dx.data(), sizeof(float) * s_touch_grid_dx.size());
+            (void)nvs_set_blob(h, "grid_dy", s_touch_grid_dy.data(), sizeof(float) * s_touch_grid_dy.size());
+            (void)nvs_set_i32(h, "sclk", (int32_t)s_touch_sclk);
+            (void)nvs_set_i32(h, "mosi", (int32_t)s_touch_mosi);
+            (void)nvs_set_i32(h, "miso", (int32_t)s_touch_miso);
+            (void)nvs_commit(h);
+            nvs_close(h);
+        }
+        vTaskDelete(NULL);
+    }, "touch_save", 4096, nullptr, 2, NULL);
+#else
     nvs_handle_t h;
     if (nvs_open("touch", NVS_READWRITE, &h) != ESP_OK) return;
     (void)nvs_set_u8(h, "mode", (uint8_t)s_touch_spi_mode);
@@ -236,6 +746,7 @@ static void save_touch_to_nvs() {
     (void)nvs_set_i32(h, "miso", (int32_t)s_touch_miso);
     (void)nvs_commit(h);
     nvs_close(h);
+#endif
 }
 
 static void apply_touch_grid(int &x, int &y) {
@@ -496,7 +1007,6 @@ static void backlight_init() {
     ch.speed_mode = kBacklightMode;
     ch.channel = kBacklightChannel;
     ch.timer_sel = kBacklightTimer;
-    ch.intr_type = LEDC_INTR_DISABLE;
     ch.gpio_num = (int)TFT_BL;
     ch.duty = 0;
     ch.hpoint = 0;
@@ -572,11 +1082,88 @@ static esp_err_t touch_deinit(void) {
         (void)esp_lcd_panel_io_del(s_touch_io);
         s_touch_io = nullptr;
     }
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (s_p4_touch_i2c_bus) {
+        (void)i2c_del_master_bus(s_p4_touch_i2c_bus);
+        s_p4_touch_i2c_bus = nullptr;
+    }
+#endif
     return ESP_OK;
 }
 
 static esp_err_t touch_init(void) {
     if (s_touch) return ESP_OK;
+    if (!s_touch_mutex) {
+        s_touch_mutex = xSemaphoreCreateMutex();
+    }
+
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        i2c_master_bus_config_t i2c_bus_cfg = {};
+        i2c_bus_cfg.i2c_port = I2C_NUM_0;
+        i2c_bus_cfg.sda_io_num = P4_TOUCH_SDA_GPIO;
+        i2c_bus_cfg.scl_io_num = P4_TOUCH_SCL_GPIO;
+        i2c_bus_cfg.clk_source = I2C_CLK_SRC_DEFAULT;
+        i2c_bus_cfg.glitch_ignore_cnt = 7;
+        i2c_bus_cfg.intr_priority = 0;
+        i2c_bus_cfg.trans_queue_depth = 0;
+        i2c_bus_cfg.flags.enable_internal_pullup = 0;
+        ESP_RETURN_ON_ERROR(i2c_new_master_bus(&i2c_bus_cfg, &s_p4_touch_i2c_bus), TAG, "p4 touch i2c");
+
+        esp_err_t last_err = ESP_FAIL;
+        for (uint8_t addr : P4_GT911_ADDR_CANDIDATES) {
+            esp_lcd_panel_io_i2c_config_t tp_io_cfg = {};
+            tp_io_cfg.scl_speed_hz = 400000;
+            tp_io_cfg.dev_addr = addr;
+            tp_io_cfg.control_phase_bytes = 1;
+            tp_io_cfg.dc_bit_offset = 0;
+            tp_io_cfg.lcd_cmd_bits = 16;
+            tp_io_cfg.lcd_param_bits = 0;
+            tp_io_cfg.flags.disable_control_phase = 1;
+            const esp_err_t io_err = esp_lcd_new_panel_io_i2c(s_p4_touch_i2c_bus, &tp_io_cfg, &s_touch_io);
+            if (io_err != ESP_OK) {
+                last_err = io_err;
+                continue;
+            }
+
+            esp_lcd_touch_config_t tp_cfg = {};
+            tp_cfg.x_max = P4_PANEL_PHYS_W;
+            tp_cfg.y_max = P4_PANEL_PHYS_H;
+            tp_cfg.rst_gpio_num = GPIO_NUM_NC;
+            tp_cfg.int_gpio_num = GPIO_NUM_NC;
+            tp_cfg.levels.reset = 0;
+            tp_cfg.levels.interrupt = 0;
+            tp_cfg.flags.swap_xy = 0;
+            tp_cfg.flags.mirror_x = 0;
+            tp_cfg.flags.mirror_y = 0;
+            tp_cfg.process_coordinates = nullptr;
+            tp_cfg.interrupt_callback = nullptr;
+            tp_cfg.user_data = nullptr;
+            tp_cfg.driver_data = nullptr;
+
+            const esp_err_t err = esp_lcd_touch_new_i2c_gt911(s_touch_io, &tp_cfg, &s_touch);
+            if (err == ESP_OK && s_touch != nullptr) {
+                ESP_LOGI(TAG, "Touch initialized (GT911, I2C addr=0x%02X, SDA=%d SCL=%d)", (unsigned)addr, (int)P4_TOUCH_SDA_GPIO, (int)P4_TOUCH_SCL_GPIO);
+                last_err = ESP_OK;
+                break;
+            }
+            last_err = err;
+            if (s_touch_io) {
+                (void)esp_lcd_panel_io_del(s_touch_io);
+                s_touch_io = nullptr;
+            }
+        }
+        if (last_err != ESP_OK || s_touch == nullptr) {
+            (void)touch_deinit();
+            return last_err;
+        }
+
+        s_touch_swap_xy = false;
+        s_touch_mirror_x = false;
+        s_touch_mirror_y = false;
+        return ESP_OK;
+    }
+#endif
 
     esp_lcd_panel_io_spi_config_t io_cfg{};
     io_cfg.cs_gpio_num = (gpio_num_t)TOUCH_CS;
@@ -631,6 +1218,29 @@ static esp_err_t touch_init(void) {
 
 static bool touch_read_once(int &x, int &y, uint16_t &z) {
     if (!s_touch) return false;
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        if (esp_lcd_touch_read_data(s_touch) != ESP_OK) {
+            x = 0;
+            y = 0;
+            z = 0;
+            return false;
+        }
+        esp_lcd_touch_point_data_t points[1]{};
+        uint8_t point_cnt = 0;
+        (void)esp_lcd_touch_get_data(s_touch, points, &point_cnt, 1);
+        if (point_cnt == 0) {
+            x = 0;
+            y = 0;
+            z = 0;
+            return false;
+        }
+        x = (int)points[0].x;
+        y = (int)points[0].y;
+        z = points[0].strength;
+        return true;
+    }
+#endif
     (void)esp_lcd_touch_read_data(s_touch);
     esp_lcd_touch_point_data_t points[1]{};
     uint8_t point_cnt = 0;
@@ -655,6 +1265,32 @@ static int median3(int a, int b, int c) {
 }
 
 void display_driver_init(void) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        load_mirror_from_nvs();
+        s_backlight_percent = kP4BacklightDefault;
+        p4_backlight_init();
+        // Keep backlight OFF while the panel is being brought up (matches reference init and avoids power oscillations).
+        p4_backlight_apply_percent(0);
+        const esp_err_t p4_err = p4_display_init();
+        if (p4_err != ESP_OK) {
+            ESP_LOGE(TAG, "P4 display init failed: %s", esp_err_to_name(p4_err));
+            return;
+        }
+        const esp_err_t tp_err = touch_init();
+        if (tp_err != ESP_OK) {
+            ESP_LOGW(TAG, "P4 touch init failed: %s", esp_err_to_name(tp_err));
+        }
+        // Ramp up to the requested brightness (simple 2-step ramp to avoid a hard current step).
+        p4_backlight_apply_percent((uint8_t)std::min<int>(s_backlight_percent, 20));
+        vTaskDelay(pdMS_TO_TICKS(60));
+        display_driver_set_backlight_percent(s_backlight_percent);
+        s_p4_backlight_runtime_locked = true;
+        ESP_LOGI(TAG, "Display initialized successfully (P4)");
+        return;
+    }
+#endif
+
     load_mirror_from_nvs();
 
     s_touch_swap_xy = true;
@@ -694,14 +1330,129 @@ uint8_t display_driver_get_backlight_percent(void) {
 }
 
 void display_driver_set_backlight_percent(uint8_t percent) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        const uint8_t clamped = (uint8_t)std::clamp<int>(percent, 0, 100);
+        if (s_p4_backlight_runtime_locked) {
+            ESP_LOGW(TAG, "P4 BL locked: ignore req=%u (current=%u)",
+                     (unsigned)clamped,
+                     (unsigned)s_backlight_percent);
+            return;
+        }
+        if (clamped == s_backlight_percent) {
+            return;
+        }
+        static uint64_t last_log_ms = 0;
+        static int last_req = -1;
+        const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+        if ((int)clamped != last_req || (now_ms - last_log_ms) > 1000) {
+            last_log_ms = now_ms;
+            last_req = (int)clamped;
+            ESP_LOGI(TAG, "P4 BL req=%d", (int)clamped);
+        }
+        s_backlight_percent = clamped;
+        p4_backlight_apply_percent(s_backlight_percent);
+        save_backlight_to_nvs();
+        return;
+    }
+#endif
     if (percent < 50) percent = 50;
     if (percent > 100) percent = 100;
+    if (percent == s_backlight_percent) return;
     s_backlight_percent = percent;
     backlight_apply();
     save_backlight_to_nvs();
 }
 
 bool display_driver_blit_rgb565(int x, int y, int w, int h, const uint16_t *data) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        if (!s_p4_display_ready || s_p4_panel == nullptr || !data || w <= 0 || h <= 0) return false;
+        if (kP4RenderTrace) {
+            const uint64_t ts_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+            ESP_LOGI(TAG, "RENDER blit_rgb565 ts=%llu ms frame=%dx%d pos=(%d,%d)",
+                     (unsigned long long)ts_ms, w, h, x, y);
+        }
+
+        const int logical_w = P4_RENDER_W;
+        const int logical_h = P4_RENDER_H;
+        int x1 = x;
+        int y1 = y;
+        int x2 = x + w - 1;
+        int y2 = y + h - 1;
+        if (x1 < 0) x1 = 0;
+        if (y1 < 0) y1 = 0;
+        if (x2 >= logical_w) x2 = logical_w - 1;
+        if (y2 >= logical_h) y2 = logical_h - 1;
+        if (x2 < x1 || y2 < y1) return false;
+
+        const int copy_w = x2 - x1 + 1;
+        const int copy_h = y2 - y1 + 1;
+        const bool full_frame_no_crop =
+            (x == 0 && y == 0 &&
+             w == logical_w && h == logical_h &&
+             x1 == 0 && y1 == 0 &&
+             copy_w == logical_w && copy_h == logical_h);
+
+        const uint16_t *src_base = data;
+        static std::vector<uint16_t> src_crop;
+        if (!full_frame_no_crop) {
+            const size_t crop_need = (size_t)copy_w * (size_t)copy_h;
+            if (src_crop.size() < crop_need) src_crop.resize(crop_need);
+            for (int row = 0; row < copy_h; ++row) {
+                const int src_row = (y1 - y) + row;
+                const uint16_t *src = data + (src_row * w) + (x1 - x);
+                uint16_t *dst = src_crop.data() + ((size_t)row * (size_t)copy_w);
+                std::copy(src, src + copy_w, dst);
+            }
+            src_base = src_crop.data();
+        }
+
+        // Rotate landscape (800x480) into portrait panel (480x800).
+        const int px1 = y1;
+        const int px2 = y2;
+        const int py1 = (P4_PANEL_PHYS_H - 1) - x2;
+        const int py2 = (P4_PANEL_PHYS_H - 1) - x1;
+        if (px1 < 0 || py1 < 0 || px2 >= P4_PANEL_PHYS_W || py2 >= P4_PANEL_PHYS_H) return false;
+
+        const int rot_w = copy_h;
+        const int rot_h = copy_w;
+        static std::vector<uint16_t> rot_buf;
+        const size_t rot_need = (size_t)rot_w * (size_t)rot_h;
+        if (rot_buf.size() < rot_need) rot_buf.resize(rot_need);
+
+        for (int row = 0; row < copy_h; ++row) {
+            const int ly = y1 + row;
+            const uint16_t *src_row = src_base + (size_t)row * (size_t)copy_w;
+            for (int col = 0; col < copy_w; ++col) {
+                const int lx = x1 + col;
+                const int px = ly;
+                const int py = (P4_PANEL_PHYS_H - 1) - lx;
+                const int local_x = px - px1;
+                const int local_y = py - py1;
+                rot_buf[(size_t)local_y * (size_t)rot_w + (size_t)local_x] = src_row[col];
+            }
+        }
+
+        // Important for MIPI-DPI stability: don't submit a new frame region until
+        // previous transfer completion callback signals done.
+        if (s_p4_render_sem) {
+            if (xSemaphoreTake(s_p4_render_sem, pdMS_TO_TICKS(120)) != pdTRUE) {
+                ESP_LOGW(TAG, "P4 blit skipped: previous transfer still in progress");
+                return false;
+            }
+        }
+        const esp_err_t draw_ok = esp_lcd_panel_draw_bitmap(
+            s_p4_panel,
+            px1,
+            py1,
+            px2 + 1,
+            py2 + 1,
+            rot_buf.data());
+        return draw_ok == ESP_OK;
+    }
+#endif
+
     if (!data || w <= 0 || h <= 0) return false;
 
     int x1 = x + s_lcd_x_offset;
@@ -772,6 +1523,67 @@ bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) 
         if (z1) *z1 = 0;
         return false;
     }
+
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        bool locked = false;
+        if (s_touch_mutex) {
+            locked = (xSemaphoreTake(s_touch_mutex, pdMS_TO_TICKS(10)) == pdTRUE);
+        }
+        const int logical_w = std::max(1, board_profile::display_width());
+        const int logical_h = std::max(1, board_profile::display_height());
+        int px = 0;
+        int py = 0;
+        uint16_t pz = 0;
+        const bool raw_pressed = touch_read_once(px, py, pz);
+        bool pressed = raw_pressed;
+        int lx = 0;
+        int ly = 0;
+        if (pressed) {
+            px = std::clamp(px, 0, P4_PANEL_PHYS_W - 1);
+            py = std::clamp(py, 0, P4_PANEL_PHYS_H - 1);
+            int lx_landscape = (P4_PANEL_PHYS_H - 1) - py; // 0..799
+            int ly_landscape = px;                         // 0..479
+            lx_landscape = std::clamp(lx_landscape, 0, P4_LANDSCAPE_W - 1);
+            ly_landscape = std::clamp(ly_landscape, 0, P4_LANDSCAPE_H - 1);
+            lx = (lx_landscape * P4_UI_LOGICAL_W) / P4_LANDSCAPE_W;
+            ly = (ly_landscape * P4_UI_LOGICAL_H) / P4_LANDSCAPE_H;
+            lx = std::clamp(lx, 0, logical_w - 1);
+            ly = std::clamp(ly, 0, logical_h - 1);
+
+        }
+
+        if (pressed) {
+            s_touch_press_streak = 1;
+            s_touch_release_streak = 0;
+            s_touch_debounced = true;
+        } else {
+            s_touch_release_streak = 1;
+            s_touch_press_streak = 0;
+            s_touch_debounced = false;
+            lx = 0;
+            ly = 0;
+            pz = 0;
+        }
+        s_touch_last_pressed = s_touch_debounced;
+        s_touch_last_raw_x = s_touch_debounced ? (uint16_t)lx : 0;
+        s_touch_last_raw_y = s_touch_debounced ? (uint16_t)ly : 0;
+        s_touch_last_z1 = s_touch_debounced ? pz : 0;
+        static uint64_t s_last_tp_log_ms = 0;
+        const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+        if (now_ms - s_last_tp_log_ms >= 800) {
+            s_last_tp_log_ms = now_ms;
+            ESP_LOGI(TAG, "P4 TP pressed=%d px=%d py=%d lx=%d ly=%d z=%u", (int)s_touch_debounced, px, py, lx, ly, (unsigned)pz);
+        }
+        if (raw_x) *raw_x = s_touch_last_raw_x;
+        if (raw_y) *raw_y = s_touch_last_raw_y;
+        if (z1) *z1 = s_touch_last_z1;
+        if (locked) {
+            xSemaphoreGive(s_touch_mutex);
+        }
+        return s_touch_debounced;
+    }
+#endif
 
     const bool pressed = true;
     int x0 = 0, y0 = 0, x1 = 0, y1 = 0, x2 = 0, y2 = 0;
@@ -855,6 +1667,172 @@ bool display_driver_touch_probe(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) 
     return s_touch_debounced;
 }
 
+bool display_driver_wait_vsync(uint32_t timeout_ms) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        if (!s_p4_render_sem) return false;
+        const TickType_t ticks = pdMS_TO_TICKS(timeout_ms ? timeout_ms : 1);
+        return xSemaphoreTake(s_p4_render_sem, ticks) == pdTRUE;
+    }
+#endif
+    (void)timeout_ms;
+    return true;
+}
+
+bool display_driver_p4_begin_frame(uint16_t **out_fb, int *out_w, int *out_h) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        if (out_fb) *out_fb = nullptr;
+        if (out_w) *out_w = 0;
+        if (out_h) *out_h = 0;
+        if (!s_p4_display_ready || s_p4_panel == nullptr) return false;
+        if (!s_p4_use_framebuffer || s_p4_framebuffer_count < 2) return false;
+        if (kP4RenderTrace) {
+            const uint64_t ts_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+            ESP_LOGI(TAG, "RENDER begin_frame ts=%llu ms frame=%dx%d",
+                     (unsigned long long)ts_ms, P4_PANEL_PHYS_W, P4_PANEL_PHYS_H);
+        }
+        // Keep exactly one frame in flight to avoid race/tearing artifacts.
+        if (s_p4_render_sem) {
+            if (xSemaphoreTake(s_p4_render_sem, pdMS_TO_TICKS(120)) != pdTRUE) {
+                const TickType_t now = xTaskGetTickCount();
+                if ((now - s_p4_last_vsync_warn) > pdMS_TO_TICKS(1000)) {
+                    s_p4_last_vsync_warn = now;
+                    ESP_LOGW(TAG, "P4 begin_frame timeout: previous frame still in flight");
+                }
+                return false;
+            }
+        }
+        const int next_fb = (s_p4_framebuffer_index + 1) % s_p4_framebuffer_count;
+        uint16_t *fb = s_p4_framebuffers[(size_t)next_fb];
+        if (!fb) return false;
+        // Full-frame swapped-buffer path: do not copy previous framebuffer here.
+        // Copying full 800x480 every frame can stall rendering and manifest as visual flash.
+        s_p4_pending_fb = fb;
+        s_p4_pending_index = next_fb;
+        if (out_fb) *out_fb = fb;
+        if (out_w) *out_w = P4_PANEL_PHYS_W;
+        if (out_h) *out_h = P4_PANEL_PHYS_H;
+        return true;
+    }
+#endif
+    if (out_fb) *out_fb = nullptr;
+    if (out_w) *out_w = 0;
+    if (out_h) *out_h = 0;
+    return false;
+}
+
+bool display_driver_p4_present_frame(void) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        if (!s_p4_display_ready || s_p4_panel == nullptr) return false;
+        if (!s_p4_pending_fb || s_p4_pending_index < 0) return false;
+        if (kP4RenderTrace) {
+            const uint64_t ts_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+            ESP_LOGI(TAG, "RENDER present_frame ts=%llu ms frame=%dx%d",
+                     (unsigned long long)ts_ms, P4_PANEL_PHYS_W, P4_PANEL_PHYS_H);
+        }
+        if (s_p4_framebuffer_pixels > 0) {
+            const size_t bytes = s_p4_framebuffer_pixels * sizeof(uint16_t);
+            (void)esp_cache_msync(
+                s_p4_pending_fb,
+                bytes,
+                ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+        }
+        const esp_err_t err = esp_lcd_panel_draw_bitmap(
+            s_p4_panel,
+            0,
+            0,
+            P4_PANEL_PHYS_W,
+            P4_PANEL_PHYS_H,
+            s_p4_pending_fb);
+        if (err == ESP_OK) {
+            s_p4_framebuffer_index = s_p4_pending_index;
+        } else if (s_p4_render_sem) {
+            // If submit failed, release the render token so the pipeline can recover.
+            (void)xSemaphoreGive(s_p4_render_sem);
+        }
+        s_p4_pending_fb = nullptr;
+        s_p4_pending_index = -1;
+        return err == ESP_OK;
+    }
+#endif
+    return false;
+}
+
+bool display_driver_p4_present_frame_region(int x, int y, int w, int h) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        if (!s_p4_display_ready || s_p4_panel == nullptr) return false;
+        if (!s_p4_pending_fb || s_p4_pending_index < 0) return false;
+
+        int x1 = std::clamp(x, 0, P4_PANEL_PHYS_W - 1);
+        int y1 = std::clamp(y, 0, P4_PANEL_PHYS_H - 1);
+        int x2 = std::clamp(x + w - 1, 0, P4_PANEL_PHYS_W - 1);
+        int y2 = std::clamp(y + h - 1, 0, P4_PANEL_PHYS_H - 1);
+        if (w <= 0 || h <= 0 || x2 < x1 || y2 < y1) {
+            return display_driver_p4_present_frame();
+        }
+
+        const int copy_w = x2 - x1 + 1;
+        const int copy_h = y2 - y1 + 1;
+        const size_t copy_pixels = (size_t)copy_w * (size_t)copy_h;
+        static std::vector<uint16_t> s_p4_region_buf;
+        if (s_p4_region_buf.size() < copy_pixels) {
+            s_p4_region_buf.resize(copy_pixels);
+        }
+
+        for (int row = 0; row < copy_h; ++row) {
+            const size_t src_off = (size_t)(y1 + row) * (size_t)P4_PANEL_PHYS_W + (size_t)x1;
+            const size_t dst_off = (size_t)row * (size_t)copy_w;
+            std::memcpy(
+                s_p4_region_buf.data() + dst_off,
+                s_p4_pending_fb + src_off,
+                (size_t)copy_w * sizeof(uint16_t));
+        }
+
+        (void)esp_cache_msync(
+            s_p4_region_buf.data(),
+            copy_pixels * sizeof(uint16_t),
+            ESP_CACHE_MSYNC_FLAG_DIR_C2M | ESP_CACHE_MSYNC_FLAG_UNALIGNED);
+
+        const esp_err_t err = esp_lcd_panel_draw_bitmap(
+            s_p4_panel,
+            x1,
+            y1,
+            x2 + 1,
+            y2 + 1,
+            s_p4_region_buf.data());
+        if (err == ESP_OK) {
+            s_p4_framebuffer_index = s_p4_pending_index;
+        } else if (s_p4_render_sem) {
+            (void)xSemaphoreGive(s_p4_render_sem);
+        }
+        s_p4_pending_fb = nullptr;
+        s_p4_pending_index = -1;
+        return err == ESP_OK;
+    }
+#else
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+#endif
+    return false;
+}
+
+void display_driver_p4_cancel_frame(void) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        s_p4_pending_fb = nullptr;
+        s_p4_pending_index = -1;
+        if (s_p4_render_sem) {
+            (void)xSemaphoreGive(s_p4_render_sem);
+        }
+    }
+#endif
+}
+
 bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *z1) {
     if (!s_touch) {
         if (raw_x) *raw_x = 0;
@@ -862,6 +1840,31 @@ bool display_driver_touch_probe_raw(uint16_t *raw_x, uint16_t *raw_y, uint16_t *
         if (z1) *z1 = 0;
         return false;
     }
+
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        bool locked = false;
+        if (s_touch_mutex) {
+            locked = (xSemaphoreTake(s_touch_mutex, pdMS_TO_TICKS(10)) == pdTRUE);
+        }
+        int px = 0;
+        int py = 0;
+        uint16_t pz = 0;
+        const bool raw_pressed = touch_read_once(px, py, pz);
+        const bool pressed = raw_pressed;
+        if (pressed) {
+            px = std::clamp(px, 0, P4_PANEL_PHYS_W - 1);
+            py = std::clamp(py, 0, P4_PANEL_PHYS_H - 1);
+        }
+        if (raw_x) *raw_x = pressed ? (uint16_t)px : 0;
+        if (raw_y) *raw_y = pressed ? (uint16_t)py : 0;
+        if (z1) *z1 = pressed ? pz : 0;
+        if (locked) {
+            xSemaphoreGive(s_touch_mutex);
+        }
+        return pressed;
+    }
+#endif
 
     (void)esp_lcd_touch_read_data(s_touch);
 
@@ -947,6 +1950,13 @@ bool display_driver_set_touch_transform(bool swap_xy, bool mirror_x, bool mirror
     s_touch_mirror_x = mirror_x;
     s_touch_mirror_y = mirror_y;
     save_touch_to_nvs();
+
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        // GT911 on P4 uses I2C and does not need SPI-style runtime reinit.
+        return true;
+    }
+#endif
 
     if (!s_touch_io && !s_touch) return true;
     if (touch_deinit() != ESP_OK) return false;
@@ -1040,6 +2050,16 @@ void display_driver_get_touch_pins(int *sclk, int *mosi, int *miso) {
 }
 
 bool display_driver_set_touch_pins(int sclk, int mosi, int miso) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        (void)sclk;
+        (void)mosi;
+        (void)miso;
+        // P4 touch is GT911 over fixed I2C pins; SPI pin remap is not applicable.
+        return true;
+    }
+#endif
+
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)sclk)) return false;
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)mosi)) return false;
     if (!GPIO_IS_VALID_GPIO((gpio_num_t)miso)) return false;
@@ -1054,6 +2074,15 @@ bool display_driver_set_touch_pins(int sclk, int mosi, int miso) {
 }
 
 bool display_driver_set_touch_spi(int mode, int clock_hz) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (board_profile::current_board() == board_profile::BoardId::NewP4) {
+        (void)mode;
+        (void)clock_hz;
+        // P4 touch is GT911 over I2C; SPI mode/frequency controls are not applicable.
+        return true;
+    }
+#endif
+
     if (mode < 0 || mode > 3) return false;
     if (clock_hz < 50 * 1000 || clock_hz > 2 * 1000 * 1000) return false;
 

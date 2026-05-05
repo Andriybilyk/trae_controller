@@ -1,0 +1,17 @@
+Command: cmake -G Ninja -B C:\Users\andri\Documents\GitHub\trae_controller\build_p4_r16 -DPYTHON_DEPS_CHECKED=1 -DPYTHON=C:\Users\andri\.espressif\python_env\idf6.0_py3.13_env\Scripts\python.exe -DESP_PLATFORM=1 -DCCACHE_ENABLE=True C:\Users\andri\Documents\GitHub\trae_controller\firmware
+Configuration Report               
+ тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА 
+   Parser Version: 1               
+   Verbosity: default              
+   Defaults policy: sdkconfig      
+   Status: Finished successfully   
+                                   
+ тФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА 
+CMake Warning (dev) at C:/Users/andri/.espressif/tools/cmake/4.0.3/share/cmake-4.0/Modules/GNUInstallDirs.cmake:250 (message):
+  Unable to determine default CMAKE_INSTALL_LIBDIR directory because no
+  target architecture is known.  Please enable at least one language before
+  including GNUInstallDirs.
+Call Stack (most recent call first):
+  C:/esp/.espressif/v6.0/esp-idf/components/mbedtls/mbedtls/CMakeLists.txt:59 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+

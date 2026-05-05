@@ -1,0 +1,23 @@
+Command: ninja all
+Configuration Report               
+ ───────────────────────────────── 
+   Parser Version: 1               
+   Verbosity: default              
+   Defaults policy: sdkconfig      
+   Status: Finished successfully   
+                                   
+ ───────────────────────────────── 
+CMake Warning at C:/esp/.espressif/v6.0/esp-idf/tools/cmake/component_validation.cmake:122 (message):
+  Private include directory
+  'C:/Users/andri/Documents/GitHub/trae_controller/firmware/main/include'
+  belongs to component main but is being used by component kiln_control.  It
+  is recommended to define the component dependency for kiln_control on the
+  component main, i.e.  'idf_component_register(...  PRIV_REQUIRES main)' in
+  the CMakeLists.txt of kiln_control, and specify the included directory as
+  idf_component_register(...  PRIV_INCLUDE_DIRS <dir relative to component>)
+  in the CMakeLists.txt of component main.
+Call Stack (most recent call first):
+  C:/esp/.espressif/v6.0/esp-idf/tools/cmake/component_validation.cmake:147 (__component_validation_check_include_dirs)
+  C:/esp/.espressif/v6.0/esp-idf/CMakeLists.txt:349 (__component_validation_run_checks)
+
+

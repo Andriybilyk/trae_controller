@@ -77,17 +77,41 @@
 #endif
 
 // 2. THERMOCOUPLE (MAX6675) - Software SPI
+#if CONFIG_TC_BOARD_NEW_P4
+// New P4 module wiring (user-provided):
+// SCK -> GPIO33, CS -> GPIO30, DO(SO) -> GPIO31
+#define MAXCLK          GPIO_NUM_33
+#define MAXCS           GPIO_NUM_30
+#define MAXDO           GPIO_NUM_31
+#else
 #define MAXCLK          GPIO_NUM_40
 #define MAXCS           GPIO_NUM_42
 #define MAXDO           GPIO_NUM_41
+#endif
 
 // 3. RELAYS
+#if CONFIG_TC_BOARD_NEW_P4
+// NewP4 expansion board:
+// - SAFETY_RELAY drives contactor relay coil on GPIO35 (ON while firing)
+// - SSR output is not used in this build
+#define SSR_ZONE1_PIN       GPIO_NUM_NC
+#define SAFETY_RELAY_PIN    GPIO_NUM_35
+#else
 #define SSR_ZONE1_PIN       GPIO_NUM_21
 #define SAFETY_RELAY_PIN    GPIO_NUM_47
+#endif
 
 // 4. EXTRAS
+#if CONFIG_TC_BOARD_NEW_P4
+// SparkFun MOSFET Power Switch CTL is active-low; use dedicated fan control pin.
+#define FAN_PIN             GPIO_NUM_29
+#define FAN_ACTIVE_LOW      1
+#define BUZZER_PIN          GPIO_NUM_28
+#else
 #define FAN_PIN             GPIO_NUM_8
+#define FAN_ACTIVE_LOW      0
 #define BUZZER_PIN          GPIO_NUM_48
+#endif
 
 #ifndef RTC_I2C_PORT
 #define RTC_I2C_PORT        0
