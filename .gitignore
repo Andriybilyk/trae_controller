@@ -14,6 +14,7 @@ coverage/
 # Vite
 frontend/dist/
 frontend/.vite/
+frontend/node_modules/
 
 # PlatformIO / embedded build artifacts
 .pio/
@@ -31,6 +32,7 @@ firmware/build_verify_agent.log
 firmware/.component_cache/
 firmware/.idf-tools/
 firmware/.dbg/
+firmware/slint_ui/target/
 firmware/slint_ui/target_preview/
 .dbg/
 _tmp_*/
