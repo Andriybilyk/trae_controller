@@ -1,3 +1,0 @@
-Command: ninja storage-flash
-Note: C:/Users/andri/.espressif/python_env/idf6.0_py3.13_env/Scripts/python.exe;-m;esptool;--chip;esp32p4 will search for a serial port. To specify a port, set the ESPPORT environment variable.
-Note: C:/Users/andri/.espressif/python_env/idf6.0_py3.13_env/Scripts/python.exe;-m;esptool;--chip;esp32p4 will attempt to set baud rate automatically. To specify a baud rate, set the ESPBAUD environment variable.

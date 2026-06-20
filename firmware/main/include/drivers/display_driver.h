@@ -10,6 +10,8 @@ extern "C" {
 void display_driver_init(void);
 
 bool display_driver_blit_rgb565(int x, int y, int w, int h, const uint16_t *data);
+bool display_driver_p4_draw_bitmap_native(int x1, int y1, int x2_exclusive, int y2_exclusive, const uint16_t *data);
+void display_driver_set_blit_fence_enabled(bool enabled);
 bool display_driver_wait_vsync(uint32_t timeout_ms);
 bool display_driver_p4_begin_frame(uint16_t **out_fb, int *out_w, int *out_h);
 bool display_driver_p4_present_frame(void);
@@ -19,6 +21,10 @@ void display_driver_p4_cancel_frame(void);
 // Backlight control (0..100%).
 uint8_t display_driver_get_backlight_percent(void);
 void display_driver_set_backlight_percent(uint8_t percent);
+void display_driver_set_backlight_percent_from_ui(uint8_t percent);
+void display_driver_set_backlight_percent_forced(uint8_t percent);
+void display_driver_show_backlight_after_first_frame(uint8_t percent);
+void display_driver_persist_backlight_now(void);
 
 // Display orientation helpers (persisted in NVS).
 void display_driver_get_mirror(bool *mirror_x, bool *mirror_y);

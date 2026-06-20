@@ -1,381 +1,109 @@
-# AGENT.md — операційна карта проєкту
-
-## 1) Мета документа
-
-- Це внутрішня карта firmware-проєкту для швидкого входу в контекст.
-- Пріоритет: зрозуміти архітектуру, потік даних, точки збереження налаштувань, build/flash сценарії.
-- Документ орієнтований на підтримку, діагностику та безпечне розширення функцій.
-
-## 2) Високорівнева архітектура
-
-- Платформа: ESP32-S3 + ESP-IDF.
-- Ядро керування печі: `components/kiln_control/*`.
-- Локальний екран: Slint UI (`slint_ui/*`) через C-bridge (`main/ui/slint_bridge.cpp`).
-- Веб-інтерфейс: `data/*` (LittleFS), API/WebSocket у `main/net/*`.
-- Віддалений доступ: MQTT remote у `main/net/remote_access.cpp`.
-
-## 3) Структура проєкту (відсортовано по важливості)
-
-### 3.1 Критичні entrypoint-и
-
-- `main/app/app_main.cpp` — старт системи, задачі, ініціалізація NVS/LittleFS/Wi-Fi/RTC/Control/UI.
-- `components/kiln_control/thermal_control.cpp` — PID, schedule runtime, autotune, safety/fault.
-- `main/net/wifi_server.cpp` — реєстрація HTTP/WS маршрутів.
-- `slint_ui/src/lib.rs` — головний цикл локального UI.
-
-### 3.2 Домени коду
-
-- `main/app/`
-  - `app_main.cpp`
-  - `device_commands.cpp`
-- `main/net/`
-  - `wifi_server.cpp`
-  - `wifi_server_settings.cpp`
-  - `wifi_server_pid.cpp`
-  - `wifi_server_fan.cpp`
-  - `wifi_server_history.cpp`
-  - `wifi_server_remote.cpp`
-  - `wifi_server_touch.cpp`
-  - `wifi_server_ota.cpp`
-  - `wifi_connection.cpp`
-  - `remote_access.cpp`
-  - `dns_server.cpp`
-- `main/ui/`
-  - `slint_bridge.cpp`
-- `main/drivers/`
-  - `display_driver.cpp`
-  - `fan_driver.cpp`
-  - `rtc_ds3231.cpp`
-- `components/kiln_control/`
-  - `thermal_control.cpp`
-  - `include/kiln_control/thermal_control.h`
-- `components/kiln_config/`
-  - `config_store.cpp`
-  - `fs_utils.cpp`
-  - `include/kiln_config/config.h`
-  - `include/kiln_config/config_store.h`
-- `components/kiln_hal_heater/`
-  - `heater_hal.cpp`
-- `components/kiln_safety/`
-  - `faults.cpp`
-- `slint_ui/`
-  - `src/lib.rs`
-  - `ui/app.slint`
-- `data/`
-  - `index.html`
-  - `bootstrap.js`
-  - `assets/*`
-  - `wifi_setup.html`
-  - `touch_calibration.html`
-  - `mqtt_gateway.html`
-
-### 3.3 Технічні директорії, які не плутати з runtime
-
-- `build/`, `slint_ui/target/`, `.component_cache/` — артефакти/кеші, не джерела функціоналу.
-- `legacy/lvgl_ui/` — legacy код, не основний активний UI-шлях.
-
-## 4) Runtime-потік
-
-1. `app_main()` ініціалізує NVS, LittleFS, RTC, fan, thermal control, Wi-Fi.
-2. Піднімаються задачі:
-   - `ui_task` → `slint_ui_run()`
-   - `control_task` → `thermalCtrl.loop()` + heartbeat/watchdog
-   - `server_task` → `wifiServer.begin()/loop()` + `remote_access_loop()`
-3. Веб і екран керують одним `thermalCtrl` через API/bridge.
-
-## 5) Налаштування і персистентність
-
-- Базовий конфіг зберігається у JSON через `kiln_config_save_json_config()` з дублюванням у NVS + LittleFS.
-- Ключові runtime-поля:
-  - `temp_offset_c`
-  - `maxC`
-  - `autotune_target_c` (синхронізується між Web і Slint)
-  - PID tunings
-- На boot: відновлення конфіг-файлу з NVS у LittleFS (якщо потрібно).
-
-## 5.1 PZEM-004T (електрика, струм, потужність)
-
-- Драйвер: `main/drivers/pzem004t_driver.*`
-- Інтерфейс читання: `pzem004t_get_reading()` → `pzem004t_reading_t { voltage, current, power, ok }`.
-- UI інтеграція:
-  - C-bridge (`main/ui/slint_bridge.cpp`) передає PZEM у `slint_kiln_state_t`.
-  - Slint UI використовує підписані поля для головного екрану і екрану очікування.
-- Логіка виявлення розірваного ТЕН:
-  - Якщо `is_firing == true` і `current < 0.20A`, UI показує “Phase: NO / Фаза: НІ”.
-  - Якщо `current >= 0.20A`, UI показує “Phase: OK / Фаза: OK”.
-
-## 6) API-карта (основне)
-
-- `GET/POST /api/settings` — загальні налаштування.
-- `GET /api/pid`, `POST /api/pid/reset`.
-- `POST /api/autotune`, `POST /api/autotune/stop`.
-- `GET /api/status` + `/ws` для live-стану.
-- `POST /api/start|stop|skip|addTemp|addTime`.
-- Додатково: `/api/fan`, `/api/history`, `/api/remote`, `/api/touch/*`, `/api/ota/update`.
-
-## 7) Важливі правила змін
-
-- Для змін `data/*` обов’язково `flash_webui.bat`.
-- Для firmware логіки — `flash_and_run.bat`.
-- Не редагувати згенеровані `data/assets/*.js` як основне джерело логіки, якщо можна обійтись `bootstrap.js` або source UI.
-- Якщо додається новий shared-параметр:
-  1. зберігати у `thermal_control` + `persistRuntimeSettingsLocked()`
-  2. віддавати/приймати через `/api/settings`
-  3. підключати в Slint bridge і web UI.
-
-## 8) Діагностика типових проблем
-
-- Web зміни не видно: не прошитий LittleFS або кеш браузера.
-- `409` на autotune: дивитись `error` причину (`fault_active`, `already_firing`, `autotune_active`, `sensor_unhealthy`).
-- Несинхронність UI: перевірити, що значення проходить ланцюгом `Web/Slint -> /api/settings -> thermalCtrl -> /api/settings -> Slint/Web`.
-
-## 9) Що покращити далі (професійний рівень)
-
-### 9.1 Надійність і безпека
-
-- Додати role-based доступ (viewer/operator/admin) до web API.
-- Додати audit log критичних команд (start/stop/autotune/fault clear/settings). ✅ Реалізовано (`/littlefs/logs/audit.log`)
-- Ввести rate-limit на критичні endpoint-и (`/api/start`, `/api/autotune`, `/api/ota/update`).
-
-### 9.2 Якість керування
-
-- Профілі PID по зонах температур (low/mid/high) з авто-вибором.
-- Автоматичний preflight-check перед стартом випалу (сенсор, fault, fan, maxC, RTC час). ✅ Реалізовано
-- Детальні метрики autotune (якість коливань, валідні цикли, confidence). ✅ Реалізовано
-
-### 9.3 Продуктовість і сервіс
-
-- Експорт/імпорт повного бекапу конфігів і програм в один файл. ✅ Реалізовано (`/api/backup`, `/api/backup/import`)
-- Версіонування структури `config.json` з міграціями. ✅ Реалізовано (`schema_version=2`)
-- Diagnostic bundle (`logs + settings + status snapshot`) для швидкого сапорту. ✅ Реалізовано (`/api/diagnostics/bundle`)
-
-### 9.4 Інфраструктура розробки
-
-- CI-пайплайн: build + статичні перевірки + базові API-тести.
-- Контрактні тести JSON API (schema/compatibility).
-- Автоматична перевірка, що web і firmware підтримують однакові ключі налаштувань.
-
-## 10) Мінімальний operational checklist перед релізом
-
-- Build firmware: OK.
-- Build/flash LittleFS: OK.
-- Перевірка `/api/status`, `/api/settings`, `/api/autotune`: OK.
-- Перевірка синхронізації значень між Slint і web UI: OK.
-- Smoke test fault/clear/reboot сценаріїв: OK.
-
-## 11) Аналіз конкурентів і цільові фічі
-
-### 11.1 Що ринок вже очікує
-
-- **Bartlett Genesis + KilnAid**: стабільний mobile-first remote monitoring, мульти-піч, простий onboarding.
-- **Orton AutoFire / Sentry клас**: зрозумілі профілі випалу, передбачувана поведінка, мінімум “магії”.
-- **Комерційні kiln/cloud рішення**: історія сесій, графіки, сервісна діагностика, журнал критичних дій.
-
-### 11.2 Де ми вже на рівні або вище
-
-- Локальний екран + web UI + API + WS у єдиному runtime.
-- Автоматичний preflight start-check і розширені autotune-метрики.
-- Backup/import, diagnostic bundle, audit log у firmware без зовнішніх агентів.
-
-### 11.3 Що дасть реальний “професійний” стрибок
-
-- **Operator roles + PIN/2FA для критичних дій**: розмежування прав безпеки.
-- **Timeline firings + аналітика деградації нагрівача**: прогноз обслуговування.
-- **Remote approvals**: start/stop/autotune через підтвердження з таймаутом.
-- **Calibration wizard**: покроковий майстер сенсора/offset/fan/touch з протоколом.
-- **Fleet mode**: порівняння кількох печей, health-score, централізовані алерти.
-
-### 11.4 Рекомендований порядок впровадження
-
-1. RBAC + PIN для критичних API
-2. Графіки/аналітика firing з quality KPI
-3. Fleet dashboard + централізовані сповіщення
-4. Напівавтоматичний сервісний майстер і predictive maintenance
-
-## 12) Структурне дослідження готових рішень (сенсорні контролери муфельних печей)
-
-### 12.1 Bartlett Genesis + KilnAid
-
-- Сенсорний UI, до 30 програм, сегментні профілі, remote monitoring через KilnAid.
-- Модель продукту: простий onboarding, мульти-піч, статуси/алерти, freemium mobile app.
-- Джерела:
-  - <https://www.bartlettinstrument.com/product/genesis-2-0>
-  - <https://www.bartlettinstrument.com/kilnaid>
-
-### 12.2 Orton AutoFire (Slide/4000/4X + RMS)
-
-- Сильна сторона: стабільний PID-контроль і зріле програмування профілів.
-- Remote історично більше про desktop RMS (аналіз temperature-time), ніж mobile-first remote control.
-- Джерела:
-  - <https://www.ortonceramic.com/autofire-controllers>
-  - <https://www.ortonceramic.com/remote-monitoring-software>
-
-### 12.3 Nabertherm Controller Series 500 + MyNabertherm
-
-- Сенсорний контролер + app з фокусом на remote monitoring/control, графіки, fault visibility.
-- Сильна сторона: екосистемність (app + controller + індустріальні сценарії).
-- Джерело:
-  - <https://nabertherm.com/en/mynabertherm-app>
-
-### 12.4 TAP (SDS Industries) + Mobile App
-
-- Mobile-first підхід: remote start/adjust, графіки, push, diagnostics і preventive maintenance alerts.
-- Сильна сторона: app як центр операцій.
-- Джерела:
-  - <https://www.kilncontrol.com/>
-  - <https://www.kilncontrol.com/tap-kiln-control-mobile/>
-
-### 12.4.1 TAP II / TAP II Pro (додатково)
-
-- Позиціювання: сенсорний контролер із фокусом на mobile remote control та “операції з телефона”.
-- Практичні фічі, які виділяють TAP II:
-  - remote start/abort/skip + редагування налаштувань і розкладів через app,
-  - графічні firing logs і live indicators,
-  - preventive maintenance alerts (ресурс relay/thermocouple/elements),
-  - diagnostics/error reporting і push-сповіщення,
-  - multi-zone сценарії в TAP II Pro.
-- Продуктова модель: freemium/premium mobile-функцій (частина remote-функцій у платному плані).
-- Висновок для нас: найсильніший референс не лише по PID, а по **сервісній екосистемі** (maintenance + alerts + mobile-first UX).
-- Джерела:
-  - <https://www.kilncontrol.com/controller/digital/tap-ii-controller/>
-  - <https://www.kilncontrol.com/controller/digital/tap-ii-pro/>
-  - <https://www.kilncontrol.com/support/faq/>
-
-### 12.5 Висновок по ринку
-
-- Ринок очікує не тільки “контролер + екран”, а повний стек:
-  1. безпечний remote access,
-  2. аналітика сесій,
-  3. сервісні алерти/maintenance,
-  4. робота з декількома печами.
-
-## 13) Gap-аналіз нашого проєкту і що змінити далі
-
-### 13.1 Що вже закрито
-
-- Preflight-check старту (sensor/fault/fan/maxC/RTC).
-- Autotune quality metrics (valid cycles/CV/quality/confidence).
-- Backup/import + diagnostics bundle.
-- Audit log критичних команд.
-
-### 13.2 Ключові прогалини до “проф рівня”
-
-- Відсутній RBAC/PIN-gating на критичних API.
-- Немає повноцінного role/session шару для web.
-- Немає fleet orchestration (мульти-піч dashboard + policy alerts).
-- KPI є, але ще немає повного trends/dashboard (періодні порівняння, health score).
-- Немає service wizard з протоколом перевірок та контрольними картками.
-
-### 13.3 Точкові технічні зміни (куди вносити)
-
-- **RBAC + PIN**
-  - API-guard middleware в `main/net/wifi_server.cpp` (перевірка ролі + step-up PIN).
-  - Сховище auth-конфігу в `components/kiln_config/config_store.cpp` (`auth` секція, hash+salt, policy).
-  - UI в `data/*` + `slint_ui/*` для ролей і підтверджень.
-- **Графіки/KPI dashboard**
-  - Розширити `history` API агрегатами за період (доба/тиждень/місяць).
-  - Додати endpoint типу `/api/analytics/kpi`.
-  - Відмалювати тренди в web UI (без правки згенерованого `assets/*`, через source/bundle pipeline).
-- **Fleet + централізовані сповіщення**
-  - Використати `remote_access.cpp` як transport base (MQTT topics + signed commands).
-  - Додати cloud/fleet-схему: device registry, last-seen, alert routing.
-  - Нормалізувати payload подій до стабільного контракту.
-- **Service wizard + predictive maintenance**
-  - Додати `maintenance` модель у config/history.
-  - Вести лічильники ресурсу relay/element/thermocouple.
-  - API: `/api/maintenance/*` + чеклісти, рекомендації, due alerts.
-
-### 13.4 Поточні вимоги UI/Hardware (оновлений пріоритет)
-
-- Підтвердження дій: пропуск кроку, додавання температури, додавання часу.
-- У верхньому барі під іконкою Wi‑Fi залишити лише Wi‑Fi налаштування; решту налаштувань перенести під іконку шестерні справа, іконки зсунути лівіше.
-- Годинник на екрані: тап для ручного вводу дати й часу, якщо немає Wi‑Fi.
-- Повноекранний стартовий екран завантаження з великим логотипом KILN PRO.
-- Режим standby: після 3 хв без торкань показувати велике значення температури і логотип KILN PRO; вихід по тапу.
-- Додати датчик струму ACS758LCB‑100B для діагностики обриву спіралі та розрахунку реальної потужності/витрат.
-- Додати АЦП ADS1115 для вимірювання струму та контрольних каналів.
-
-## 14) ESP-IDF v6.0 migration checklist
-
-### 14.1 Статус
-
-- Build/flash на ESP-IDF v6.0: ✅
-- RTC DS3231 мігровано на `driver/i2c_master.h`: ✅
-- Legacy include `driver/i2c.h` у `config.h` прибрано: ✅
-- Crypto API для remote/OTA (PSA): ✅
-
-### 14.2 Залишкові warning-и (не блокують)
-
-- Rust/Slint лінкер-попередження про `chown` (ESP-платформа не підтримує): informational.
-- Linker warning про `.note.GNU-stack` із toolchain/libm: зовнішній тулчейн-артефакт.
-- Попередження esptool `--after hard_reset` (deprecated): бажано перевести на `hard-reset`.
-
-### 14.3 Далі для “чистого” CI
-
-- Додати окрему CI-конфігурацію під IDF 6.0 з fail-on-new-warnings policy.
-- Зафіксувати baseline warning log і контролювати тільки нові регресії.
-
-## 15) Оновлений список покращень за референсами сучасних контролерів (2026)
-
-### 15.1 Витяг із референсів ринку
-
-- **Nabertherm MyNabertherm + Series 500**
-  - мультипічний dashboard;
-  - прогрес програми з сегментами, часом старту/залишком;
-  - push про помилки і завершення;
-  - багатомовність інтерфейсу;
-  - відображення додаткових функцій печі (вентилятор/заслінка/газ тощо).
-- **Bartlett Genesis + KilnAid**
-  - remote monitoring з мобільного;
-  - графіки випалу і логи;
-  - правки під час випалу (add segment/temp, skip segment);
-  - вбудована діагностика і error codes;
-  - Wi‑Fi оновлення.
-- **myKiln / TAP-подібні mobile-first рішення**
-  - архів кривих + нотатки/фото по кожному випалу;
-  - трекінг енергоспоживання;
-  - сповіщення по етапах і аномаліях;
-  - віддалене редагування програм.
-
-### 15.2 Пріоритетні покращення саме для цього проєкту
-
-1. **Мовна консистентність end-to-end**
-   - Єдине джерело `language` для Slint + web + push.
-   - Локалізація статусів, fault-причин, одиниць виміру та KPI в історії/графіках.
-2. **“Smart History” (паспорт випалу + аналітика)**
-   - На кожен випал: програма, сегменти, факт/план, енергія, вартість, max load, peak temp, quality KPI.
-   - Фільтри по даті/статусу/програмі + швидкий пошук.
-3. **Промислові сповіщення**
-   - Push/Telegram/MQTT нотифікації: start, complete, fault, sensor anomaly.
-   - Політики оповіщення (тихий режим, ескалація, rate-limit).
-4. **Редагування “на льоту” з журналюванням**
-   - Дозволити безпечні зміни під час випалу (target/hold/rate) з audit trail “хто/коли/що”.
-   - Показувати diff у деталях випалу.
-5. **Профілі обладнання в Налаштуваннях**
-   - Зміщення термопари, потужність печі, maxC, тариф, fan-curve, кількість зон.
-   - Всі зміни через спільний config-контракт (`/api/settings`) для повної синхронізації web↔controller.
-6. **Service & Maintenance контур**
-   - Лічильники ресурсу спіралей/реле/термопари.
-   - Прогноз ТО (due-by-hours / due-by-cycles), сервісні нагадування.
-7. **Мультипічний режим (Fleet Lite)**
-   - Екран “парк печей”: онлайн/офлайн, активна програма, ETA, fault state.
-   - Базова централізація алертів і health-score.
-8. **Прозора діагностика для сапорту**
-   - One-click diagnostic bundle: history + settings + sensor snapshots + logs.
-   - Шаблони “типових причин” і рекомендації дій для оператора.
-
-### 15.3 Що впроваджувати першим (короткий roadmap)
-
-1. Завершити уніфікацію локалізації у web/Slint/history/faults.
-2. Закрити профілі обладнання в єдиному `/api/settings` і додати валідацію діапазонів.
-3. Додати push-сповіщення для `fault/complete`.
-4. Розгорнути аналітику історії (тренди енергії/часу/піків).
-5. Додати maintenance-лічильники і сервісні нагадування.
-
-### 15.4 Референси для команди
-
-- Nabertherm MyNabertherm: <https://nabertherm.com/ru/mobilnoe-prilozhenie-mynabertherm>
-- Nabertherm Series 500: <https://nabertherm.com/en/series-500>
-- Bartlett Kiln Controllers: <https://www.bartlettinstrument.com/kiln>
-- Bartlett Genesis LT3140: <https://www.bartlettinstrument.com/product/genesis-model-lt3140>
-- ROHDE myKiln (приклад mobile-first UX): <https://www.rohde-kilns.com/blogs/news/take-your-kiln-into-your-hands-with-mykiln-app>
+# План міграції контролера на ESP-IDF 5.4.2 та LVGL
+
+Цей документ містить інструкції для переведення проекту контролера на стабільну базу ESP-IDF 5.4.2 з використанням графічного двигуна LVGL та архітектури, перевіреної в проекті `esp_brookesia_phone`.
+
+## 🛠 Технічний стек
+- **Framework:** ESP-IDF v5.4.2 (стабільна версія для ESP32-P4)
+- **Graphics:** LVGL v8.3.x або v9.x (рекомендовано v8.3 для Brookesia)
+- **Display Driver:** ST7701 (MIPI DSI, 2-lane, 480x800)
+- **Touch Driver:** GT911 (I2C)
+- **Hardware:** ESP32-P4 (Core v1.3 p4)
+
+## 📍 Ключові налаштування (sdkconfig)
+
+Для досягнення плавності без мигання необхідно встановити наступні параметри:
+
+### 1. Пам'ять (PSRAM)
+Пропускна здатність PSRAM критична для роздільної здатності 480x800.
+```ini
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_200M=y
+CONFIG_SPIRAM_X16_MODE=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+```
+
+### 2. Дисплей та LVGL (Анти-флікер)
+Використання подвійної буферизації в PSRAM та MIPI DSI V-Sync.
+```ini
+CONFIG_BSP_LCD_DPI_BUFFER_NUMS=2
+CONFIG_BSP_DISPLAY_LVGL_AVOID_TEAR=y
+CONFIG_BSP_DISPLAY_LVGL_DIRECT_MODE=y
+CONFIG_LV_MEM_CUSTOM=y
+CONFIG_LV_MEM_CUSTOM_INCLUDE="esp_heap_caps.h"
+CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=y
+```
+
+### 3. FreeRTOS (Стабільність)
+Дозвіл на розміщення завдань у PSRAM для складних UI-додатків.
+```ini
+CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=y
+CONFIG_FREERTOS_SUPPORT_STATIC_ALLOCATION=y
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+```
+
+## 🚀 Послідовність ініціалізації (main.cpp)
+
+Для стабільного старту рекомендується наступний порядок у `app_main`:
+
+1. **NVS & Storage:** Ініціалізація NVS та монтування SPIFFS (для іконок/шрифтів).
+2. **BSP Display:**
+   - Налаштування `bsp_display_cfg_t` з `buff_spiram = true`.
+   - Запуск `bsp_display_start_with_config()`.
+   - Увімкнення підсвічування після ініціалізації LVGL.
+3. **Touch:** Ініціалізація GT911. Якщо тач не відповідає, створення dummy-пристрою для запобігання крашу системи Brookesia.
+4. **LVGL Lock:** Завжди використовувати `bsp_display_lock()` при маніпуляціях з об'єктами LVGL.
+
+## 🔄 Альбомна орієнтація (Landscape 800x480)
+
+Для вашого контролера печі, щоб отримати стабільне зображення 800x480 в альбомному режимі:
+
+### 1. Налаштування драйвера дисплея
+В коді ініціалізації BSP (`esp32_p4_function_ev_board.c` або ваш `main.cpp`) необхідно налаштувати `swap_xy`. Оскільки фізична матриця зазвичай має орієнтацію 480x800, ми міняємо осі на рівні драйвера:
+
+```cpp
+const lvgl_port_display_cfg_t disp_cfg = {
+    .hres = 800, // Вказуємо ширину як 800
+    .vres = 480, // Вказуємо висоту як 480
+    .rotation = {
+        .swap_xy = true,  // Міняємо X та Y місцями
+        .mirror_x = false,
+        .mirror_y = false,
+    },
+    // ... інші налаштування з прикладу Brookesia
+};
+```
+
+### 2. Координати тачскріна
+Для тачскріна GT911 також потрібно увімкнути `swap_xy` в конфігурації `esp_lcd_touch_config_t`, щоб натискання збігалися з альбомним інтерфейсом:
+```cpp
+.flags = {
+    .swap_xy = 1,
+    .mirror_x = 0,
+    .mirror_y = 0,
+}
+```
+
+### 3. Інтеграція екранів Pico Pixel
+Коли ви отримаєте файли з Pico Pixel:
+1. Додайте згенеровані файли до папки `main/ui/`.
+2. В `main.cpp` після ініціалізації дисплея додайте:
+```cpp
+bsp_display_lock(0);
+ui_init(); // Функція ініціалізації з Pico Pixel
+bsp_display_unlock();
+```
+
+## 🎨 Особливості для контролера печі
+- Використовуйте шрифти великого розміру для читабельності температури (монтуються через SPIFFS).
+- Всі графічні елементи в Pico Pixel мають бути створені під розмір **800x480**.
+
+## 📦 Залежності (idf_component.yml)
+Обов'язкові компоненти для вашого контролера:
+- `espressif/esp_lvgl_port`
+- `espressif/esp_lcd_st7701`
+- `espressif/esp_lcd_touch_gt911`
+- `espressif/esp32_p4_function_ev_board`
+
+---
+*Примітка: Всі налаштування базуються на успішному запуску прошивки Brookesia Phone на вашому залізі.*

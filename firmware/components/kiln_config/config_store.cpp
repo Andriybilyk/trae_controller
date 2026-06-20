@@ -43,14 +43,9 @@ static void config_save_worker_task(void *pv) {
             const std::string migrated = migrate_config_json_schema(req.json, nullptr);
             free(req.json);
 
-            ESP_LOGI(TAG, "Starting debounced async config save to NVS and LittleFS...");
+            ESP_LOGI(TAG, "STORAGE_WRITE begin target=config_json bytes=%u backend=nvs mode=debounced", (unsigned)migrated.size());
             (void)nvs_save_string(migrated);
-            
-            SemaphoreHandle_t m = kiln_config_fs_mutex();
-            if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
-            (void)write_string_to_file_locked(CONFIG_FILE, migrated);
-            if (m) xSemaphoreGiveRecursive(m);
-            ESP_LOGI(TAG, "Debounced async config save complete");
+            ESP_LOGI(TAG, "STORAGE_WRITE done target=config_json bytes=%u backend=nvs mode=debounced", (unsigned)migrated.size());
         }
     }
 }
@@ -64,7 +59,7 @@ static void ensure_async_worker() {
 
 static constexpr const char *NVS_NS = "kiln";
 static constexpr const char *NVS_KEY = "config_json";
-static constexpr int CONFIG_SCHEMA_VERSION = 3;
+static constexpr int CONFIG_SCHEMA_VERSION = 5;
 
 static std::string to_lower_ascii(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) {
@@ -207,6 +202,29 @@ static std::string migrate_config_json_schema(const std::string &json, bool *cha
         changed = true;
     }
 
+    if (ver < 4) {
+        ver = 4;
+        changed = true;
+    }
+
+    if (ver < 5) {
+        cJSON_DeleteItemFromObject(root, "temp_offset_low_c");
+        cJSON_DeleteItemFromObject(root, "temp_offset_high_c");
+        const cJSON *pid = cJSON_GetObjectItem(root, "pid");
+        if (cJSON_IsObject(pid)) {
+            if (!cJSON_IsObject(cJSON_GetObjectItem(root, "pid_low"))) {
+                cJSON_AddItemToObject(root, "pid_low", cJSON_Duplicate(pid, 1));
+                changed = true;
+            }
+            if (!cJSON_IsObject(cJSON_GetObjectItem(root, "pid_high"))) {
+                cJSON_AddItemToObject(root, "pid_high", cJSON_Duplicate(pid, 1));
+                changed = true;
+            }
+        }
+        ver = 5;
+        changed = true;
+    }
+
     cJSON_DeleteItemFromObject(root, "schema_version");
     cJSON_AddNumberToObject(root, "schema_version", (double)CONFIG_SCHEMA_VERSION);
 
@@ -219,6 +237,14 @@ static std::string migrate_config_json_schema(const std::string &json, bool *cha
 }
 
 std::string kiln_config_load_json_config() {
+#if CONFIG_IDF_TARGET_ESP32P4
+    std::string nvs = nvs_load_string();
+    if (nvs.empty()) return {};
+    bool migrated = false;
+    std::string out = migrate_config_json_schema(nvs, &migrated);
+    if (migrated) (void)kiln_config_save_json_config(out);
+    return out;
+#else
     SemaphoreHandle_t m = kiln_config_fs_mutex();
     if (m) xSemaphoreTakeRecursive(m, portMAX_DELAY);
     std::string file = read_file_to_string_locked(CONFIG_FILE);
@@ -235,6 +261,7 @@ std::string kiln_config_load_json_config() {
     std::string out = migrate_config_json_schema(nvs, &migrated);
     if (migrated) (void)kiln_config_save_json_config(out);
     return out;
+#endif
 }
 
 bool kiln_config_save_json_config(const std::string &json) {
@@ -245,8 +272,16 @@ bool kiln_config_save_json_config(const std::string &json) {
     AsyncSaveReq req;
     req.json = strdup(json.c_str());
     if (xQueueSend(s_async_save_queue, &req, 0) != pdTRUE) {
-        free(req.json);
-        return false;
+        // Queue can be full during burst updates from UI.
+        // Drop one oldest pending item and retry once with the newest payload.
+        AsyncSaveReq stale{};
+        if (xQueueReceive(s_async_save_queue, &stale, 0) == pdTRUE) {
+            free(stale.json);
+        }
+        if (xQueueSend(s_async_save_queue, &req, 0) != pdTRUE) {
+            free(req.json);
+            return false;
+        }
     }
     return true;
 #else
@@ -261,6 +296,11 @@ bool kiln_config_save_json_config(const std::string &json) {
 }
 
 void kiln_config_restore_json_config_file() {
+#if CONFIG_IDF_TARGET_ESP32P4
+    // ESP32-P4 display timing is sensitive to flash filesystem writes during boot.
+    // Runtime config source is NVS only; do not mirror back to LittleFS.
+    return;
+#else
     const std::string json = nvs_load_string();
     if (json.empty()) return;
     const std::string migrated = migrate_config_json_schema(json, nullptr);
@@ -274,4 +314,5 @@ void kiln_config_restore_json_config_file() {
     }
     (void)write_string_to_file_locked(CONFIG_FILE, migrated);
     if (m) xSemaphoreGiveRecursive(m);
+#endif
 }

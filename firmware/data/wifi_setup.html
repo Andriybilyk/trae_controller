@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="uk">
 <head>
   <meta charset="utf-8">
@@ -38,6 +38,30 @@
       padding: 10px 12px;
       font-size: 16px;
     }
+    select {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0d0f14;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 16px;
+    }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+    .btn2 {
+      min-height: 46px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0d0f14;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn2:active { background: #10131a; }
+    .hide { display: none; }
     .btn {
       width: 100%;
       min-height: 48px;
@@ -70,8 +94,12 @@
       <p>Введіть назву мережі та пароль. Після збереження контролер спробує підключитися.</p>
 
       <form id="wifiForm" action="/save_wifi" method="POST" autocomplete="on" novalidate>
-        <label for="ssid">SSID (назва мережі)</label>
-        <input id="ssid" name="ssid" type="text" maxlength="32" autocapitalize="none" autocomplete="username" spellcheck="false" required>
+        <label for="ssidSelect">SSID (назва мережі)</label>
+        <div class="row">
+          <select id="ssidSelect" aria-label="Список мереж"></select>
+          <button id="scanBtn" class="btn2" type="button">Сканувати</button>
+        </div>
+        <input id="ssid" name="ssid" class="hide" type="text" maxlength="32" autocapitalize="none" autocomplete="username" spellcheck="false">
 
         <label for="password">Пароль</label>
         <input id="password" name="password" type="password" maxlength="64" autocomplete="current-password">
@@ -86,9 +114,11 @@
   <script>
     const form = document.getElementById('wifiForm');
     const ssid = document.getElementById('ssid');
+    const ssidSelect = document.getElementById('ssidSelect');
     const password = document.getElementById('password');
     const btn = document.getElementById('connectBtn');
     const statusEl = document.getElementById('status');
+    const scanBtn = document.getElementById('scanBtn');
 
     function setStatus(msg, cls) {
       statusEl.textContent = msg || '';
@@ -103,6 +133,80 @@
       const t = await resp.text();
       try { return JSON.parse(t); } catch (_) { return null; }
     }
+
+    function setSsidOptions(items) {
+      const prev = ssidSelect.value;
+      ssidSelect.innerHTML = '';
+
+      const opt0 = document.createElement('option');
+      opt0.value = '';
+      opt0.textContent = 'Оберіть мережу...';
+      ssidSelect.appendChild(opt0);
+
+      const optManual = document.createElement('option');
+      optManual.value = '__manual__';
+      optManual.textContent = 'Ввести вручну';
+      ssidSelect.appendChild(optManual);
+
+      if (Array.isArray(items)) {
+        const sorted = [...items].sort((a, b) => (Number(b?.rssi || -999) - Number(a?.rssi || -999)));
+        for (const it of sorted) {
+          const s = String(it?.ssid || '').trim();
+          if (!s) continue;
+          const rssi = Number(it?.rssi || 0);
+          const auth = Number(it?.auth ?? 0);
+          const sec = auth === 0 ? ' (відкрита)' : '';
+          const o = document.createElement('option');
+          o.value = s;
+          o.textContent = `${s}${sec}  [${rssi} dBm]`;
+          ssidSelect.appendChild(o);
+        }
+      }
+
+      if (prev && [...ssidSelect.options].some(o => o.value === prev)) {
+        ssidSelect.value = prev;
+      } else {
+        ssidSelect.value = '';
+      }
+    }
+
+    function getSelectedSsid() {
+      const v = ssidSelect.value;
+      if (v === '__manual__') return safeTrim(ssid.value);
+      return safeTrim(v);
+    }
+
+    function syncSsidInputVisibility() {
+      const manual = ssidSelect.value === '__manual__';
+      ssid.classList.toggle('hide', !manual);
+      ssid.required = manual;
+      if (manual) {
+        ssid.focus();
+      }
+    }
+
+    async function scanAndFill() {
+      scanBtn.disabled = true;
+      scanBtn.textContent = '...';
+      setStatus('Сканую мережі...', '');
+      try {
+        await fetch('/scan_wifi', { cache: 'no-store' });
+      } catch (_) {}
+
+      const t0 = Date.now();
+      while (Date.now() - t0 < 15000) {
+        try {
+          const r = await fetch('/scan_results', { cache: 'no-store' });
+          const j = r.ok ? await safeJson(r) : null;
+          if (Array.isArray(j)) {
+            setSsidOptions(j);
+            setStatus('Оберіть мережу зі списку.', '');
+            break;
+          }
+        } catch (_) {}
+        await new Promise(r => setTimeout(r, 700));
+      }
+    } 
 
     async function waitForConnected(timeoutMs) {
       const t0 = Date.now();
@@ -119,6 +223,16 @@
       return false;
     }
 
+    async function fetchServerUrl() {
+      try {
+        const r = await fetch('/api/status', { cache: 'no-store' });
+        if (!r.ok) return '';
+        const j = await safeJson(r);
+        if (j && typeof j.server_url === 'string') return j.server_url;
+      } catch (_) {}
+      return '';
+    }
+
     function closePortalWindow() {
       // Best-effort close for captive portal webviews/CNA.
       try { window.close(); } catch (_) {}
@@ -130,15 +244,25 @@
       }, 1000);
     }
 
+    ssidSelect.addEventListener('change', () => {
+      syncSsidInputVisibility();
+    });
+
+    scanBtn.addEventListener('click', async () => {
+      await scanAndFill();
+      scanBtn.disabled = false;
+      scanBtn.textContent = 'Сканувати';
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const vSsid = safeTrim(ssid.value);
+      const vSsid = getSelectedSsid();
       const vPass = password.value || '';
 
       if (!vSsid) {
-        setStatus('Вкажіть SSID мережі.', 'err');
-        ssid.focus();
+        setStatus('Оберіть або введіть SSID мережі.', 'err');
+        if (ssidSelect.value === '__manual__') ssid.focus();
         return;
       }
 
@@ -164,8 +288,13 @@
         setStatus('Підключаюся до Wi-Fi...');
         const ok = await waitForConnected(180000);
         if (ok) {
-          setStatus('Підключено успішно.', 'ok');
-          setTimeout(closePortalWindow, 1200);
+          const url = await fetchServerUrl();
+          if (url && !url.includes('192.168.4.1')) {
+            setStatus('Підключено. Перепідключіться до домашньої Wi‑Fi мережі і відкрийте: ' + url, 'ok');
+          } else {
+            setStatus('Підключено успішно.', 'ok');
+          }
+          setTimeout(closePortalWindow, 5000);
         } else {
           setStatus('Підключення триває довше зазвичай. Дані збережено, контролер ще намагається підключитися.', '');
           btn.disabled = false;
@@ -176,6 +305,13 @@
         btn.disabled = false;
         btn.textContent = 'Підключити';
       }
+    });
+
+    setSsidOptions([]);
+    syncSsidInputVisibility();
+    scanAndFill().finally(() => {
+      scanBtn.disabled = false;
+      scanBtn.textContent = 'Сканувати';
     });
   </script>
 </body>

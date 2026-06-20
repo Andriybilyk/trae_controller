@@ -30,3 +30,11 @@ config TC_DISPLAY_HEIGHT
     default 320
 
 endmenu
+
+menu "TRAE Controller UI Backend"
+
+config TC_UI_BACKEND_LVGL
+    bool "LVGL"
+    default y
+
+endmenu

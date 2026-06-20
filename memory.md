@@ -89,6 +89,7 @@
 - Dual-board migration started: introduced board profile config (`legacy_s3` / `new_p4`) via `firmware/main/Kconfig.projbuild`, runtime board API (`board_profile.*`), and Slint bridge getters for board/display geometry.
 - Slint startup now reads board display geometry from firmware bridge and sets window size dynamically; layout is still largely 480x320 and will be generalized incrementally.
 - Added board-specific defaults overlays: `firmware/sdkconfig.defaults.board_legacy_s3` and `firmware/sdkconfig.defaults.board_new_p4`.
+- Wi-Fi autoconnect orchestration aligned with UI anti-flicker flow (`AGENTS.md`): removed duplicate STA autostart task from `WiFiServerManager::begin()` and kept a single-loop single-flight autoconnect with initial UI delay + retry backoff in `WiFiServerManager::loop()`.
 
 - Settings spacing follow-up: the top block offset now comes from shared Settings metrics, and the display temperature/time/date card was widened to the same right visual edge used by the header close button.
 - Library graph action now opens a dedicated Slint `ScheduleGraph` screen with a read-only time/temperature preview generated from the selected program steps.
@@ -119,6 +120,7 @@
 - P1: Hardware check for new Slint Settings/standby/boot layout on real 480x320 panel (verify no clipping in UA/EN strings and touch hit zones).
 - P1: Re-test editor input on hardware after UI changes: numeric keypad open/close, long program names, UA/EN keyboard rows, and touch-release edge cases.
 - P0: Replace hardcoded `480x320` constants in `firmware/slint_ui/ui/app.slint` with `root.width/root.height`-driven tokens (phase-by-phase to avoid UI regressions on legacy hardware).
+- P0: Continue `AGENTS.md` anti-flicker refactor in Slint runtime: batch property updates per tick (`UiPatch`-style) and remove remaining multi-step UI transitions that can trigger full-frame churn.
 - P0: Implement display/touch HAL split for dual-board support, keeping `drivers/display_driver.cpp` as legacy path and adding new P4 path behind board profile gates.
 - P1: Persist fan curve + mode at boot explicitly (load config before fan init or defer fan init until LittleFS config is applied).
 - P1: Remote access hardening: broker TLS cert pinning/CA upload, per-device command auth (signed nonce), and role-based command allowlist.

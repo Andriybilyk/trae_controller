@@ -72,6 +72,7 @@ private:
     static esp_err_t api_settings_get_handler(httpd_req_t *req);
     static esp_err_t api_settings_set_handler(httpd_req_t *req);
     static esp_err_t api_pid_get_handler(httpd_req_t *req);
+    static esp_err_t api_pid_post_handler(httpd_req_t *req);
     static esp_err_t api_pid_reset_handler(httpd_req_t *req);
     static esp_err_t api_autotune_start_handler(httpd_req_t *req);
     static esp_err_t api_autotune_stop_handler(httpd_req_t *req);

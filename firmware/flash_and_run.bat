@@ -40,7 +40,7 @@ if "%EXPORT_PS1%"=="" (
   exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "& '%EXPORT_PS1%'; Set-Location '%~dp0'; idf.py set-target esp32s3; if ($LASTEXITCODE -ne 0) { exit 1 }; idf.py build; if ($LASTEXITCODE -ne 0) { exit 1 }; idf.py -p %PORT% flash; if ($LASTEXITCODE -ne 0) { exit 1 }; python -c \"import serial; s=serial.Serial('%PORT%',115200,timeout=0.2); s.dtr=False; s.rts=False; s.close()\" | Out-Null; python -m esptool --chip esp32s3 -p %PORT% --after hard_reset run" 
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& '%EXPORT_PS1%'; Set-Location '%~dp0'; if (!(Test-Path 'sdkconfig') -and (Test-Path 'sdkconfig.old')) { Copy-Item -Force 'sdkconfig.old' 'sdkconfig' }; idf.py -B build_s3 build; if ($LASTEXITCODE -ne 0) { exit 1 }; idf.py -B build_s3 -p %PORT% flash; if ($LASTEXITCODE -ne 0) { exit 1 }; python -c \"import serial; s=serial.Serial('%PORT%',115200,timeout=0.2); s.dtr=False; s.rts=False; s.close()\" | Out-Null; python -m esptool --chip esp32s3 -p %PORT% --after hard_reset run; idf.py -B build_s3 -p %PORT% monitor -b 115200"
 if errorlevel 1 exit /b 1
 
 echo.

@@ -93,7 +93,35 @@ private:
         int holdMin = 0;   // for HOLD
     };
 
+    struct EditorRowControls {
+        lv_obj_t *row;
+        lv_obj_t *lblIdx, *lblType;
+        lv_obj_t *groupRamp, *lblRampVal;
+        lv_obj_t *groupHold, *lblHoldVal;
+    };
+
     std::vector<EditorStep> editorSteps;
+    std::vector<EditorRowControls> editorRows;
+
+    struct EditorRowControls {
+        lv_obj_t *row, *lblIdx, *btnType, *lblType, *groupRamp, *groupHold, *btnDel;
+        // RAMP controls
+        lv_obj_t *lblTarget, *btnRampMinus, *lblRampVal, *btnRampPlus;
+        // HOLD controls
+        lv_obj_t *lblHold, *btnHoldMinus, *lblHoldVal, *btnHoldPlus;
+    };
+
+    std::vector<EditorStep> editorSteps;
+    std::vector<EditorRowControls> editorRows; {
+        lv_obj_t* row;
+        lv_obj_t* lblIdx;
+        lv_obj_t* btnType;
+        lv_obj_t* lblType;
+        // ... other pointers
+    };
+
+    std::vector<EditorStep> editorSteps;
+    std::vector<EditorRow> editorRows;
 
     bool isUa = true;
     lv_obj_t *langLabel = nullptr;

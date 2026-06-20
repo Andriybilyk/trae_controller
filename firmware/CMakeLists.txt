@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Force LittleFS component to process our data folder
-set(EXTRA_COMPONENT_DIRS "components" "slint_ui" "managed_components")
+set(EXTRA_COMPONENT_DIRS "components")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(trae_controller)

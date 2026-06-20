@@ -31,6 +31,10 @@
 #define TFT_BL          GPIO_NUM_18
 #endif
 
+#ifndef TFT_BL_ACTIVE_LOW
+#define TFT_BL_ACTIVE_LOW 0
+#endif
+
 // Display SPI frequency. Typical stable range for ST7796S is ~20-40 MHz.
 // If you see artifacts/tearing, try 26 MHz or 20 MHz.
 #ifndef TFT_SPI_CLOCK_HZ
@@ -39,7 +43,7 @@
 // Number of full display lines per SPI DMA transaction chunk.
 // Larger chunks improve throughput; smaller chunks can reduce frame-time jitter.
 #ifndef TFT_SPI_DMA_LINES
-#define TFT_SPI_DMA_LINES 12
+#define TFT_SPI_DMA_LINES 24
 #endif
 // SPI queued transactions for display writes.
 #ifndef TFT_SPI_QUEUE_SIZE
@@ -101,6 +105,14 @@
 #define SAFETY_RELAY_PIN    GPIO_NUM_47
 #endif
 
+#ifndef SSR_ZONE1_ACTIVE_LOW
+#define SSR_ZONE1_ACTIVE_LOW 0
+#endif
+
+#ifndef SSR_BOOT_DIAG_PULSE_MS
+#define SSR_BOOT_DIAG_PULSE_MS 0
+#endif
+
 // 4. EXTRAS
 #if CONFIG_TC_BOARD_NEW_P4
 // SparkFun MOSFET Power Switch CTL is active-low; use dedicated fan control pin.
@@ -154,7 +166,7 @@
 #define SENSOR_FAULT_AUTO_CLEAR_MS (3000)
 
 // --- PID Defaults ---
-#define PID_WINDOW_SIZE     2000    // 2 seconds for SSR
+#define PID_WINDOW_SIZE     1000    // 1 second; aligns better with common kiln SSR time-proportioning loops
 #define PID_KP              22.2f
 #define PID_KI              1.06f
 #define PID_KD              116.55f

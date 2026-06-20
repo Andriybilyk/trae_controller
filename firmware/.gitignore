@@ -2,11 +2,16 @@
 .vscode/
 .cache/
 build/
+build_*/
+build_verify/
+build_verify_agent.log
+slint_ui/target_preview/
 *.o
 *.a
 *.so
 *.bin
 *.elf
+*.map
 compile_commands.json
 dependencies.lock
 

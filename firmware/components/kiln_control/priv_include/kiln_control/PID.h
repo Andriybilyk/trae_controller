@@ -31,15 +31,23 @@ public:
 
     bool Compute() {
         if (!inAuto) return false;
-        // Simplified Compute for now
         double input = *myInput;
         double error = *mySetpoint - input;
-        ITerm += (ki * error);
-        if (ITerm > outMax) ITerm = outMax;
-        else if (ITerm < outMin) ITerm = outMin;
         double dInput = (input - lastInput);
+        const double proposedITerm = ITerm + (ki * error);
+        double unclamped = kp * error + proposedITerm - kd * dInput;
 
-        double output = kp * error + ITerm - kd * dInput;
+        // Conditional integration prevents the I term from winding up while the output is saturated.
+        const bool saturatingHigh = unclamped > outMax;
+        const bool saturatingLow = unclamped < outMin;
+        if (!((saturatingHigh && error > 0) || (saturatingLow && error < 0))) {
+            ITerm = proposedITerm;
+            if (ITerm > outMax) ITerm = outMax;
+            else if (ITerm < outMin) ITerm = outMin;
+            unclamped = kp * error + ITerm - kd * dInput;
+        }
+
+        double output = unclamped;
         if (output > outMax) output = outMax;
         else if (output < outMin) output = outMin;
         *myOutput = output;

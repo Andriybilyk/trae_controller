@@ -1,9 +1,10 @@
 #pragma once
 
 #include "esp_err.h"
-#include <string>
+#include <stdint.h>
 
 #ifdef __cplusplus
+#include <string>
 extern "C" {
 #endif
 
@@ -50,11 +51,6 @@ void wifi_save_creds(const char* ssid, const char* password);
 void wifi_erase_creds(void);
 
 /**
- * @brief Scan for available networks and return JSON string.
- */
-std::string wifi_get_scanned_networks(void);
-
-/**
  * @brief Start an asynchronous WiFi scan.
  */
 void wifi_start_scan(void);
@@ -63,12 +59,33 @@ void wifi_start_scan(void);
  * @brief Get the status of the WiFi scan.
  */
 bool wifi_is_scan_done(void);
+bool wifi_scan_in_progress(void);
+
+void wifi_get_scanned_networks_c(char *out, int32_t out_len);
 
 /**
  * @brief Check current STA link status.
  */
 bool wifi_is_connected(void);
 uint64_t wifi_last_sta_got_ip_ms(void);
+bool wifi_sta_connect_in_progress(void);
+
+/**
+ * @brief User-facing Wi-Fi enable flag stored in NVS.
+ * When disabled, STA won't auto-connect; controller should stay in SoftAP for setup.
+ */
+bool wifi_is_user_enabled(void);
+void wifi_set_user_enabled(bool enabled);
+
+/**
+ * @brief Disconnect STA without erasing saved credentials.
+ */
+void wifi_disconnect_sta(void);
+
+/**
+ * @brief Force Wi-Fi driver into STA-only mode (disable AP interface) when STA connected.
+ */
+void wifi_set_sta_only_mode(void);
 
 /**
  * @brief Check whether AP interface is currently enabled (AP/APSTA mode).
@@ -76,15 +93,11 @@ uint64_t wifi_last_sta_got_ip_ms(void);
 bool wifi_ap_active(void);
 
 /**
- * @brief Get URL for web interface.
- * Returns STA URL when connected, otherwise SoftAP fallback.
+ * @brief C-friendly helpers for UI (avoid std::string in C files).
  */
-std::string wifi_get_server_url(void);
-
-/**
- * @brief Get active controller SoftAP SSID.
- */
-std::string wifi_get_ap_ssid(void);
+void wifi_get_server_url_c(char *out, int32_t out_len);
+void wifi_get_ap_ssid_c(char *out, int32_t out_len);
+void wifi_get_sta_ssid_c(char *out, int32_t out_len);
 
 /**
  * @brief Save credentials for manual connect flow.
@@ -111,16 +124,12 @@ void wifi_prov_stop(void);
  */
 bool wifi_prov_is_active(void);
 
-/**
- * @brief Service name exposed by provisioning SoftAP.
- */
-std::string wifi_prov_service_name(void);
-
-/**
- * @brief Proof-of-possession string used by provisioning security.
- */
-std::string wifi_prov_pop(void);
-
 #ifdef __cplusplus
 }
+
+std::string wifi_get_scanned_networks(void);
+std::string wifi_get_server_url(void);
+std::string wifi_get_ap_ssid(void);
+std::string wifi_prov_service_name(void);
+std::string wifi_prov_pop(void);
 #endif

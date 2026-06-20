@@ -39,6 +39,7 @@ static constexpr const char *AUDIT_LOG_PREV_FILE = "/littlefs/logs/audit.log.1";
 static constexpr size_t AUDIT_LOG_MAX_BYTES = 128 * 1024;
 static constexpr const char *EVENTS_LOG_FILE = "/littlefs/logs/events.log";
 static constexpr const char *EVENTS_LOG_PREV_FILE = "/littlefs/logs/events.log.1";
+static constexpr const char *SCHEDULES_FILE = "/littlefs/schedules.json";
 
 struct EventLogRow {
     uint64_t ts_ms = 0;
@@ -51,6 +52,15 @@ static const char *result_code_to_str(device_commands::ResultCode code);
 static const char *result_message(device_commands::ResultCode code);
 static std::string normalize_schedule_storage_name(const char *name);
 static std::string render_json_and_delete(cJSON *doc);
+
+static std::string schedules_store_load_json() {
+    return kiln_fs_read_text(SCHEDULES_FILE);
+}
+
+static bool schedules_store_save_json(const std::string &json) {
+    return kiln_fs_write_text_atomic(SCHEDULES_FILE, json, true, true);
+}
+
 static bool event_or_message_contains_fault(const std::string &value) {
     std::string lower = value;
     std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
@@ -974,10 +984,7 @@ static esp_err_t captive_probe_handler(httpd_req_t *req) {
 
     const std::string target = ap_portal_url();
     if (ios_probe_html) {
-        // Serve portal HTML directly for iOS probes (without additional redirects).
-        // This is more reliable for opening Captive Network Assistant.
-        (void)target;
-        return send_wifi_setup_file(req);
+        return redirect_handler(req);
     } else {
         httpd_resp_set_status(req, "302 Found");
         httpd_resp_set_hdr(req, "Location", target.c_str());
@@ -1163,18 +1170,17 @@ esp_err_t WiFiServerManager::ws_handler(httpd_req_t *req) {
 }
 
 void WiFiServerManager::begin() {
-    if (wifi_is_configured()) {
-        if (wifi_init_sta()) {
-            isAPMode = false;
-        }
-        else {
-            wifi_init_softap();
-            isAPMode = true;
-        }
-    } else {
-        wifi_init_softap();
-        isAPMode = true;
-    }
+#if CONFIG_IDF_TARGET_ESP32P4
+    // On ESP32-P4, bringing up WiFi stack immediately causes bus contention 
+    // that interferes with initial MIPI display sequence.
+    // We defer the actual hardware and server initialization to loop() where it can 
+    // wait for UI stability.
+    ESP_LOGI(TAG, "WiFi and Server init deferred for P4 boot stability");
+#else
+    // Always bring up SoftAP immediately so UI/captive portal is available.
+    // STA autoconnect is started asynchronously a bit later to avoid early boot races.
+    wifi_init_softap();
+    isAPMode = true;
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.stack_size = 8192;
@@ -1189,6 +1195,7 @@ void WiFiServerManager::begin() {
     } else {
         ESP_LOGE(TAG, "httpd_start failed");
     }
+#endif
 }
 
 void WiFiServerManager::setupRoutes() {
@@ -1320,6 +1327,9 @@ void WiFiServerManager::setupRoutes() {
 
     httpd_uri_t api_pid_get_uri = make_uri("/api/pid", HTTP_GET, api_pid_get_handler);
     httpd_register_uri_handler(server, &api_pid_get_uri);
+
+    httpd_uri_t api_pid_post_uri = make_uri("/api/pid", HTTP_POST, api_pid_post_handler);
+    httpd_register_uri_handler(server, &api_pid_post_uri);
 
     httpd_uri_t api_pid_reset_uri = make_uri("/api/pid/reset", HTTP_POST, api_pid_reset_handler);
     httpd_register_uri_handler(server, &api_pid_reset_uri);
@@ -1593,6 +1603,110 @@ esp_err_t WiFiServerManager::api_events_handler(httpd_req_t *req) {
 
 void WiFiServerManager::loop() {
     uint64_t now = esp_timer_get_time() / 1000;
+
+    static bool s_p4_hw_init_done = false;
+#if !CONFIG_IDF_TARGET_ESP32P4
+    s_p4_hw_init_done = true;
+#endif
+
+    // If STA init failed during early boot, retry after UI/server are already running.
+    // This avoids "connect only after scan button" behavior when backend comes up late.
+    static uint64_t s_last_sta_diag_ms = 0;
+    static uint64_t s_next_sta_attempt_ms = 0;
+    static bool s_sta_initial_delay_armed = false;
+    static constexpr uint64_t kStaInitialDelayMs = 2500;
+    static constexpr uint64_t kStaRetryDelayMs = 10000;
+
+    const uint64_t ui_hb = now;
+    const bool ui_ready = true;
+
+    // On P4, wait for UI to be stable (at least 3 seconds of heartbeat) before 
+    // kicking off the SDIO WiFi stack.
+    if (!s_p4_hw_init_done && ui_hb > 3000) {
+        ESP_LOGI(TAG, "P4 UI stable (hb=%llu), starting WiFi HW...", (unsigned long long)ui_hb);
+        wifi_init_softap();
+        isAPMode = true;
+
+        httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+        config.stack_size = 8192;
+        config.lru_purge_enable = true;
+        config.max_uri_handlers = 320;
+        config.uri_match_fn = httpd_uri_match_wildcard;
+
+        if (httpd_start(&server, &config) == ESP_OK) {
+            setupRoutes();
+        } else {
+            ESP_LOGE(TAG, "httpd_start failed during deferred init");
+        }
+
+        s_p4_hw_init_done = true;
+    }
+
+    if (!s_p4_hw_init_done) return;
+
+    // If STA init failed during early boot, retry after UI/server are already running.
+    const bool configured = wifi_is_configured();
+    const bool connected = wifi_is_connected();
+    const bool scan_busy = wifi_scan_in_progress();
+    const bool connect_busy = wifi_sta_connect_in_progress();
+    const bool user_enabled = wifi_is_user_enabled();
+    static bool s_prev_user_enabled = true;
+
+    if (!user_enabled) {
+        if (s_prev_user_enabled) {
+            wifi_disconnect_sta();
+            wifi_init_softap();
+            isAPMode = true;
+        }
+        s_prev_user_enabled = false;
+    } else {
+        s_prev_user_enabled = true;
+    }
+
+    static uint64_t s_connected_since_ms = 0;
+    static constexpr uint64_t kApShutdownGraceMs = 15000;
+    if (connected) {
+        if (s_connected_since_ms == 0) {
+            s_connected_since_ms = now;
+        }
+        if (wifi_ap_active() && (now - s_connected_since_ms) >= kApShutdownGraceMs) {
+            wifi_set_sta_only_mode();
+        }
+        isAPMode = wifi_ap_active();
+    } else {
+        s_connected_since_ms = 0;
+    }
+
+    if (!connected && (s_last_sta_diag_ms == 0 || (now - s_last_sta_diag_ms) >= 5000)) {
+        s_last_sta_diag_ms = now;
+        ESP_LOGI(TAG, "AUTO_STA gate: ui_ready=%d configured=%d connected=%d scan_busy=%d connect_busy=%d ui_hb=%llu",
+                 ui_ready ? 1 : 0,
+                 configured ? 1 : 0,
+                 connected ? 1 : 0,
+                 scan_busy ? 1 : 0,
+                 connect_busy ? 1 : 0,
+                 (unsigned long long)ui_hb);
+    }
+
+    if (!s_sta_initial_delay_armed && ui_ready) {
+        s_sta_initial_delay_armed = true;
+        s_next_sta_attempt_ms = now + kStaInitialDelayMs;
+    }
+
+    if (user_enabled && ui_ready && configured && !connected && !scan_busy && !connect_busy) {
+        if (s_next_sta_attempt_ms == 0 || now >= s_next_sta_attempt_ms) {
+            if (wifi_init_sta()) {
+                s_next_sta_attempt_ms = now + kStaRetryDelayMs;
+                ESP_LOGI(TAG, "AUTO_STA: connect started");
+            } else {
+                s_next_sta_attempt_ms = now + kStaRetryDelayMs;
+                ESP_LOGW(TAG, "AUTO_STA: connect deferred (not ready/no creds)");
+            }
+        }
+    } else if (connected) {
+        s_next_sta_attempt_ms = now + kStaRetryDelayMs;
+    }
+
     if (now - lastBroadcast > 1000) {
         lastBroadcast = now;
         broadcastState();
@@ -1951,7 +2065,7 @@ esp_err_t WiFiServerManager::api_schedules_handler(httpd_req_t *req) {
     std::string name;
     (void)query_value(req, "name", name);
 
-    const std::string file = kiln_fs_read_text("/littlefs/schedules.json");
+    const std::string file = schedules_store_load_json();
     if (file.empty()) {
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, !name.empty() ? "{}" : "[]");
@@ -2122,7 +2236,7 @@ esp_err_t WiFiServerManager::api_schedules_save_handler(httpd_req_t *req) {
         }
         respName = ensure_schedule_name(scheduleObj);
 
-        const std::string existingFile = kiln_fs_read_text("/littlefs/schedules.json");
+        const std::string existingFile = schedules_store_load_json();
         cJSON *root = existingFile.empty() ? cJSON_CreateArray() : cJSON_Parse(existingFile.c_str());
         if (!root || !cJSON_IsArray(root)) {
             if (root) cJSON_Delete(root);
@@ -2169,7 +2283,7 @@ esp_err_t WiFiServerManager::api_schedules_save_handler(httpd_req_t *req) {
     if (rendered) free(rendered);
     cJSON_Delete(arr);
 
-    if (!kiln_fs_write_text_atomic("/littlefs/schedules.json", out)) {
+    if (!schedules_store_save_json(out)) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
@@ -2251,7 +2365,7 @@ esp_err_t WiFiServerManager::api_schedules_delete_handler(httpd_req_t *req) {
 
     ESP_LOGI(TAG, "DELETE /api/schedules resolved name='%s' index=%d", name, index);
 
-    const std::string existingFile = kiln_fs_read_text("/littlefs/schedules.json");
+    const std::string existingFile = schedules_store_load_json();
     cJSON *root = existingFile.empty() ? cJSON_CreateArray() : cJSON_Parse(existingFile.c_str());
     if (!root || !cJSON_IsArray(root)) {
         if (root) cJSON_Delete(root);
@@ -2287,7 +2401,7 @@ esp_err_t WiFiServerManager::api_schedules_delete_handler(httpd_req_t *req) {
     if (rendered) free(rendered);
     cJSON_Delete(root);
 
-    if (!kiln_fs_write_text_atomic("/littlefs/schedules.json", out)) {
+    if (!schedules_store_save_json(out)) {
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }

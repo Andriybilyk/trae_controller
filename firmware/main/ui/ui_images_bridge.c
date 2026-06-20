@@ -1,0 +1,14 @@
+#include "images.h"
+
+const ext_img_desc_t images[9] = {
+    { "pngwing_com_1_png", &pngwing_com_1_png },
+    { "free_icon_transformer_2804080_png", &free_icon_transformer_2804080_png },
+    { "free_icon_thunder_2682835_png", &free_icon_thunder_2682835_png },
+    { "music_14073594_png", &music_14073594_png },
+    { "free_icon_electrocardiogram_8011473_png", &free_icon_electrocardiogram_8011473_png },
+    { "pngwing_com_png", &pngwing_com_png },
+    { "free_icon_play_button_arrowhead_27223_png", &free_icon_play_button_arrowhead_27223_png },
+    { "free_icon_right_arrow_271228_png", &free_icon_right_arrow_271228_png },
+    { "free_icon_speedometer_251043_png", &free_icon_speedometer_251043_png }
+};
+

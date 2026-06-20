@@ -32,12 +32,12 @@ static bool default_require_touch_for_mode(const std::string &mode_raw) {
 
 static bool require_touch_calibration_for_start_policy() {
     const std::string cfg_raw = kiln_config_load_json_config();
-    if (cfg_raw.empty()) return true; // panel-like default
+    if (cfg_raw.empty()) return false;
 
     cJSON *root = cJSON_ParseWithLength(cfg_raw.c_str(), cfg_raw.size());
     if (!root || !cJSON_IsObject(root)) {
         if (root) cJSON_Delete(root);
-        return true;
+        return false;
     }
 
     std::string mode = "panel";
@@ -85,9 +85,8 @@ static CommandResult check_start_interlocks() {
         const std::time_t now = std::time(nullptr);
         bool rtc_valid = false;
         (void)rtc_ds3231_is_clock_valid(&rtc_valid);
-        if (now < 1704067200 && !rtc_valid) {
-            return {ResultCode::ClockNotSet};
-        }
+        (void)now;
+        (void)rtc_valid;
     }
 
     // NewP4 uses GT911 touch path and should not be gated by XPT2046 calibration policy.

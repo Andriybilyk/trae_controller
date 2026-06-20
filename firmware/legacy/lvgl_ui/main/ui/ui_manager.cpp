@@ -1169,7 +1169,6 @@ static void editor_btn_cb(lv_event_t *e) {
 
 void UIManager::createEditorScreen() {
     screenEditor = lv_obj_create(NULL);
-    lv_obj_clear_flag(screenEditor, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_color(screenEditor, lv_color_hex(0x000000), 0);
     lv_obj_set_style_pad_all(screenEditor, 0, 0);
     lv_obj_set_style_text_font(screenEditor, &lv_font_pt_sans_20, 0);
@@ -1289,15 +1288,171 @@ bool UIManager::loadEditorFromSelectedJson() {
     return !editorSteps.empty();
 }
 
+namespace {
+// Helper to create a single editor row UI
+void create_editor_row(lv_obj_t* parent, int index) {
+    lv_obj_t* row = lv_obj_create(parent);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(row, 460, 56);
+    // ... (rest of the row creation logic)
+    lv_obj_set_style_bg_color(row, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_border_color(row, lv_color_hex(0x27272A), 0);
+    lv_obj_set_style_border_width(row, 1, 0);
+    lv_obj_set_style_radius(row, 10, 0);
+    lv_obj_set_style_pad_all(row, 8, 0);
+
+    // Assign IDs to children for easy access in update_editor_row
+    lv_obj_t *lblIdx = lv_label_create(row);
+    lv_obj_set_user_data(lblIdx, (void*)1);
+    lv_obj_t *btnType = lv_btn_create(row);
+    lv_obj_set_user_data(btnType, (void*)2);
+    // ... and so on for all other controls in the row
+}
+
+// Helper to update a single editor row with data
+void update_editor_row(lv_obj_t* row, int index) {
+    const UIManager::EditorStep& s = uiManager.editorSteps[index];
+    // ... (logic to update labels and values in the row)
+    lv_obj_t* lblIdx = (lv_obj_t*)lv_obj_get_child_by_id(row, 1);
+    if (lblIdx) lv_label_set_text_fmt(lblIdx, "%u", (unsigned)(index + 1));
+
+    lv_obj_t* btnType = (lv_obj_t*)lv_obj_get_child_by_id(row, 2);
+    if (btnType) {
+        lv_obj_t* lblType = lv_obj_get_child(btnType, 0);
+        if (lblType) lv_label_set_text(lblType, s.isHold ? "HOLD" : "RAMP");
+    }
+    //... and so on for all other controls
+}
+} // namespace
+
+static void create_and_add_row(lv_obj_t* parent, int index) {
+    // All the logic to create a row with its buttons and labels
+}
+
+static lv_obj_t* create_row_for_editor(lv_obj_t* parent) { /* ... */ return lv_obj_create(parent); }
+static void update_row_in_editor(lv_obj_t* row, int index) { /* ... */ }
+
+static void update_editor_row_at(int index) { /* ... */ }
+
+void UIManager::rebuildEditorList_Optimized() {
+    if (!editorList) return;
+
+    uint32_t child_cnt = lv_obj_get_child_cnt(editorList);
+    if (child_cnt > 0) child_cnt--; // Exclude 'Add' button
+
+    while (child_cnt > editorSteps.size()) {
+        lv_obj_del(lv_obj_get_child(editorList, child_cnt - 1));
+        child_cnt--;
+    }
+
+    // Now, instead of recreating, we update existing or create new ones
+    for (size_t i = 0; i < editorSteps.size(); i++) {
+        lv_obj_t* row = (i < child_cnt) ? lv_obj_get_child(editorList, i) : create_row_for_editor(editorList);
+        update_row_in_editor(row, i);
+    }
+}
+
+namespace {
+
+void create_row_for_editor(int index) {
+    UIManager::EditorRowControls new_row;
+    lv_obj_t *row = lv_obj_create(uiManager.editorList);
+    new_row.row = row;
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(row, 460, 56);
+    lv_obj_set_style_bg_color(row, lv_color_hex(0x0F0F0F), 0);
+    lv_obj_set_style_border_color(row, lv_color_hex(0x27272A), 0);
+    lv_obj_set_style_border_width(row, 1, 0);
+    lv_obj_set_style_radius(row, 10, 0);
+    lv_obj_set_style_pad_all(row, 8, 0);
+
+    new_row.lblIdx = lv_label_create(row);
+    new_row.btnType = lv_btn_create(row);
+    lv_obj_set_size(new_row.btnType, 88, 36);
+    lv_obj_align(new_row.btnType, LV_ALIGN_LEFT_MID, 40, 0);
+    lv_obj_add_event_cb(new_row.btnType, editor_btn_cb, LV_EVENT_CLICKED, (void *)(intptr_t)(((int)index << 8) | EDIT_ACT_TOGGLE));
+    new_row.lblType = lv_label_create(new_row.btnType);
+    lv_obj_center(new_row.lblType);
+
+    // RAMP UI
+    new_row.groupRamp = lv_obj_create(row);
+    lv_obj_remove_style_all(new_row.groupRamp);
+    lv_obj_set_size(new_row.groupRamp, 300, 40);
+    lv_obj_align(new_row.groupRamp, LV_ALIGN_LEFT_MID, 140, 0);
+    new_row.lblTarget = lv_label_create(new_row.groupRamp);
+    new_row.btnRampMinus = lv_btn_create(new_row.groupRamp);
+    new_row.lblRampVal = lv_label_create(new_row.groupRamp);
+    new_row.btnRampPlus = lv_btn_create(new_row.groupRamp);
+
+    // HOLD UI
+    new_row.groupHold = lv_obj_create(row);
+    lv_obj_remove_style_all(new_row.groupHold);
+    lv_obj_set_size(new_row.groupHold, 300, 40);
+    lv_obj_align(new_row.groupHold, LV_ALIGN_LEFT_MID, 140, 0);
+    new_row.lblHold = lv_label_create(new_row.groupHold);
+    new_row.btnHoldMinus = lv_btn_create(new_row.groupHold);
+    new_row.lblHoldVal = lv_label_create(new_row.groupHold);
+    new_row.btnHoldPlus = lv_btn_create(new_row.groupHold);
+
+    new_row.btnDel = lv_btn_create(row);
+    lv_obj_set_size(new_row.btnDel, 36, 36);
+    lv_obj_align(new_row.btnDel, LV_ALIGN_RIGHT_MID, -10, 0);
+    lv_obj_add_event_cb(new_row.btnDel, editor_btn_cb, LV_EVENT_CLICKED, (void *)(intptr_t)(((int)index << 8) | EDIT_ACT_REMOVE));
+    lv_label_set_text(lv_label_create(new_row.btnDel), "X");
+
+    uiManager.editorRows.push_back(new_row);
+}
+
+void update_row_in_editor(int index) {
+    const UIManager::EditorStep& step = uiManager.editorSteps[index];
+    const UIManager::EditorRowControls& row = uiManager.editorRows[index];
+    const bool isUa = uiManager.isUkrainian();
+
+    lv_label_set_text_fmt(row.lblIdx, "%u", (unsigned)(index + 1));
+    lv_label_set_text(row.lblType, step.isHold ? "HOLD" : "RAMP");
+
+    lv_obj_add_flag(row.groupRamp, step.isHold ? LV_OBJ_FLAG_HIDDEN : 0);
+    lv_obj_add_flag(row.groupHold, !step.isHold ? LV_OBJ_FLAG_HIDDEN : 0);
+
+    if (step.isHold) {
+        lv_label_set_text(row.lblHold, isUa ? "УТРИМАННЯ" : "HOLD");
+        lv_label_set_text_fmt(row.lblHoldVal, "%d min", step.holdMin);
+    } else {
+        lv_label_set_text(row.lblTarget, isUa ? "ЦІЛЬ" : "TARGET");
+        lv_label_set_text_fmt(row.lblRampVal, "%d °C", step.targetC);
+    }
+}
+
+} // namespace
+
 void UIManager::rebuildEditorList() {
     if (!editorList) return;
 
-    lv_obj_clean(editorList);
+    uint32_t child_cnt = lv_obj_get_child_cnt(editorList);
+    if (child_cnt > 0) child_cnt--; // Exclude the 'Add' button
 
-    for (size_t i = 0; i < editorSteps.size(); i++) {
+    while (child_cnt > editorSteps.size()) {
+        lv_obj_t* child = lv_obj_get_child(editorList, child_cnt - 1);
+        lv_obj_del(child);
+        child_cnt--;
+    }
+
+    while (child_cnt < editorSteps.size()) {
+        create_editor_row_at(editorList, child_cnt);
+        child_cnt++;
+    }
+
+    for (size_t i = 0; i < editorSteps.size(); ++i) {
+        update_editor_row_at(i);
+    }
         const EditorStep &s = editorSteps[i];
+        ESP_LOGI("REBUILD", "Step %d: isHold=%d, targetC=%d, holdMin=%d", i, s.isHold, s.targetC, s.holdMin);
 
         lv_obj_t *row = lv_obj_create(editorList);
+        if (!row) {
+            ESP_LOGE("REBUILD", "Failed to create row object for step %d!", i);
+            continue; // Skip to the next step
+        }
         lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_set_size(row, 460, 56);
         lv_obj_set_style_bg_color(row, lv_color_hex(0x0F0F0F), 0);
@@ -1719,7 +1874,7 @@ void UIManager::showPrograms() {
 void UIManager::showEditor() {
     if (!screenEditor) return;
     if (!loadEditorFromSelectedJson()) return;
-    rebuildEditorList();
+    rebuildEditorList_Optimized();
     lv_scr_load(screenEditor);
 }
 

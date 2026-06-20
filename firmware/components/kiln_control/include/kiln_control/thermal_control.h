@@ -48,6 +48,12 @@ struct SafetyStats {
     char faultReason[96];
 };
 
+struct ScheduleStep {
+    int type; // 0=RAMP, 1=HOLD
+    float value; // Temp or Time(min)
+    float rate; // C/min for RAMP
+};
+
 class ThermalController {
 public:
     ThermalController();
@@ -70,6 +76,10 @@ public:
     bool setCurrentRampRate(float rateCPerMin);
     bool setTemperatureOffset(float offsetC);
     float getTemperatureOffset();
+    bool setPidProfileTunings(bool highProfile, double kp, double ki, double kd);
+    void getPidProfileTunings(bool highProfile, double *kp, double *ki, double *kd);
+    bool setManualSsrTest(bool on);
+    bool getManualSsrTest();
     bool setUserMaxTemperatureC(float maxC);
     float getUserMaxTemperatureC();
     float getLoadedScheduleMaxTargetC();
@@ -103,15 +113,23 @@ public:
         double ki_default;
         double kd_default;
         float temp_offset_c;
+        double low_kp;
+        double low_ki;
+        double low_kd;
+        double high_kp;
+        double high_ki;
+        double high_kd;
     };
     PidTunings getPidTunings();
     bool resetPidToDefaults();
     
     // Getters
+    const std::vector<ScheduleStep>& getActiveSchedule() const { return activeSchedule; }
     KilnState getState();
     double getOutput(); // 0-100% or window time
     ThermoStats getThermoStats();
     SafetyStats getSafetyStats();
+    bool getUiActiveStepInfo(int *out_type, float *out_target_c, float *out_rate_c_per_min, float *out_step_start_temp_c);
     
     // Safety
     bool isSensorHealthy();
@@ -127,7 +145,10 @@ private:
     double setpoint, input, output;
     uint64_t windowStartTime;
     double runtimeKp, runtimeKi, runtimeKd;
+    double lowProfileKp, lowProfileKi, lowProfileKd;
+    double highProfileKp, highProfileKi, highProfileKd;
     float temperatureOffsetC;
+    bool manualSsrTestOn;
     float userMaxTempC;
     float autotuneTargetC;
 
@@ -180,13 +201,8 @@ private:
 
     // State
     KilnState state;
-    
+
     // Schedule
-    struct ScheduleStep {
-        int type; // 0=RAMP, 1=HOLD
-        float value; // Temp or Time(min)
-        float rate; // C/min for RAMP
-    };
     std::vector<ScheduleStep> activeSchedule;
     uint64_t stepStartTime;
     float stepStartTemp;

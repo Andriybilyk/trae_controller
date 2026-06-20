@@ -37,6 +37,10 @@ static void replace_item(cJSON *obj, const char *key, cJSON *item) {
     cJSON_AddItemToObject(obj, key, item);
 }
 
+static std::string schedules_store_load_json() {
+    return kiln_fs_read_text("/littlefs/schedules.json");
+}
+
 static int get_step_int(const cJSON *step, const char *key, int fallback = 0) {
     const cJSON *v = cJSON_GetObjectItemCaseSensitive(step, key);
     return cJSON_IsNumber(v) ? v->valueint : fallback;
@@ -56,7 +60,7 @@ static int get_step_hold_minutes(const cJSON *step) {
 
 static cJSON *build_planned_from_schedule_name(const std::string &schedule_name, double start_temp) {
     if (schedule_name.empty()) return nullptr;
-    const std::string schedules_raw = kiln_fs_read_text("/littlefs/schedules.json");
+    const std::string schedules_raw = schedules_store_load_json();
     if (schedules_raw.empty()) return nullptr;
     cJSON *root = cJSON_Parse(schedules_raw.c_str());
     if (!cJSON_IsArray(root)) {

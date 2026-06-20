@@ -1,108 +1,157 @@
 dependencies:
   atanisoft/esp_lcd_touch_xpt2046:
-    dependencies: []
+    component_hash: 7e6381b67b6e487379118368b8e91624dc87036ef5734818de1db9eb35697998
+    dependencies:
+    - name: espressif/esp_lcd_touch
+      registry_url: https://components.espressif.com
+      require: private
+      version: '>=1.0.4'
+    - name: idf
+      require: private
+      version: '>=4.4'
     source:
-      path: managed_components\atanisoft__esp_lcd_touch_xpt2046
-      type: local
+      registry_url: https://components.espressif.com/
+      type: service
     version: 1.0.6
   esp_lcd_touch_gt911:
     dependencies: []
     source:
-      path: components\esp_lcd_touch_gt911
+      path: C:\Users\andri\Documents\GitHub\trae_controller\firmware\components\esp_lcd_touch_gt911
       type: local
     version: 1.2.0~2
   espressif/cjson:
-    dependencies: []
+    component_hash: e788323270d90738662d66fffa910bfe1fba019bba087f01557e70c40485b469
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
     source:
-      path: managed_components\espressif__cjson
-      type: local
+      registry_url: https://components.espressif.com/
+      type: service
     version: 1.7.19~2
   espressif/cmake_utilities:
-    dependencies: []
+    component_hash: 351350613ceafba240b761b4ea991e0f231ac7a9f59a9ee901f751bddc0bb18f
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.1'
     source:
-      path: managed_components\espressif__cmake_utilities
-      type: local
+      registry_url: https://components.espressif.com
+      type: service
     version: 0.5.3
-  espressif/eppp_link:
-    dependencies: []
-    source:
-      path: managed_components\espressif__eppp_link
-      type: local
-    version: 1.1.4
-  espressif/esp_hosted:
-    dependencies: []
-    source:
-      path: managed_components\espressif__esp_hosted
-      type: local
-    version: 2.12.3
   espressif/esp_lcd_st7701:
-    dependencies: []
+    component_hash: 924f346e36da39aaa38177e21bd360b5442abc792338fb64ad1e644481255898
+    dependencies:
+    - name: espressif/cmake_utilities
+      registry_url: https://components.espressif.com
+      require: private
+      version: 0.*
+    - name: idf
+      require: private
+      version: '>=5.4'
     source:
-      path: managed_components\espressif__esp_lcd_st7701
-      type: local
-    version: 2.0.2
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32s3
+    - esp32s31
+    - esp32p4
+    version: 2.0.2~2
   espressif/esp_lcd_touch:
-    dependencies: []
+    component_hash: 3f85a7d95af876f1a6ecca8eb90a81614890d0f03a038390804e5a77e2caf862
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=4.4.2'
     source:
-      path: managed_components\espressif__esp_lcd_touch
-      type: local
+      registry_url: https://components.espressif.com/
+      type: service
     version: 1.2.1
-  espressif/esp_serial_slave_link:
-    dependencies: []
+  espressif/esp_lvgl_port:
+    component_hash: fb6c1fdfe70d4ca39a035d63ca394a35f17ec84ce16ff98ecb13a54155d75da4
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.2'
+    - name: lvgl/lvgl
+      registry_url: https://components.espressif.com
+      require: public
+      version: '>=8,<10'
     source:
-      path: managed_components\espressif__esp_serial_slave_link
-      type: local
-    version: 1.1.2
-  espressif/esp_wifi_remote:
-    dependencies: []
-    source:
-      path: managed_components\espressif__esp_wifi_remote
-      type: local
-    version: 1.5.1
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 2.8.0~1
   espressif/mdns:
-    dependencies: []
+    component_hash: 8bcf12e37c58c1d584aef32a02b92548124c7a3a9fcf548d3235c844a035e0f0
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
     source:
-      path: managed_components\espressif__mdns
-      type: local
-    version: 1.11.0
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.11.1
   espressif/mqtt:
-    dependencies: []
+    component_hash: ffdad5659706b4dc14bc63f8eb73ef765efa015bf7e9adf71c813d52a2dc9342
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.3'
     source:
-      path: managed_components\espressif__mqtt
-      type: local
+      registry_url: https://components.espressif.com/
+      type: service
     version: 1.0.0
-  espressif/wifi_remote_over_eppp:
-    dependencies: []
+  espressif/usb:
+    component_hash: 1d90d7c7b0682dbfcc36f47cf5acf224a5cfb850a62f39cd86d3159cfec12a81
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.4'
     source:
-      path: managed_components\espressif__wifi_remote_over_eppp
-      type: local
-    version: 0.3.2
+      registry_url: https://components.espressif.com/
+      type: service
+    targets:
+    - esp32s2
+    - esp32s3
+    - esp32s31
+    - esp32p4
+    - esp32h4
+    - linux
+    version: 1.4.1
   idf:
     source:
       type: idf
-    version: 6.0.0
+    version: 5.5.3
   joltwallet/littlefs:
+    component_hash: 01faa388c6305fe77fd6962cda6171e753033458f24f8fae9e9d932e3d817a4c
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.22.1
+  lvgl/lvgl:
+    component_hash: 184e532558c1c45fefed631f3e235423d22582aafb4630f3e8885c35281a49ae
     dependencies: []
     source:
-      path: managed_components\joltwallet__littlefs
-      type: local
-    version: 1.20.4
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 9.5.0
 direct_dependencies:
 - atanisoft/esp_lcd_touch_xpt2046
 - espressif/cjson
-- espressif/cmake_utilities
-- espressif/eppp_link
-- espressif/esp_hosted
 - espressif/esp_lcd_st7701
 - espressif/esp_lcd_touch
 - espressif/esp_lcd_touch_gt911
-- espressif/esp_serial_slave_link
-- espressif/esp_wifi_remote
+- espressif/esp_lvgl_port
 - espressif/mdns
 - espressif/mqtt
-- espressif/wifi_remote_over_eppp
+- espressif/usb
 - idf
 - joltwallet/littlefs
-manifest_hash: 8e389a8c88514640fa5bb6ca70b3e5fdbc0df86d6366ff4582f67ca84d32f4f0
-target: esp32p4
-version: 3.0.0
+- lvgl/lvgl
+manifest_hash: 7e34e5cf654e080e079239b3e635386984886f6e3af108fd657fa104b0cde017
+target: esp32s3
+version: 2.0.0

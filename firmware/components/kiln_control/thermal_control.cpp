@@ -25,15 +25,36 @@
 #include "kiln_safety/faults.h"
 
 static const char *TAG = "THERMAL";
-static constexpr uint32_t SENSOR_INVALID_LATCH_COUNT = 3;
+static constexpr uint64_t THERMOCOUPLE_SAMPLE_INTERVAL_MS = 1000;
+static constexpr float PID_PROFILE_SPLIT_TEMP_C = 650.0f;
+static constexpr uint32_t SENSOR_INVALID_LATCH_COUNT = 10;
+static constexpr uint32_t SENSOR_INVALID_LATCH_COUNT_FIRING = 10; // require 10 consecutive invalid reads before latching
+static constexpr uint32_t SENSOR_INVALID_LATCH_COUNT_TUNE = 10;
 static constexpr uint32_t SENSOR_VALID_RECOVERY_COUNT = 12;
-static constexpr uint32_t SENSOR_STUCK_LATCH_COUNT = 240; // ~60s at 250ms sample time
-static constexpr uint32_t SENSOR_SHORT_LATCH_COUNT = 20;  // ~5s
+static constexpr uint32_t SENSOR_STUCK_LATCH_COUNT = 60; // ~60s at 1Hz sample time
+static constexpr uint32_t SENSOR_STUCK_LATCH_COUNT_RAMP = 120; // ~120s base during active ramp heating at 1Hz
+static constexpr uint32_t SENSOR_SHORT_LATCH_COUNT = 5;  // ~5s at 1Hz
 static constexpr float SENSOR_STUCK_DELTA_C = 0.05f;
 static constexpr uint64_t SSR_STUCK_OFF_MIN_MS = 30000;   // heater commanded OFF for >=30s
 static constexpr float SSR_STUCK_RISE_DELTA_C = 12.0f;    // while OFF, temp rose >=12C
 static constexpr uint32_t SSR_STUCK_LATCH_COUNT = 3;      // consecutive confirmations
 static constexpr uint64_t SENSOR_READ_TIMEOUT_MS = 5000;
+static constexpr double PID_RAMP_KP_MULT = 1.10;
+static constexpr double PID_RAMP_KI_MULT = 0.95;
+static constexpr double PID_RAMP_KD_MULT = 0.80;
+static constexpr double PID_HOLD_KP_MULT = 0.72;
+static constexpr double PID_HOLD_KI_MULT = 1.05;
+static constexpr double PID_HOLD_KD_MULT = 1.25;
+static constexpr double PID_LOW_TEMP_KP_MULT = 0.92;
+static constexpr double PID_LOW_TEMP_KI_MULT = 0.95;
+static constexpr double PID_LOW_TEMP_KD_MULT = 1.10;
+static constexpr double PID_HIGH_TEMP_KP_MULT = 1.12;
+static constexpr double PID_HIGH_TEMP_KI_MULT = 1.08;
+static constexpr double PID_HIGH_TEMP_KD_MULT = 0.90;
+static constexpr double PID_RAMP_MAX_OUTPUT_FRAC = 0.95;
+static constexpr double PID_HOLD_MAX_OUTPUT_FRAC = 0.88;
+static constexpr double SENSOR_STUCK_MIN_OUTPUT_FRAC = 0.80;
+static constexpr float SENSOR_STUCK_MIN_ERROR_C = 15.0f;
 static constexpr const char* RECOVERY_FILE = "/littlefs/recovery.json";
 static constexpr const char* EVENTS_LOG_FILE = "/littlefs/logs/events.log";
 static constexpr const char* EVENTS_LOG_PREV_FILE = "/littlefs/logs/events.log.1";
@@ -42,6 +63,50 @@ static constexpr uint64_t RECOVERY_MAX_AGE_MS_DEFAULT = 30ULL * 60ULL * 1000ULL;
 static constexpr float RECOVERY_RESUME_TEMP_MIN_C = SENSOR_TEMP_MIN_C;
 static constexpr float RECOVERY_RESUME_TEMP_MAX_C = FAULT_CLEAR_MAX_TEMP_C;
 static constexpr std::time_t UNIX_TIME_VALID_AFTER = 1700000000; // 2023-11-14
+
+static kiln_fault_code_t thermocouple_fault_code_from_raw(uint32_t raw) {
+    if (MAX31855::isShortToGnd(raw) && !MAX31855::isShortToVcc(raw)) return KILN_FAULT_SENSOR_SHORT_GND;
+    if (MAX31855::isShortToVcc(raw) && !MAX31855::isShortToGnd(raw)) return KILN_FAULT_SENSOR_SHORT_VCC;
+    if (MAX31855::isOpenCircuit(raw)) return KILN_FAULT_SENSOR_OPEN;
+    if (MAX31855::isShortToGnd(raw) || MAX31855::isShortToVcc(raw)) return KILN_FAULT_SENSOR_SHORT;
+    return KILN_FAULT_SENSOR_NAN;
+}
+
+static const char *thermocouple_fault_reason_from_raw(uint32_t raw, char *buf, size_t buf_sz) {
+    if (!buf || buf_sz == 0) return "";
+    buf[0] = 0;
+
+    if (raw == 0x00000000U || raw == 0xFFFFFFFFU) {
+        std::snprintf(buf, buf_sz, "Thermocouple no-data / SPI read fault");
+        return buf;
+    }
+
+    const uint32_t detail = MAX31855::faultDetailBits(raw);
+    if (detail == 0) {
+        std::snprintf(buf, buf_sz, "Thermocouple fault bit set without detail");
+        return buf;
+    }
+
+    const bool open = (detail & MAX31855::RAW_OPEN_CIRCUIT) != 0;
+    const bool short_gnd = (detail & MAX31855::RAW_SHORT_TO_GND) != 0;
+    const bool short_vcc = (detail & MAX31855::RAW_SHORT_TO_VCC) != 0;
+
+    if (open && !short_gnd && !short_vcc) {
+        std::snprintf(buf, buf_sz, "Thermocouple open circuit");
+    } else if (short_gnd && !open && !short_vcc) {
+        std::snprintf(buf, buf_sz, "Thermocouple short to GND");
+    } else if (short_vcc && !open && !short_gnd) {
+        std::snprintf(buf, buf_sz, "Thermocouple short to VCC");
+    } else {
+        std::snprintf(buf,
+                      buf_sz,
+                      "Thermocouple fault bits: %s%s%s",
+                      open ? "OPEN " : "",
+                      short_gnd ? "SCG " : "",
+                      short_vcc ? "SCV" : "");
+    }
+    return buf;
+}
 
 static inline void thermal_set_safety_relay(bool on) {
     heater_hal_set_safety_relay(on);
@@ -96,8 +161,13 @@ static void append_event_log(const char *type, const char *msg) {
 
     FILE *f = fopen(EVENTS_LOG_FILE, "a");
     if (!f) return;
-    const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-    fprintf(f, "%llu %s %s\n", (unsigned long long)now_ms, type, msg);
+    const uint64_t uptime_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
+    const uint64_t unix_s = (uint64_t)time(nullptr);
+    fprintf(f, "%llu %llu %s %s\n",
+            (unsigned long long)uptime_ms,
+            (unsigned long long)unix_s,
+            type,
+            msg);
 #if !CONFIG_TC_BOARD_NEW_P4
     fflush(f);
     const int fd = fileno(f);
@@ -134,7 +204,14 @@ ThermalController::ThermalController() {
     runtimeKp = Kp;
     runtimeKi = Ki;
     runtimeKd = Kd;
+    lowProfileKp = Kp;
+    lowProfileKi = Ki;
+    lowProfileKd = Kd;
+    highProfileKp = Kp;
+    highProfileKi = Ki;
+    highProfileKd = Kd;
     temperatureOffsetC = 0.0f;
+    manualSsrTestOn = false;
     userMaxTempC = (float)MAX_TEMP_SAFETY;
     autotuneTargetC = 600.0f;
 
@@ -245,6 +322,7 @@ void ThermalController::tripFaultLocked(kiln_fault_code_t code, const char *reas
 }
 
 void ThermalController::applyFaultStateLocked() {
+    manualSsrTestOn = false;
     heater_hal_all_off();
     const bool wasFiring = state.isFiring;
     state.isFiring = false;
@@ -297,6 +375,7 @@ void ThermalController::loop() {
         const bool is_recoverable_fault =
             (f.code == KILN_FAULT_SENSOR_NAN || f.code == KILN_FAULT_SENSOR_OOR ||
              f.code == KILN_FAULT_SENSOR_OPEN || f.code == KILN_FAULT_SENSOR_SHORT ||
+             f.code == KILN_FAULT_SENSOR_SHORT_GND || f.code == KILN_FAULT_SENSOR_SHORT_VCC ||
              f.code == KILN_FAULT_SENSOR_STUCK || f.code == KILN_FAULT_WATCHDOG);
         const bool can_clear = is_recoverable_fault && sensorRecoveredForClearLocked(now_ms);
         if (is_recoverable_fault && can_clear) {
@@ -352,7 +431,12 @@ void ThermalController::loop() {
         }
 
     } else {
-        heater_hal_all_off();
+        if (manualSsrTestOn && !kiln_fault_is_active()) {
+            thermal_set_safety_relay(false);
+            thermal_set_ssr(true);
+        } else {
+            heater_hal_all_off();
+        }
         output = 0;
         setpoint = 0;
         state.timeRemaining = -1;
@@ -369,7 +453,7 @@ void ThermalController::updateTemperature() {
 
     // Thermocouple conversion guard.
     const uint64_t now_ms = (uint64_t)(esp_timer_get_time() / 1000ULL);
-    if (lastThermoReadMs != 0 && (now_ms - lastThermoReadMs) < 250) {
+    if (lastThermoReadMs != 0 && (now_ms - lastThermoReadMs) < THERMOCOUPLE_SAMPLE_INTERVAL_MS) {
         return;
     }
     lastThermoReadMs = now_ms;
@@ -383,20 +467,25 @@ void ThermalController::updateTemperature() {
     const bool raw_comm_bad = raw_all_zero || raw_all_ones;
     if (raw_comm_bad) t = NAN;
 
-    const bool raw_fault = (raw & 0x00010000U) != 0;
-    const bool raw_open = raw_fault && ((raw & 0x00000001U) != 0);
-    const bool raw_short = raw_fault && ((raw & 0x00000006U) != 0);
+    const bool raw_fault = MAX31855::hasFault(raw);
+    const uint32_t raw_fault_detail = MAX31855::faultDetailBits(raw);
+    const bool raw_open = (raw_fault_detail & MAX31855::RAW_OPEN_CIRCUIT) != 0;
+    const bool raw_short_gnd = (raw_fault_detail & MAX31855::RAW_SHORT_TO_GND) != 0;
+    const bool raw_short_vcc = (raw_fault_detail & MAX31855::RAW_SHORT_TO_VCC) != 0;
 
     if (raw_comm_bad || raw_fault) {
         static uint64_t last_log_ms = 0;
         if (now_ms - last_log_ms >= 1000) {
             ESP_LOGW(TAG,
-                     "Thermo raw=0x%08" PRIx32 " comm_bad=%d fault=%d open=%d short=%d",
+                     "Thermo raw=0x%08" PRIx32 " comm_bad=%d fault=%d detail=0x%02" PRIx32
+                     " open=%d scg=%d scv=%d",
                      raw,
                      (int)raw_comm_bad,
                      (int)raw_fault,
+                     raw_fault_detail,
                      (int)raw_open,
-                     (int)raw_short);
+                     (int)raw_short_gnd,
+                     (int)raw_short_vcc);
             last_log_ms = now_ms;
         }
     }
@@ -424,21 +513,27 @@ void ThermalController::updateTemperature() {
         sensorValidStreak = 0;
         sensorInvalidStreak++;
         lastSensorOk = false;
-        lastTempValid = false;
-        state.currentTemp = NAN;
         const bool enforce_fault = state.isFiring || tune.active;
+        const uint32_t invalid_limit = state.isFiring ? SENSOR_INVALID_LATCH_COUNT_FIRING
+                                    : (tune.active ? SENSOR_INVALID_LATCH_COUNT_TUNE
+                                                   : SENSOR_INVALID_LATCH_COUNT);
+        const bool transient_glitch = enforce_fault && sensorInvalidStreak < invalid_limit && lastTempValid;
+        if (transient_glitch) {
+            state.currentTemp = lastTemp;
+        } else {
+            lastTempValid = false;
+            state.currentTemp = NAN;
+        }
 
+        char sensor_reason_buf[96];
         const char *sensor_reason = "Sensor out of range";
         kiln_fault_code_t sensor_code = KILN_FAULT_SENSOR_OOR;
         if (raw_comm_bad) {
-            sensor_reason = "Sensor comm/no-data";
+            sensor_reason = thermocouple_fault_reason_from_raw(raw, sensor_reason_buf, sizeof(sensor_reason_buf));
             sensor_code = KILN_FAULT_SENSOR_NAN;
-        } else if (raw_open) {
-            sensor_reason = "Sensor open";
-            sensor_code = KILN_FAULT_SENSOR_OPEN;
-        } else if (raw_short) {
-            sensor_reason = "Sensor short";
-            sensor_code = KILN_FAULT_SENSOR_SHORT;
+        } else if (raw_fault) {
+            sensor_reason = thermocouple_fault_reason_from_raw(raw, sensor_reason_buf, sizeof(sensor_reason_buf));
+            sensor_code = thermocouple_fault_code_from_raw(raw);
         } else if (!finite) {
             sensor_reason = "Sensor NaN/open";
             sensor_code = KILN_FAULT_SENSOR_NAN;
@@ -448,7 +543,7 @@ void ThermalController::updateTemperature() {
             state.errorMsg = sensor_reason;
         }
 
-        if (enforce_fault && sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
+        if (enforce_fault && sensorInvalidStreak >= invalid_limit) {
             tripFaultLocked(sensor_code, sensor_reason);
         }
         return;
@@ -491,7 +586,16 @@ void ThermalController::updateTemperature() {
                 sensorValidStreak = 0;
                 sensorInvalidStreak++;
                 lastSensorOk = false;
-                if (sensorInvalidStreak >= SENSOR_INVALID_LATCH_COUNT) {
+                const uint32_t invalid_limit = state.isFiring ? SENSOR_INVALID_LATCH_COUNT_FIRING
+                                            : (tune.active ? SENSOR_INVALID_LATCH_COUNT_TUNE
+                                                           : SENSOR_INVALID_LATCH_COUNT);
+                if (sensorInvalidStreak < invalid_limit && lastTempValid) {
+                    state.currentTemp = lastTemp;
+                } else {
+                    lastTempValid = false;
+                    state.currentTemp = NAN;
+                }
+                if (sensorInvalidStreak >= invalid_limit) {
                     tripFaultLocked(KILN_FAULT_SENSOR_OOR, "Sensor spike/out of range");
                 }
                 return;
@@ -580,11 +684,30 @@ void ThermalController::updateTemperature() {
         }
     }
 
-    // Stuck-value detection while heating demand is high.
-    const bool demanding_heat = state.isFiring && std::isfinite(setpoint) && setpoint > state.currentTemp + 20.0f;
+    const ScheduleStep *active_step =
+        (state.isFiring && state.currentStep >= 0 && (size_t)state.currentStep < activeSchedule.size())
+            ? &activeSchedule[(size_t)state.currentStep]
+            : nullptr;
+    const bool ramp_step = active_step && active_step->type == 0;
+    const float ramp_rate_c_per_min =
+        (ramp_step && std::isfinite(active_step->rate) && active_step->rate > 0.0f) ? active_step->rate : 0.0f;
+    const double expected_max_output =
+        (double)PID_WINDOW_SIZE * (ramp_step ? PID_RAMP_MAX_OUTPUT_FRAC : PID_HOLD_MAX_OUTPUT_FRAC);
+    const bool strong_heating_drive =
+        state.isFiring && std::isfinite(output) && output >= (expected_max_output * SENSOR_STUCK_MIN_OUTPUT_FRAC);
+    const bool demanding_heat = ramp_step &&
+                                strong_heating_drive &&
+                                std::isfinite(setpoint) &&
+                                setpoint > state.currentTemp + SENSOR_STUCK_MIN_ERROR_C;
+
+    uint32_t stuck_limit = SENSOR_STUCK_LATCH_COUNT_RAMP;
+    if (ramp_rate_c_per_min > 0.0f && ramp_rate_c_per_min < 8.0f) {
+        stuck_limit = SENSOR_STUCK_LATCH_COUNT_RAMP * 2U;
+    }
+
     if (demanding_heat && lastTempValid && std::fabs(state.currentTemp - lastTemp) <= SENSOR_STUCK_DELTA_C) {
         sensorStuckStreak++;
-        if (sensorStuckStreak >= SENSOR_STUCK_LATCH_COUNT) {
+        if (sensorStuckStreak >= stuck_limit) {
             tripFaultLocked(KILN_FAULT_SENSOR_STUCK, "Sensor stuck");
         }
     } else {
@@ -600,6 +723,12 @@ void ThermalController::loadRuntimeSettingsLocked() {
     runtimeKp = Kp;
     runtimeKi = Ki;
     runtimeKd = Kd;
+    lowProfileKp = Kp;
+    lowProfileKi = Ki;
+    lowProfileKd = Kd;
+    highProfileKp = Kp;
+    highProfileKi = Ki;
+    highProfileKd = Kd;
     temperatureOffsetC = 0.0f;
 
     const std::string file = kiln_config_load_json_config();
@@ -613,7 +742,7 @@ void ThermalController::loadRuntimeSettingsLocked() {
 
     const cJSON *off = cJSON_GetObjectItem(root, "temp_offset_c");
     if (!cJSON_IsNumber(off)) off = cJSON_GetObjectItem(root, "offset");
-    if (cJSON_IsNumber(off)) temperatureOffsetC = (float)off->valuedouble;
+    if (cJSON_IsNumber(off)) temperatureOffsetC = std::max(-100.0f, std::min(100.0f, (float)off->valuedouble));
 
     const cJSON *maxC = cJSON_GetObjectItem(root, "maxC");
     if (cJSON_IsNumber(maxC)) {
@@ -632,11 +761,42 @@ void ThermalController::loadRuntimeSettingsLocked() {
         const cJSON *ki = cJSON_GetObjectItem(pidObj, "ki");
         const cJSON *kd = cJSON_GetObjectItem(pidObj, "kd");
         if (cJSON_IsNumber(kp) && cJSON_IsNumber(ki) && cJSON_IsNumber(kd)) {
-            runtimeKp = kp->valuedouble;
-            runtimeKi = ki->valuedouble;
-            runtimeKd = kd->valuedouble;
+            lowProfileKp = kp->valuedouble;
+            lowProfileKi = ki->valuedouble;
+            lowProfileKd = kd->valuedouble;
+            highProfileKp = kp->valuedouble;
+            highProfileKi = ki->valuedouble;
+            highProfileKd = kd->valuedouble;
         }
     }
+
+    const cJSON *pidLowObj = cJSON_GetObjectItem(root, "pid_low");
+    if (cJSON_IsObject(pidLowObj)) {
+        const cJSON *kp = cJSON_GetObjectItem(pidLowObj, "kp");
+        const cJSON *ki = cJSON_GetObjectItem(pidLowObj, "ki");
+        const cJSON *kd = cJSON_GetObjectItem(pidLowObj, "kd");
+        if (cJSON_IsNumber(kp) && cJSON_IsNumber(ki) && cJSON_IsNumber(kd)) {
+            lowProfileKp = kp->valuedouble;
+            lowProfileKi = ki->valuedouble;
+            lowProfileKd = kd->valuedouble;
+        }
+    }
+
+    const cJSON *pidHighObj = cJSON_GetObjectItem(root, "pid_high");
+    if (cJSON_IsObject(pidHighObj)) {
+        const cJSON *kp = cJSON_GetObjectItem(pidHighObj, "kp");
+        const cJSON *ki = cJSON_GetObjectItem(pidHighObj, "ki");
+        const cJSON *kd = cJSON_GetObjectItem(pidHighObj, "kd");
+        if (cJSON_IsNumber(kp) && cJSON_IsNumber(ki) && cJSON_IsNumber(kd)) {
+            highProfileKp = kp->valuedouble;
+            highProfileKi = ki->valuedouble;
+            highProfileKd = kd->valuedouble;
+        }
+    }
+
+    runtimeKp = lowProfileKp;
+    runtimeKi = lowProfileKi;
+    runtimeKd = lowProfileKd;
 
     cJSON_Delete(root);
 }
@@ -652,6 +812,10 @@ void ThermalController::persistRuntimeSettingsLocked() {
 
     cJSON_DeleteItemFromObject(root, "temp_offset_c");
     cJSON_AddNumberToObject(root, "temp_offset_c", (double)temperatureOffsetC);
+    cJSON_DeleteItemFromObject(root, "offset");
+    cJSON_AddNumberToObject(root, "offset", (double)temperatureOffsetC);
+    cJSON_DeleteItemFromObject(root, "temp_offset_low_c");
+    cJSON_DeleteItemFromObject(root, "temp_offset_high_c");
     cJSON_DeleteItemFromObject(root, "autotune_target_c");
     cJSON_AddNumberToObject(root, "autotune_target_c", (double)autotuneTargetC);
 
@@ -664,9 +828,35 @@ void ThermalController::persistRuntimeSettingsLocked() {
     cJSON_DeleteItemFromObject(pidObj, "kp");
     cJSON_DeleteItemFromObject(pidObj, "ki");
     cJSON_DeleteItemFromObject(pidObj, "kd");
-    cJSON_AddNumberToObject(pidObj, "kp", runtimeKp);
-    cJSON_AddNumberToObject(pidObj, "ki", runtimeKi);
-    cJSON_AddNumberToObject(pidObj, "kd", runtimeKd);
+    cJSON_AddNumberToObject(pidObj, "kp", lowProfileKp);
+    cJSON_AddNumberToObject(pidObj, "ki", lowProfileKi);
+    cJSON_AddNumberToObject(pidObj, "kd", lowProfileKd);
+
+    cJSON *pidLowObj = cJSON_GetObjectItem(root, "pid_low");
+    if (!cJSON_IsObject(pidLowObj)) {
+        cJSON_DeleteItemFromObject(root, "pid_low");
+        pidLowObj = cJSON_CreateObject();
+        cJSON_AddItemToObject(root, "pid_low", pidLowObj);
+    }
+    cJSON_DeleteItemFromObject(pidLowObj, "kp");
+    cJSON_DeleteItemFromObject(pidLowObj, "ki");
+    cJSON_DeleteItemFromObject(pidLowObj, "kd");
+    cJSON_AddNumberToObject(pidLowObj, "kp", lowProfileKp);
+    cJSON_AddNumberToObject(pidLowObj, "ki", lowProfileKi);
+    cJSON_AddNumberToObject(pidLowObj, "kd", lowProfileKd);
+
+    cJSON *pidHighObj = cJSON_GetObjectItem(root, "pid_high");
+    if (!cJSON_IsObject(pidHighObj)) {
+        cJSON_DeleteItemFromObject(root, "pid_high");
+        pidHighObj = cJSON_CreateObject();
+        cJSON_AddItemToObject(root, "pid_high", pidHighObj);
+    }
+    cJSON_DeleteItemFromObject(pidHighObj, "kp");
+    cJSON_DeleteItemFromObject(pidHighObj, "ki");
+    cJSON_DeleteItemFromObject(pidHighObj, "kd");
+    cJSON_AddNumberToObject(pidHighObj, "kp", highProfileKp);
+    cJSON_AddNumberToObject(pidHighObj, "ki", highProfileKi);
+    cJSON_AddNumberToObject(pidHighObj, "kd", highProfileKd);
 
     char *rendered = cJSON_PrintUnformatted(root);
     const std::string out = rendered ? rendered : "{}";
@@ -881,6 +1071,71 @@ float ThermalController::getTemperatureOffset() {
     return v;
 }
 
+bool ThermalController::setPidProfileTunings(bool highProfile, double kp, double ki, double kd) {
+    if (!mutex) return false;
+    if (!(std::isfinite(kp) && std::isfinite(ki) && std::isfinite(kd))) return false;
+    if (kp < 0.0 || ki < 0.0 || kd < 0.0) return false;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    if (highProfile) {
+        highProfileKp = kp;
+        highProfileKi = ki;
+        highProfileKd = kd;
+    } else {
+        lowProfileKp = kp;
+        lowProfileKi = ki;
+        lowProfileKd = kd;
+    }
+    persistRuntimeSettingsLocked();
+    xSemaphoreGiveRecursive(mutex);
+    return true;
+}
+
+void ThermalController::getPidProfileTunings(bool highProfile, double *kp, double *ki, double *kd) {
+    if (!kp || !ki || !kd) return;
+    *kp = Kp;
+    *ki = Ki;
+    *kd = Kd;
+    if (!mutex) return;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    if (highProfile) {
+        *kp = highProfileKp;
+        *ki = highProfileKi;
+        *kd = highProfileKd;
+    } else {
+        *kp = lowProfileKp;
+        *ki = lowProfileKi;
+        *kd = lowProfileKd;
+    }
+    xSemaphoreGiveRecursive(mutex);
+}
+
+bool ThermalController::setManualSsrTest(bool on) {
+    if (!mutex) return false;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    if (state.isFiring || tune.active || kiln_fault_is_active()) {
+        xSemaphoreGiveRecursive(mutex);
+        return false;
+    }
+    manualSsrTestOn = on;
+    thermal_set_safety_relay(false);
+    thermal_set_ssr(on);
+    if (on) {
+        ESP_LOGW(TAG, "Manual SSR test -> ON");
+    } else {
+        ESP_LOGI(TAG, "Manual SSR test -> OFF");
+    }
+    xSemaphoreGiveRecursive(mutex);
+    return true;
+}
+
+bool ThermalController::getManualSsrTest() {
+    if (!mutex) return false;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+    const bool on = manualSsrTestOn;
+    xSemaphoreGiveRecursive(mutex);
+    return on;
+}
+
 bool ThermalController::setUserMaxTemperatureC(float maxC) {
     if (!mutex) return false;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
@@ -955,12 +1210,25 @@ ThermalController::PidTunings ThermalController::getPidTunings() {
     p.kp_default = Kp;
     p.ki_default = Ki;
     p.kd_default = Kd;
+    p.temp_offset_c = 0.0f;
+    p.low_kp = Kp;
+    p.low_ki = Ki;
+    p.low_kd = Kd;
+    p.high_kp = Kp;
+    p.high_ki = Ki;
+    p.high_kd = Kd;
 
     if (!mutex) return p;
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
     p.kp = runtimeKp;
     p.ki = runtimeKi;
     p.kd = runtimeKd;
+    p.low_kp = lowProfileKp;
+    p.low_ki = lowProfileKi;
+    p.low_kd = lowProfileKd;
+    p.high_kp = highProfileKp;
+    p.high_ki = highProfileKi;
+    p.high_kd = highProfileKd;
     p.temp_offset_c = temperatureOffsetC;
     xSemaphoreGiveRecursive(mutex);
     return p;
@@ -975,6 +1243,12 @@ bool ThermalController::resetPidToDefaults() {
         return false;
     }
 
+    lowProfileKp = Kp;
+    lowProfileKi = Ki;
+    lowProfileKd = Kd;
+    highProfileKp = Kp;
+    highProfileKi = Ki;
+    highProfileKd = Kd;
     runtimeKp = Kp;
     runtimeKi = Ki;
     runtimeKd = Kd;
@@ -999,6 +1273,7 @@ bool ThermalController::startAutotune(float setpointC) {
         return false;
     }
 
+    manualSsrTestOn = false;
     tune = AutoTune{};
     tune.active = true;
     tune.heaterOn = true;
@@ -1181,9 +1456,22 @@ void ThermalController::autotuneFinalizeLocked(uint64_t now_ms) {
     const double ki_new = kp_new / std::max(1.0, ti);
     const double kd_new = kp_new * td;
 
-    runtimeKp = std::max(0.0, kp_new);
-    runtimeKi = std::max(0.0, ki_new);
-    runtimeKd = std::max(0.0, kd_new);
+    const double tuned_kp = std::max(0.0, kp_new);
+    const double tuned_ki = std::max(0.0, ki_new);
+    const double tuned_kd = std::max(0.0, kd_new);
+    const bool high_profile = tune.setpointC >= PID_PROFILE_SPLIT_TEMP_C;
+    if (high_profile) {
+        highProfileKp = tuned_kp;
+        highProfileKi = tuned_ki;
+        highProfileKd = tuned_kd;
+    } else {
+        lowProfileKp = tuned_kp;
+        lowProfileKi = tuned_ki;
+        lowProfileKd = tuned_kd;
+    }
+    runtimeKp = tuned_kp;
+    runtimeKi = tuned_ki;
+    runtimeKd = tuned_kd;
     pid->SetTunings(runtimeKp, runtimeKi, runtimeKd);
     persistRuntimeSettingsLocked();
 
@@ -1201,13 +1489,13 @@ void ThermalController::autotuneFinalizeLocked(uint64_t now_ms) {
     state.targetTemp = 0.0f;
 
     char done[96];
-    snprintf(done, sizeof(done), "Autotune OK kp=%.2f ki=%.3f kd=%.2f Q=%.0f%% C=%.0f%%",
-             runtimeKp, runtimeKi, runtimeKd, (double)tune.quality, (double)tune.confidence);
+    snprintf(done, sizeof(done), "Autotune OK %s kp=%.2f ki=%.3f kd=%.2f",
+             high_profile ? "HIGH" : "LOW", runtimeKp, runtimeKi, runtimeKd);
     state.errorMsg = done;
     append_event_log("AUTOTUNE", "done");
 
-    ESP_LOGI(TAG, "Autotune done: Ku=%.3f Pu=%.1fs -> Kp=%.3f Ki=%.4f Kd=%.3f",
-             ku, pu_s, runtimeKp, runtimeKi, runtimeKd);
+    ESP_LOGI(TAG, "Autotune done (%s): Ku=%.3f Pu=%.1fs -> Kp=%.3f Ki=%.4f Kd=%.3f",
+             high_profile ? "HIGH" : "LOW", ku, pu_s, runtimeKp, runtimeKi, runtimeKd);
 }
 
 bool ThermalController::isSensorHealthy() {
@@ -1249,8 +1537,9 @@ void ThermalController::processSchedule() {
         float rate = step.rate;
         if (!std::isfinite(rate) || rate <= 0.0f) rate = 9999.0f;
         const float elapsed_min = (float)elapsed / 60.0f;
+        const bool ramp_up = (target >= stepStartTemp);
         float rampTarget = target;
-        if (target >= stepStartTemp) {
+        if (ramp_up) {
             rampTarget = std::min(target, stepStartTemp + rate * elapsed_min);
         } else {
             rampTarget = std::max(target, stepStartTemp - rate * elapsed_min);
@@ -1259,8 +1548,10 @@ void ThermalController::processSchedule() {
         state.targetTemp = rampTarget;
         setpoint = state.targetTemp;
         state.timeRemaining = -1;
-        
-        if (state.currentTemp >= target - 1.0f) { // Hysteresis 1.0C
+
+        const bool step_reached = ramp_up ? (state.currentTemp >= target - 1.0f)
+                                          : (state.currentTemp <= target + 1.0f);
+        if (step_reached) { // Hysteresis 1.0C
             state.currentStep++;
             ESP_LOGI(TAG, "RAMP Step %d completed. Moving to next step.", state.currentStep);
             stepStartTime = esp_timer_get_time() / 1000;
@@ -1269,6 +1560,12 @@ void ThermalController::processSchedule() {
 
     } else if (step.type == 1) { // HOLD
         state.status = KILN_HOLD;
+        if (state.currentStep > 0) {
+            const ScheduleStep &prevStep = activeSchedule[(size_t)state.currentStep - 1U];
+            if (prevStep.type == 0 && std::isfinite(prevStep.value)) {
+                state.targetTemp = std::min(prevStep.value, userMaxTempC);
+            }
+        }
         setpoint = state.targetTemp; // Keep previous target
 
         // Remaining time: estimate from current + future HOLD steps only.
@@ -1291,29 +1588,114 @@ void ThermalController::processSchedule() {
 
 void ThermalController::computePID() {
     input = state.currentTemp;
-    
-    // Simple Gain Scheduling based on temperature
-    // These are example bands. In a real kiln, > 600C usually requires more aggressive driving
-    // due to higher heat loss, and < 300C requires gentle driving.
-    if (state.currentTemp > 600.0f) {
-        pid->SetTunings(runtimeKp * 1.5, runtimeKi * 1.2, runtimeKd * 0.8);
-    } else if (state.currentTemp < 300.0f) {
-        pid->SetTunings(runtimeKp * 0.8, runtimeKi * 0.8, runtimeKd * 1.2);
-    } else {
-        pid->SetTunings(runtimeKp, runtimeKi, runtimeKd);
+
+    const ScheduleStep *active_step =
+        (state.isFiring && state.currentStep >= 0 && (size_t)state.currentStep < activeSchedule.size())
+            ? &activeSchedule[(size_t)state.currentStep]
+            : nullptr;
+    const bool ramp_step = active_step && active_step->type == 0;
+    const bool hold_step = active_step && active_step->type == 1;
+
+    const float pid_ref_temp = std::isfinite((float)setpoint) ? (float)setpoint : state.currentTemp;
+    const bool high_profile = std::isfinite(pid_ref_temp) && pid_ref_temp >= PID_PROFILE_SPLIT_TEMP_C;
+    runtimeKp = high_profile ? highProfileKp : lowProfileKp;
+    runtimeKi = high_profile ? highProfileKi : lowProfileKi;
+    runtimeKd = high_profile ? highProfileKd : lowProfileKd;
+
+    double tuned_kp = runtimeKp;
+    double tuned_ki = runtimeKi;
+    double tuned_kd = runtimeKd;
+
+    // Kiln profiles behave differently while climbing to a target versus holding it.
+    if (ramp_step) {
+        tuned_kp *= PID_RAMP_KP_MULT;
+        tuned_ki *= PID_RAMP_KI_MULT;
+        tuned_kd *= PID_RAMP_KD_MULT;
+    } else if (hold_step) {
+        tuned_kp *= PID_HOLD_KP_MULT;
+        tuned_ki *= PID_HOLD_KI_MULT;
+        tuned_kd *= PID_HOLD_KD_MULT;
     }
 
+    if (state.currentTemp > 600.0f) {
+        tuned_kp *= PID_HIGH_TEMP_KP_MULT;
+        tuned_ki *= PID_HIGH_TEMP_KI_MULT;
+        tuned_kd *= PID_HIGH_TEMP_KD_MULT;
+    } else if (state.currentTemp < 300.0f) {
+        tuned_kp *= PID_LOW_TEMP_KP_MULT;
+        tuned_ki *= PID_LOW_TEMP_KI_MULT;
+        tuned_kd *= PID_LOW_TEMP_KD_MULT;
+    }
+
+    const double max_output_frac = hold_step ? PID_HOLD_MAX_OUTPUT_FRAC : PID_RAMP_MAX_OUTPUT_FRAC;
+    const double max_output_ms = (double)PID_WINDOW_SIZE * max_output_frac;
+    pid->SetOutputLimits(0, max_output_ms);
+    pid->SetTunings(tuned_kp, tuned_ki, tuned_kd);
+
     pid->Compute();
+
+    if (std::isfinite(output) && output > max_output_ms) {
+        output = max_output_ms;
+    }
+
+    // Ramp-assist: if the kiln lags behind the active ramp setpoint,
+    // push SSR harder so heating starts immediately and the profile is tracked
+    // by step rate rather than waiting for PID error to build up slowly.
+    if (!state.isFiring) return;
+    if (state.currentStep < 0 || (size_t)state.currentStep >= activeSchedule.size()) return;
+    if (!std::isfinite(setpoint) || !std::isfinite(state.currentTemp)) return;
+
+    const ScheduleStep &step = activeSchedule[(size_t)state.currentStep];
+    if (step.type != 0) return;
+
+    float rate_c_per_min = step.rate;
+    if (!std::isfinite(rate_c_per_min) || rate_c_per_min <= 0.0f) rate_c_per_min = 9999.0f;
+
+    const float lag_c = setpoint - state.currentTemp;
+    if (lag_c <= 0.0f) return;
+
+    const float assist_start_c = std::max(1.0f, std::min(6.0f, rate_c_per_min * 0.20f));
+    const float full_power_lag_c = std::max(assist_start_c + 1.5f, std::min(12.0f, rate_c_per_min * 0.40f));
+
+    double assisted_output = output;
+    const double assist_cap = (double)PID_WINDOW_SIZE * PID_RAMP_MAX_OUTPUT_FRAC;
+    if (lag_c >= full_power_lag_c) {
+        assisted_output = assist_cap;
+    } else if (lag_c >= assist_start_c) {
+        const double lag_frac = std::max(0.0, std::min(1.0, (double)((lag_c - assist_start_c) / (full_power_lag_c - assist_start_c))));
+        const double min_frac = std::max(0.35, std::min(0.85, 0.35 + lag_frac * 0.45));
+        const double min_output = assist_cap * min_frac;
+        if (assisted_output < min_output) assisted_output = min_output;
+    }
+
+    if (assisted_output != output) {
+        static uint32_t s_last_assist_log_ms = 0;
+        const uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000ULL);
+        output = assisted_output;
+        if ((now_ms - s_last_assist_log_ms) >= 2000U) {
+            s_last_assist_log_ms = now_ms;
+            ESP_LOGI(TAG, "RAMP_ASSIST: lag=%.2fC rate=%.2fC/min out=%.0fms", (double)lag_c, (double)rate_c_per_min, (double)output);
+        }
+    }
 }
 
 void ThermalController::driveSSR() {
     uint64_t now = esp_timer_get_time() / 1000;
-    if (now - windowStartTime > PID_WINDOW_SIZE) {
+    while (now - windowStartTime > PID_WINDOW_SIZE) {
         windowStartTime += PID_WINDOW_SIZE;
     }
     // Safety relay (contactor) is latched in start()/stop()/fault paths.
     // Avoid toggling it in the fast PID loop to prevent relay chatter.
-    thermal_set_ssr(output > (now - windowStartTime));
+    const bool ssr_on = std::isfinite(output) && output > (now - windowStartTime);
+    thermal_set_ssr(ssr_on);
+
+    static uint32_t s_last_dbg_ms = 0;
+    const uint32_t now_ms_u32 = (uint32_t)(now & 0xFFFFFFFFULL);
+    if ((now_ms_u32 - s_last_dbg_ms) >= 2000U) {
+        s_last_dbg_ms = now_ms_u32;
+        ESP_LOGI(TAG, "HEAT: T=%.2fC SP=%.2fC out=%.0fms ssr=%d", (double)state.currentTemp, (double)setpoint, (double)output,
+                 (int)ssr_on);
+    }
 }
 
 void ThermalController::historyStartLocked(uint64_t now_ms) {
@@ -1634,6 +2016,7 @@ void ThermalController::start() {
         return;
     }
     
+    manualSsrTestOn = false;
     // Reset State
     state.isFiring = true;
     state.status = KILN_RUNNING;
@@ -1668,6 +2051,7 @@ void ThermalController::stop(const std::string& reason) {
     }
     
     const bool wasFiring = state.isFiring;
+    manualSsrTestOn = false;
     state.isFiring = false;
     state.status = KILN_IDLE;
     wifi_set_firing_active(false);
@@ -1706,6 +2090,7 @@ void ThermalController::emergencyStop(const std::string& reason) {
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     tune.active = false;
+    manualSsrTestOn = false;
 
     // Explicitly call stop logic inline to avoid recursion deadlock if stop() also takes mutex
     // But since it's recursive mutex, it should be fine.
@@ -1747,6 +2132,7 @@ bool ThermalController::clearFault() {
     xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
 
     tune.active = false;
+    manualSsrTestOn = false;
 
     heater_hal_all_off();
 
@@ -1764,6 +2150,7 @@ bool ThermalController::clearFault() {
     const bool sensor_fault =
         (f.code == KILN_FAULT_SENSOR_NAN || f.code == KILN_FAULT_SENSOR_OOR ||
          f.code == KILN_FAULT_SENSOR_OPEN || f.code == KILN_FAULT_SENSOR_SHORT ||
+         f.code == KILN_FAULT_SENSOR_SHORT_GND || f.code == KILN_FAULT_SENSOR_SHORT_VCC ||
          f.code == KILN_FAULT_SENSOR_STUCK);
     if (sensor_fault && !sensorRecoveredForClearLocked((uint64_t)(esp_timer_get_time() / 1000ULL))) {
         kiln_fault_update_reason("Sensor not stable yet, wait for valid readings");
@@ -1931,6 +2318,43 @@ SafetyStats ThermalController::getSafetyStats() {
     memcpy(s.faultReason, f.reason, sizeof(s.faultReason) - 1);
     s.faultReason[sizeof(s.faultReason) - 1] = 0;
     return s;
+}
+
+bool ThermalController::getUiActiveStepInfo(int *out_type, float *out_target_c, float *out_rate_c_per_min, float *out_step_start_temp_c) {
+    if (!mutex) return false;
+    xSemaphoreTakeRecursive(mutex, portMAX_DELAY);
+
+    const int idx = state.currentStep;
+    const int total = (int)activeSchedule.size();
+    const bool ok = (idx >= 0 && idx < total);
+
+    int type = -1;
+    float target_c = 0.0f;
+    float rate_c_per_min = 0.0f;
+    float start_temp_c = stepStartTemp;
+
+    if (ok) {
+        const ScheduleStep step = activeSchedule[(size_t)idx];
+        type = step.type;
+        if (type == 0) {
+            target_c = step.value;
+            if (target_c > userMaxTempC) target_c = userMaxTempC;
+            rate_c_per_min = step.rate;
+            if (!(rate_c_per_min == rate_c_per_min) || rate_c_per_min <= 0.0f) rate_c_per_min = 9999.0f;
+        } else {
+            target_c = state.targetTemp;
+            rate_c_per_min = 0.0f;
+        }
+    }
+
+    xSemaphoreGiveRecursive(mutex);
+
+    if (!ok) return false;
+    if (out_type) *out_type = type;
+    if (out_target_c) *out_target_c = target_c;
+    if (out_rate_c_per_min) *out_rate_c_per_min = rate_c_per_min;
+    if (out_step_start_temp_c) *out_step_start_temp_c = start_temp_c;
+    return true;
 }
 
 ThermalController thermalCtrl;

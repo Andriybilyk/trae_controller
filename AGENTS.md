@@ -1,112 +1,290 @@
-# Codex Agent Instructions (trae_controller)
+﻿# AGENTS.md - Slint UI Architecture and Flicker Elimination Guide
 
-Цей файл — “контракт” для агента/асистента у цьому репозиторії. Мета: мінімум токенів, максимум корисних змін у коді, з фокусом на **ESP32‑S3 контролер муфельної печі** на **ESP‑IDF 5+** та UI на **Slint** (LVGL може бути присутній як спадщина/фолбек).
+## Scope
 
-## 1) Принципи роботи (коротко)
-- Працюй інкрементально: маленькі PR‑подібні зміни, що збираються.
-- Мінімізуй токени: короткі відповіді, менше “теорії”, більше конкретних дифів/команд.
-- Перед змінами: швидко знайди “де живе функція/модуль” (див. мапу нижче).
-- Після змін: по можливості перевір `idf.py build` (або точкові тести/збірку).
-- Не роби “рефактор заради рефактору”. Лише те, що потрібно задачі.
+This document defines mandatory engineering rules for AI agents working on this repository.
 
-## 2) Безпека (муфельна піч = high‑stakes)
-- Завжди продумуй **fail‑safe**: відмова датчика → вимкнути нагрів, сигнал/лог, safe state.
-- Обов’язково враховуй: **over‑temperature**, обрив/КЗ термопари, зависання UI/мережі, watchdog.
-- Будь‑які зміни в керуванні нагрівом/SSR/реле мають мати явні межі, таймаути, стан “heater off”.
-- Логи й телеметрія важливі: події fault/overtemp мають бути видимі (UI + мережа, якщо є).
+Primary objective:
+- Eliminate visible screen flash/blink during boot, Wi-Fi connect, start/stop firing, save program, and settings updates.
 
-## 3) Репозиторій: розділи та призначення
-- `firmware/` — **ESP‑IDF** прошивка (основний фокус для ESP32‑S3).
-- `frontend/` — веб/UI частина (якщо використовується для налаштувань/дашборду).
-- `backend/` — серверна частина (API/збереження/інтеграції), якщо потрібна.
-- `data/` — дані/артефакти (перевіряй, що саме тут зберігається перед змінами).
+Secondary objective:
+- Keep UI responsive while storage, network, and control logic run in background tasks.
 
-## 4) Firmware (ESP‑IDF) — “де що лежить”
-ESP‑IDF проєкт: `firmware/CMakeLists.txt`, конфіг: `firmware/sdkconfig*`, розділи: `firmware/partitions.csv`.
-
-Головний компонент застосунку: `firmware/main/`
-- `firmware/main/app/app_main.cpp` — точка входу застосунку (ініціалізація, цикли).
-- `firmware/main/drivers/display_driver.cpp` — дисплей + touch (XPT2046) + NVS калібрування.
-- `firmware/main/ui/slint_bridge.cpp` + `firmware/main/include/ui/slint_bridge.h` — місток C++ ↔ Slint.
-- `firmware/main/net/wifi_connection.cpp` — Wi‑Fi (STA/AP), NVS креденшали, scan task.
-- `firmware/main/net/wifi_server.cpp` — HTTP/WS сервер (керування/телеметрія, captive portal).
-- `firmware/main/net/dns_server.cpp` — DNS (для captive portal).
-
-Компоненти (ESP‑IDF): `firmware/components/`
-- `firmware/components/kiln_control/` — сервіс керування нагрівом (ThermalController + PID/MAX6675).
-- `firmware/components/kiln_config/` — єдина конфігурація плати/пінів/лімітів (`config.h`).
-
-UI:
-- `firmware/slint_ui/` — Rust + `.slint` (рантайм UI на Slint).
-- `firmware/data/` — LittleFS артефакти (в т.ч. `touch_calibration.html`).
-
-## 5) Правила структурування коду (рекомендований поділ)
-Коли додаєш/переносиш функції — тримай шари:
-- `hal/` (або компонент) — GPIO/I2C/SPI/ADC, датчики, SSR/реле (без бізнес‑логіки).
-- `drivers/` — дисплей, сенсори, NVS (thin wrappers).
-- `services/` — PID/профілі випалу, стани, safety/fault manager, планувальник.
-- `ui/` — Slint екрани й presenter‑логіка (без прямого керування GPIO).
-- `net/` — HTTP/WS, протоколи, серіалізація, OTA (за потреби).
-- `app/` — glue/ініціалізація, tasks, залежності.
-
-Мінімальна вимога: **не змішувати** UI/мережу з керуванням нагрівом напряму; все через service API.
-
-## 6) Конвенції
-- Мова: як у проєкті зараз (C++ для `main/*.cpp`, Rust для `firmware/slint_ui/`).
-- Імена: чіткі, без “utils2”, краще `*_service`, `*_driver`, `*_manager`.
-- Конфіг: використовуй `sdkconfig.defaults`/Kconfig (де доречно), не хардкодь піни/параметри.
-- Логи: через ESP‑IDF logging (узгоджені TAG), без спаму в tight loops.
-
-## 7) “Пам’ять” проєкту та TODO
-Тримай живий короткий стан у `memory.md` (оновлюй, коли змінюється архітектура/рішення/плани).
-- Після кожної суттєвої зміни: онови **Project Map**, **Decisions**, **TODO**.
-- TODO — конкретні, з чек‑пунктами і пріоритетом (P0/P1/P2).
-
-## 8) Збірка/флеш (типово)
-Усі команди запускай з `firmware/`:
-- `idf.py set-target esp32s3` (один раз/за потреби)
-- `idf.py build`
-- `idf.py -p COMx flash monitor` (Windows)
-
-## 9) Коли потрібна “актуальність”
-Якщо питання про “найновіші” версії бібліотек/ESP‑IDF/Slint/LVGL/залежностей або API — перевіряй офіційні джерела перед порадами (не вигадуй).
+This guide is based on lessons from:
+- `catorendal-a11y/DIY-Welding-Positioner-ESP32-P4` (LVGL task architecture and failure analysis)
+- ESP32-P4 + external PSRAM display constraints
 
 ---
 
-## 10) Notes (Updated 2026-03-27)
-- Touch stack: XPT2046 в RAW режимі (0..4095) + box calibration + optional affine + optional 3x3 grid warp; усе зберігається в NVS.
-- Touch APIs: `/api/touch/calibration`, `/api/touch/affine`, `/api/touch/grid`, `/api/touch/raw`, `/api/touch/probe`, `/api/touch/spi`, `/touch_calibration.html` (9-point).
-- Effective RAW range: XPT2046 відкидає значення біля “рейок”; практичний діапазон ~`50..4045` (використовується для clamping калібровки).
-- UI renderer: Slint software renderer (MCU) **не** підтримує `Path`; іконки робимо через прямокутники/текст або glyph‑font.
-- UI debug: touch debug bar прибрано; червона “точка дотику” лишається для діагностики вирівнювання.
+## Non-Negotiable Rules
 
-## 11) UI Map (Slint) — швидка навігація
-- Основний файл UI: `firmware/slint_ui/ui/app.slint` (зараз це головна точка правок інтерфейсу контролера).
-- Boot/standby оверлеї: секція внизу `app.slint` з умовами `boot_splash_visible` та `standby_visible`.
-- Сторінки керуються `View` enum: `Dashboard`, `Schedules`, `Editor`, `RunningEditor`, `Settings`, `Calibration`.
-- Для інтеграції з firmware дивись `firmware/main/ui/slint_bridge.cpp` + `firmware/main/include/ui/slint_bridge.h` (передача props/callbacks).
+1. Single UI owner thread
+- Only the Slint event loop thread may mutate Slint properties/models.
+- Worker/control/storage/network tasks must never call Slint setters directly.
+- Use `invoke_from_event_loop` or `upgrade_in_event_loop` with weak handles only.
 
-## 12) UI Design System (обовʼязково для нових змін)
-- Екран контролера фіксований: **480x320**. Не хардкодь розмітку поза цими межами.
-- Використовуй токени в `AppWindow` замість випадкових чисел:
-  - кольори: `c_bg`, `c_card`, `c_border`, `c_text`, `c_muted`, `c_accent`, `c_danger`;
-  - layout: `edge_gap`, `top_bar_h`, `page_content_h`;
-  - settings: `settings_side_gap`, `settings_content_width`, `settings_content_y`, `settings_content_height`;
-  - кнопки settings: `settings_btn_height`, `settings_btn_radius`, `settings_btn_text_size`.
-- Для однакового стилю і безпечного тексту:
-  - використовуй `UiButton` для кнопок (має єдині паддінги + `overflow: elide`);
-  - використовуй `UiCard`/картки з `clip: true` для контейнерів;
-  - в текстах кнопок/лейблів задавай або `overflow: elide`, або достатню ширину.
-- Не копіюй “старі” `Rectangle + Text + TouchArea` для нових кнопок, якщо можна замінити на `UiButton`.
+2. No heavy work in UI callbacks
+- Slint callbacks must only enqueue `UiCommand` and return.
+- Forbidden in callbacks: flash writes, JSON parse/serialize of large payloads, blocking IO, sleep/delay, control state machine transitions.
 
-## 13) Guardrails проти виходу за межі екрана
-- Будь-яка нова сторінка/оверлей має мати контейнер з явними `width/height` в межах 480x320 і за потреби `clip: true`.
-- Для контенту сторінок тримайся `page_content_h` та єдиних відступів (`edge_gap`/`settings_side_gap`).
-- Для довгих рядків (UA/EN) перевіряй обидві локалі; там, де ризик, став `overflow: elide`.
-- Після UI-правок мінімум: перевір лінтер + візуально екран Settings, модалки Wi‑Fi, Splash/Standby.
+3. Root window created once
+- Never destroy/recreate root component for normal flow.
+- Screen changes = property switch only (`current_screen`).
 
-## 14) Практика внесення змін
-- Спочатку шукай існуючий токен/компонент, і лише якщо бракує — додавай новий.
-- Пріоритет: стабільність і читабельність UI > “красивий мікро-рефактор”.
-- Якщо змінюєш стиль кнопок/карток, оновлюй централізовано (через токени/`UiButton`), а не точково в десятках місць.
+4. No temporary empty model states
+- Never clear model then refill on screen.
+- Build next data snapshot first, then apply once.
 
+5. No loading screen for short actions
+- Start/Stop/Save/setting edits must stay on current screen.
+- Use small inline status indicator, not full-screen transition.
+
+6. One render submit path at runtime
+- Do not mix multiple framebuffer submit paths during one run (for example direct path + fallback path switching per event).
+- Choose one stable path per board profile and keep it fixed.
+
+7. Display and touch access serialized
+- Touch read and display updates must run under one ownership model; avoid concurrent hardware access from multiple tasks.
+- If one task owns touch/display hardware, others communicate via queue/flags only.
+
+8. During flash write: never trigger full UI churn
+- No screen recreate, no model rebuild, no theme reinit, no backlight changes while writing flash.
+- Flash write must be debounced and executed in storage worker.
+
+---
+
+## Required Runtime Pipeline
+
+```text
+Slint callback
+  -> UiCommand queue
+  -> Control/Storage/Network worker
+  -> AppState reducer
+  -> UiPatch (minimal diff)
+  -> single event-loop apply
+  -> render
+```
+
+Do not bypass this pipeline.
+
+---
+
+## Required Structures
+
+Use equivalent structures if names differ.
+
+```rust
+enum UiCommand {
+    StartFiring,
+    StopFiringTap,
+    StopFiringConfirm,
+    SaveProgram(Program),
+    DeleteProgram(u32),
+    ChangeSetting(SettingChange),
+    Navigate(ScreenId),
+    WifiScan,
+    WifiConnect,
+}
+
+struct UiPatch {
+    screen: Option<ScreenId>,
+    kiln_state: Option<KilnState>,
+    status_text: Option<String>,
+    error_text: Option<String>,
+    saving: Option<bool>,
+    wifi_connected: Option<bool>,
+    // add only small fields that can be applied atomically
+}
+
+struct PendingWrites {
+    settings_save_pending: bool,
+    programs_save_pending: bool,
+    last_settings_change_ms: u64,
+    last_program_change_ms: u64,
+}
+```
+
+---
+
+## Apply UI in One Batch
+
+Each user action must map to one `UiPatch` application callback.
+
+Bad:
+- 10 separate `invoke_from_event_loop` calls for one action.
+
+Good:
+- One callback applying all changed fields.
+
+```rust
+fn apply_ui_patch(weak: slint::Weak<MainWindow>, patch: UiPatch) {
+    weak.upgrade_in_event_loop(move |w| {
+        if let Some(v) = patch.status_text { w.set_status_text(v.into()); }
+        if let Some(v) = patch.kiln_state  { w.set_kiln_state(v as i32); }
+        if let Some(v) = patch.screen      { w.set_current_screen(v as i32); }
+        if let Some(v) = patch.saving      { w.set_is_saving(v); }
+    }).ok();
+}
+```
+
+---
+
+## Storage Rules (Critical)
+
+1. Debounce writes
+- Settings flush: 500-1000 ms after last change.
+- Program flush: 500-1000 ms after last change.
+
+2. Storage worker only
+- All NVS/LittleFS writes happen in storage worker/task.
+
+3. Copy-under-lock, write-outside-lock
+- If shared structures require mutex, copy data under lock, release lock, then serialize/write.
+- Do not hold shared mutex across flash commit.
+
+4. Avoid self-induced reload
+- After local successful save, do not immediately force global schedule reload.
+- Reload only if external revision changed and snapshot differs.
+
+5. Flash-write guard
+- Expose `flash_write_in_progress` flag.
+- While true: block expensive UI rebuild/reinit operations.
+
+---
+
+## Model Update Rules
+
+1. Change detection first
+- Before applying schedule/program model, compare against current snapshot.
+- If unchanged, skip model update.
+
+2. Atomic model refresh
+- Build rows in RAM, set model once.
+
+3. No full-screen invalidation for local field edits
+- For settings and status changes, patch only affected properties.
+
+---
+
+## Boot/Backlight Sequence (Mandatory)
+
+```text
+1) Backlight OFF/low
+2) Init panel and Slint root once
+3) Apply initial AppState and models
+4) Render first stable main frame
+5) Set final brightness
+```
+
+Forbidden:
+- Boot -> blank/blue -> Boot -> Main
+- brightness 100 -> 20 bounce during boot unless hardware-specific and documented
+
+---
+
+## Wi-Fi Flow Rules
+
+1. Autoconnect must start once UI is ready.
+2. Wi-Fi scan and connect are async commands only.
+3. On `STA_GOT_IP`, patch only Wi-Fi icon/text/time fields.
+4. Never switch screen due to Wi-Fi state changes.
+
+---
+
+## Start/Stop Firing Rules
+
+1. Start tap
+- Enqueue `StartFiring`.
+- Validate in control worker.
+- If blocked (sensor/fault), emit inline error patch only.
+
+2. Stop flow
+- Tap shows confirm popup only.
+- Confirm sends command; keep current screen stable.
+
+3. No model clears/reloads on start/stop.
+
+---
+
+## Screen Navigation Rules
+
+- One root + `current_screen` state.
+- If saving from editor, navigation target must be deterministic:
+  - `EditorSave` -> `ProgramLibrary` immediately in UI patch.
+- No hidden delayed navigation from unrelated events.
+
+---
+
+## Render Stability Rules (ESP32-P4)
+
+1. Keep frame pacing fixed (target FPS) to avoid jitter bursts.
+2. Avoid submitting partial garbage regions:
+- Submit region only when dirty bounds are valid.
+- Never present frame when there are no dirty updates.
+
+3. If direct framebuffer mode is used:
+- ensure begin/present/cancel is strictly paired.
+- do not fall back to alternate blit path in same runtime mode.
+
+4. Backlight control must be decoupled from frequent UI updates.
+- No repeated brightness writes for unchanged value.
+
+---
+
+## Required Logs
+
+Agents must keep these log families and use them to validate fixes:
+
+- `UI_FLOW`
+- `SCREEN_STATE`
+- `MODEL_UPDATE`
+- `STORAGE_WRITE`
+- `RENDER_PROFILE`
+- `BACKLIGHT`
+
+Minimum examples:
+
+```text
+UI_FLOW: button=start pressed
+UI_FLOW: command queued StartFiring
+UI_FLOW: event FiringStartBlocked reason=thermocouple_missing
+SCREEN_STATE: view=ProgramLibrary
+MODEL_UPDATE: schedules rows=12 changed=true
+MODEL_UPDATE: schedules changed=false skip=true
+STORAGE_WRITE: programs flush begin
+STORAGE_WRITE: programs flush done ok=true
+RENDER_PROFILE: reason=save_program frame_ms=14 dirty=...
+BACKLIGHT: set old=75 new=62 req=60
+```
+
+---
+
+## Definition of Done for Any UI Change
+
+All must be true:
+
+- Root window is never recreated in normal operation.
+- Save/start/stop/settings do not cause screen blink.
+- No full-screen redraw caused by unchanged model reload.
+- Flash writes are debounced and off UI thread.
+- UI remains responsive during storage/network operations.
+- Required logs confirm command -> state -> patch flow.
+
+If any point fails, task is not complete.
+
+---
+
+## Explicit Anti-Patterns (Do Not Implement)
+
+```text
+on_click:
+  show_loading_screen()
+  write_flash_blocking()
+  clear_model()
+  recreate_root()
+  show_main()
+```
+
+Do not fix flicker with arbitrary sleeps.
+Do not hide hardware/sensor errors by forcing start.
+Do not mutate Slint from worker threads.

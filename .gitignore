@@ -23,7 +23,18 @@ firmware/.piolibdeps/
 firmware/.cache/
 
 # ESP-IDF style build dirs
+build_*/
 firmware/build/
+firmware/build_*/
+firmware/build_verify/
+firmware/build_verify_agent.log
+firmware/.component_cache/
+firmware/.idf-tools/
+firmware/.dbg/
+firmware/slint_ui/target_preview/
+.dbg/
+_tmp_*/
+lv_port_pc_vscode/
 
 # OS / tooling noise
 .vercel/
